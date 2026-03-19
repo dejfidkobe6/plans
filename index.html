@@ -1,0 +1,5206 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StavbaBoard Půdorysy</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #111111;
+  --panel: #1a1a1a;
+  --card: #2a2a2a;
+  --border: #333333;
+  --text: #e0e0e0;
+  --text-dim: #888888;
+  --text-bright: #ffffff;
+  --olive: #4A5340;
+  --olive-hover: #6B7A5A;
+  --olive-light: #8A9A7A;
+  --elektro: #F59E0B;
+  --voda: #3B82F6;
+  --vzduchotechnika: #06B6D4;
+  --konstrukce: #EF4444;
+  --interier: #8B5CF6;
+  --koordinace: #10B981;
+  --vlastni: #6B7280;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-main: 'Barlow Condensed', sans-serif;
+}
+#annot-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 9000;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 10px 14px;
+  min-width: 180px;
+  max-width: 280px;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  font-family: 'Barlow Condensed', sans-serif;
+}
+#annot-tooltip .tt-prof {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+#annot-tooltip .tt-popisek {
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+#annot-tooltip .tt-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+#annot-tooltip .tt-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: #2a2a2a;
+  color: #aaa;
+  border: 1px solid #444;
+}
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-main);
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  user-select: none;
+}
+
+/* TOP BAR */
+#top-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  height: 48px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+#logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-right: 1px solid var(--border);
+  min-width: 180px;
+}
+#logo .logo-icon {
+  width: 28px; height: 28px;
+  background: var(--olive);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+#logo .logo-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-bright);
+  line-height: 1.2;
+}
+#logo .logo-sub {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* LEVEL TABS */
+#level-tabs {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#level-tabs::-webkit-scrollbar { display: none; }
+.level-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: color 0.15s, background 0.15s;
+  min-width: 0;
+}
+.level-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.level-tab.active { color: var(--text-bright); }
+.level-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--olive);
+}
+.level-tab .tab-icon { font-size: 12px; opacity: 0.7; }
+.level-tab .tab-name { font-family: var(--font-main); }
+.level-tab .tab-close {
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  margin-left: 2px;
+}
+.level-tab:hover .tab-close { opacity: 1; }
+.level-tab .tab-close:hover { background: rgba(239,68,68,0.3); color: #EF4444; }
+.level-tab input.tab-rename {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--olive);
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  width: 80px;
+  padding: 0;
+}
+#add-level-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 18px;
+  transition: color 0.15s, background 0.15s;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#add-level-btn:hover { background: rgba(255,255,255,0.05); color: var(--olive-light); }
+
+/* TOOLBAR BUTTONS */
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  border-left: 1px solid var(--border);
+}
+.tb-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+}
+.tb-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.tb-btn.active { background: rgba(74,83,64,0.4); color: var(--olive-light); }
+.tb-btn.active:hover { background: rgba(74,83,64,0.6); }
+.tb-btn svg { width: 16px; height: 16px; }
+.tb-separator { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.tb-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 999;
+  border: 1px solid var(--border);
+}
+
+/* MAIN LAYOUT */
+#main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* LEFT SIDEBAR */
+#left-sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s, min-width 0.2s;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+#left-sidebar.collapsed { width: 0; min-width: 0; }
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+#sidebar-header span { text-transform: uppercase; }
+#sidebar-toggle {
+  position: absolute;
+  left: 240px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 40px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 10px;
+  z-index: 10;
+  transition: left 0.2s, color 0.15s;
+}
+#sidebar-toggle:hover { color: var(--text-bright); background: var(--card); }
+#left-sidebar.collapsed ~ #sidebar-toggle { left: 0; }
+
+/* FILTERS */
+#filter-row {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.filter-select {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+.filter-select:focus { border-color: var(--olive); }
+option { background: var(--card); }
+
+/* ANNOTATION LIST */
+#annot-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#annot-list::-webkit-scrollbar { width: 4px; }
+#annot-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.annot-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.annot-item:hover { background: rgba(255,255,255,0.05); }
+.annot-item.selected { background: rgba(74,83,64,0.25); border-color: var(--olive); }
+.annot-item .annot-color-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.annot-item .annot-info { flex: 1; min-width: 0; }
+.annot-item .annot-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.annot-item .annot-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  display: flex; gap: 6px; margin-top: 2px;
+}
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-right: 3px;
+}
+.status-otevreno { background: #F59E0B; }
+.status-vreseni { background: #3B82F6; }
+.status-hotovo { background: #10B981; }
+
+/* PROFESSION BADGES */
+#prof-badges {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.prof-badge {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.prof-badge.dimmed { opacity: 0.35; }
+.prof-badge .badge-count {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* CANVAS AREA */
+#canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+#canvas-wrapper {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
+canvas#fabric-canvas { display: block; }
+#drop-zone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 5;
+  pointer-events: all;
+}
+#drop-zone.hidden { display: none; }
+#drop-zone-inner {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: rgba(26,26,26,0.8);
+  transition: border-color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+#drop-zone-inner:hover, #drop-zone-inner.drag-over {
+  border-color: var(--olive-light);
+  background: rgba(74,83,64,0.15);
+}
+#drop-zone-inner .dz-icon { font-size: 48px; opacity: 0.4; }
+#drop-zone-inner h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+#drop-zone-inner p {
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: center;
+}
+#drop-zone-inner .dz-formats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex; gap: 8px;
+}
+#drop-zone-inner .dz-formats span {
+  padding: 2px 8px;
+  background: var(--card);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.dz-btn {
+  background: var(--olive);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dz-btn:hover { background: var(--olive-hover); }
+
+/* GRID */
+#grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  display: none;
+}
+#grid-overlay.visible { display: block; }
+
+/* RIGHT PANEL */
+#right-panel {
+  width: 240px;
+  min-width: 240px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.2s, min-width 0.2s;
+}
+#right-panel.no-selection {
+  /* still show but with empty state */
+}
+#right-panel-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+#right-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#right-panel-content::-webkit-scrollbar { width: 4px; }
+#right-panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.no-sel-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; height: 100%; padding: 20px;
+  color: var(--text-dim); text-align: center;
+}
+.no-sel-state .ns-icon { font-size: 32px; opacity: 0.3; }
+.no-sel-state p { font-size: 12px; line-height: 1.5; }
+
+/* FORM FIELDS */
+.field-group { margin-bottom: 12px; }
+.field-label {
+  display: block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+.field-input, .field-select, .field-textarea {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field-input:focus, .field-select:focus, .field-textarea:focus {
+  border-color: var(--olive);
+}
+.field-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-size: 12px;
+}
+.field-select { cursor: pointer; }
+option { background: var(--card); color: var(--text); }
+
+/* PRIORITY BUTTONS */
+.priority-btns {
+  display: flex; gap: 4px;
+}
+.prio-btn {
+  flex: 1; padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.prio-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.prio-btn.active-low { background: rgba(16,185,129,0.2); border-color: #10B981; color: #10B981; }
+.prio-btn.active-mid { background: rgba(245,158,11,0.2); border-color: #F59E0B; color: #F59E0B; }
+.prio-btn.active-high { background: rgba(239,68,68,0.2); border-color: #EF4444; color: #EF4444; }
+
+/* STATUS SELECT */
+.status-select-row {
+  display: flex; gap: 4px;
+}
+.status-btn {
+  flex: 1; padding: 5px 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.status-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.status-btn.active-otevreno { background: rgba(245,158,11,0.2); border-color: #F59E0B; color: #F59E0B; }
+.status-btn.active-vreseni { background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #3B82F6; }
+.status-btn.active-hotovo { background: rgba(16,185,129,0.2); border-color: #10B981; color: #10B981; }
+
+/* DELETE BTN */
+#delete-annot-btn {
+  width: 100%;
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #EF4444;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+#delete-annot-btn:hover { background: rgba(239,68,68,0.3); }
+
+/* STATUS BAR */
+#status-bar {
+  height: 26px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.status-item { display: flex; align-items: center; gap: 5px; }
+.status-dot-green { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+#zoom-display { color: var(--olive-light); font-weight: 600; }
+.status-sep { color: var(--border); }
+
+/* 3D MODEL PANEL */
+#model-3d-panel {
+  position: absolute;
+  right: -420px;
+  top: 0; bottom: 0;
+  width: 400px;
+  min-width: 260px;
+  max-width: 88vw;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+#model-3d-panel.open { right: 0; }
+#model-3d-panel.resizing { transition: none; user-select: none; }
+#model-3d-resize-handle {
+  position: absolute;
+  left: -5px; top: 0; bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+#model-3d-resize-handle::after {
+  content: '';
+  display: block;
+  width: 3px; height: 40px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s, height 0.15s;
+}
+#model-3d-resize-handle:hover::after,
+#model-3d-panel.resizing #model-3d-resize-handle::after {
+  background: var(--olive);
+  height: 60px;
+}
+#model-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+  flex-shrink: 0;
+}
+#close-3d-btn, #remove-3d-model-btn {
+  background: none; border: none;
+  color: var(--text-dim); cursor: pointer; font-size: 13px;
+  height: 28px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+#close-3d-btn { font-size: 18px; width: 28px; padding: 0; }
+#close-3d-btn:hover, #remove-3d-model-btn:hover { background: var(--card); color: var(--text-bright); }
+#remove-3d-model-btn:hover { color: #EF4444; }
+#upload-3d-label {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; cursor: pointer; border-radius: 4px;
+  color: var(--text-dim); transition: background 0.15s, color 0.15s;
+}
+#upload-3d-label:hover { background: var(--card); color: var(--text-bright); }
+#model-status-bar {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-dim); padding: 3px 16px;
+  min-height: 0; flex-shrink: 0;
+  border-bottom: 0;
+  transition: all 0.2s;
+}
+#model-status-bar:not(:empty) {
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--border);
+}
+#three-canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#three-canvas-container canvas { display: block; }
+#model-legend {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 6px;
+  flex-shrink: 0;
+}
+.model-legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-dim);
+}
+.model-legend-color {
+  width: 12px; height: 12px; border-radius: 2px;
+}
+
+/* CONTEXT MENU */
+#context-menu {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 9999;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: none;
+}
+#context-menu.visible { display: block; }
+.ctx-item {
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex; align-items: center; gap: 8px;
+  transition: background 0.12s;
+}
+.ctx-item:hover { background: rgba(255,255,255,0.08); }
+.ctx-item.danger { color: #EF4444; }
+.ctx-item.danger:hover { background: rgba(239,68,68,0.15); }
+.ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* MODAL */
+#modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#modal-overlay.visible { display: flex; }
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+}
+.modal-title {
+  font-size: 16px; font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 12px;
+}
+.modal-body { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.6; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s;
+}
+.modal-btn-primary { background: var(--olive); color: white; }
+.modal-btn-primary:hover { background: var(--olive-hover); }
+.modal-btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+.modal-btn-secondary:hover { background: rgba(255,255,255,0.08); }
+
+/* SCROLLBAR GLOBAL */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Profese color classes */
+.prof-elektro { color: var(--elektro); }
+.prof-voda { color: var(--voda); }
+.prof-vzduchotechnika { color: var(--vzduchotechnika); }
+.prof-konstrukce { color: var(--konstrukce); }
+.prof-interier { color: var(--interier); }
+.prof-koordinace { color: var(--koordinace); }
+.prof-vlastni { color: var(--vlastni); }
+.bg-elektro { background: var(--elektro); }
+.bg-voda { background: var(--voda); }
+.bg-vzduchotechnika { background: var(--vzduchotechnika); }
+.bg-konstrukce { background: var(--konstrukce); }
+.bg-interier { background: var(--interier); }
+.bg-koordinace { background: var(--koordinace); }
+.bg-vlastni { background: var(--vlastni); }
+.border-elektro { border-color: var(--elektro); }
+.border-voda { border-color: var(--voda); }
+.border-vzduchotechnika { border-color: var(--vzduchotechnika); }
+.border-konstrukce { border-color: var(--konstrukce); }
+.border-interier { border-color: var(--interier); }
+.border-koordinace { border-color: var(--koordinace); }
+.border-vlastni { border-color: var(--vlastni); }
+
+/* ANNOT ID tag */
+.annot-id-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  background: var(--card);
+  padding: 1px 4px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* File input hidden */
+#file-input { display: none; }
+#import-json-input { display: none; }
+
+/* Canvas crosshair for drawing tools */
+.canvas-crosshair { cursor: crosshair !important; }
+.canvas-grab { cursor: grab !important; }
+.canvas-grabbing { cursor: grabbing !important; }
+
+/* Tooltip */
+[data-tip] { position: relative; }
+[data-tip]:hover::before {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  border: 1px solid var(--border);
+}
+
+/* Level type color lines */
+.tab-type-np1::after { background: #3B82F6 !important; }
+.tab-type-np2::after { background: #10B981 !important; }
+.tab-type-suteren::after { background: #F59E0B !important; }
+.tab-type-strecha::after { background: #EF4444 !important; }
+.tab-type-custom::after { background: var(--text-dim) !important; }
+
+/* HOME / SUBDODAVATELE BUTTON */
+#subddodavatele-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  border: none;
+  background: rgba(74,83,64,0.25);
+  color: var(--olive-light);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#subddodavatele-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
+#subddodavatele-btn.active { background: rgba(74,83,64,0.6); color: var(--text-bright); }
+#subddodavatele-btn svg { width: 16px; height: 16px; }
+
+/* HOME PAGE OVERLAY */
+#home-page {
+  position: fixed;
+  top: 48px;
+  left: 0; right: 0;
+  bottom: 26px;
+  background: var(--bg);
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#home-page.visible { display: flex; }
+
+/* ---- tasks strip ---- */
+#home-tasks-strip {
+  flex-shrink: 0;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  max-height: 52vh;
+  min-height: 180px;
+}
+#home-tasks-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 20px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+#home-tasks-title {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--text-bright); text-transform: uppercase; letter-spacing:.05em;
+  white-space: nowrap; margin-right: 4px;
+}
+.htfilter-input, .htfilter-select, .htfilter-date {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 12px;
+  padding: 4px 8px; border-radius: 4px; outline: none;
+}
+.htfilter-input { width: 170px; }
+.htfilter-input:focus, .htfilter-select:focus, .htfilter-date:focus { border-color: var(--olive); }
+.htfilter-date { font-family: var(--font-mono); font-size: 11px; color-scheme: dark; width: 130px; }
+.htfilter-sep { color: var(--text-dim); font-size: 11px; }
+#ht-reset-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 11px; font-family: var(--font-main);
+  padding: 4px 8px; border-radius: 4px; cursor: pointer; transition: all .15s;
+}
+#ht-reset-btn:hover { border-color: #EF4444; color: #EF4444; }
+#ht-stats { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.ht-stat {
+  font-family: var(--font-mono); font-size: 10px; white-space: nowrap;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1px 8px; color: var(--text-dim);
+}
+.ht-stat b { color: var(--text-bright); }
+#home-tasks-list {
+  flex: 1; overflow-x: auto; overflow-y: auto;
+  padding: 8px 12px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-content: flex-start;
+}
+.ht-card {
+  flex-shrink: 0;
+  width: 220px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ht-card:hover { background: var(--card); }
+.ht-card-top { display: flex; align-items: center; gap: 6px; }
+.ht-card-prof { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing:.04em; }
+.ht-card-id { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); margin-left: auto; }
+.ht-card-desc { font-size: 12px; color: var(--text-bright); line-height: 1.3; max-height: 36px; overflow: hidden; }
+.ht-card-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+.ht-card-level { font-size: 10px; background: var(--card); border-radius: 3px; padding: 1px 5px; color: var(--text-dim); }
+.ht-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ht-card-deadline { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-left: auto; }
+.ht-card-deadline.overdue { color: #EF4444; font-weight: 600; }
+.ht-card-deadline.due-soon { color: #F59E0B; }
+.ht-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 13px; }
+
+/* ---- strip resize handle ---- */
+#home-tasks-resizer {
+  flex-shrink: 0; height: 6px; cursor: ns-resize;
+  background: var(--border); position: relative;
+}
+#home-tasks-resizer::after {
+  content: ''; position: absolute;
+  left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 40px; height: 3px; border-radius: 2px;
+  background: var(--text-dim); opacity: .4;
+  transition: opacity .15s;
+}
+#home-tasks-resizer:hover::after { opacity: 1; }
+
+/* ---- subdodavatele section ---- */
+#home-subdod-section {
+  flex: 1; overflow-y: auto;
+  padding: 18px 24px;
+}
+#home-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+#home-page-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+}
+#home-search {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  outline: none;
+  width: 240px;
+  transition: border-color 0.15s;
+}
+#home-search:focus { border-color: var(--olive); }
+#prof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) { #prof-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { #prof-grid { grid-template-columns: 1fr; } }
+.prof-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s, transform 0.1s;
+  cursor: default;
+}
+.prof-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+.prof-card-header {
+  height: 6px;
+}
+.prof-card-body {
+  padding: 16px;
+}
+.prof-card-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  margin-bottom: 6px;
+}
+.prof-card-firma {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 12px;
+  min-height: 18px;
+}
+.prof-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+.prof-card-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.prof-card-row svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.6; }
+.prof-card-row a { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+.prof-card-row a:hover { color: var(--text-bright); text-decoration: underline; }
+.prof-card-row .placeholder { color: var(--border); font-style: italic; }
+.prof-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.prof-annot-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.prof-card-edit-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.prof-card-edit-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-bright); }
+.prof-card-add {
+  background: var(--panel);
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 160px;
+  color: var(--text-dim);
+}
+.prof-card-add:hover { border-color: var(--olive-light); background: rgba(74,83,64,0.1); color: var(--olive-light); }
+.prof-card-add .add-icon { font-size: 28px; opacity: 0.5; }
+.prof-card-add span { font-size: 14px; font-weight: 600; font-family: var(--font-main); }
+
+/* MANAGE PROFESE PANEL */
+#manage-profese-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 10001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#manage-profese-overlay.visible { display: flex; }
+#manage-profese-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 600px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+#manage-profese-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+#manage-profese-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+}
+#close-manage-profese-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+#close-manage-profese-btn:hover { background: var(--card); color: var(--text-bright); }
+#profese-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.profese-row {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.profese-row-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+}
+.profese-row-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.profese-row-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-family: var(--font-main);
+}
+.profese-row-firma {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-main);
+}
+.profese-row-actions {
+  display: flex;
+  gap: 4px;
+}
+.profese-action-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.profese-action-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.profese-action-btn.danger:hover { background: rgba(239,68,68,0.15); color: #EF4444; border-color: rgba(239,68,68,0.4); }
+.profese-edit-form {
+  padding: 12px 14px;
+  background: rgba(0,0,0,0.2);
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.profese-edit-form.open { display: block; }
+.profese-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.profese-form-field { display: flex; flex-direction: column; gap: 4px; }
+.profese-form-field label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.profese-form-field input[type="text"],
+.profese-form-field input[type="email"],
+.profese-form-field input[type="tel"] {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.profese-form-field input:focus { border-color: var(--olive); }
+.profese-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profese-color-row input[type="color"] {
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  cursor: pointer;
+}
+.profese-form-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.profese-save-btn {
+  background: var(--olive);
+  border: none;
+  color: white;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.profese-save-btn:hover { background: var(--olive-hover); }
+.profese-cancel-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.profese-cancel-btn:hover { background: rgba(255,255,255,0.08); }
+#manage-profese-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+#add-profese-btn {
+  width: 100%;
+  background: rgba(74,83,64,0.3);
+  border: 1px dashed var(--olive);
+  color: var(--olive-light);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+#add-profese-btn:hover { background: rgba(74,83,64,0.5); }
+
+/* ALL TASKS PAGE */
+#tasks-page {
+  display: none;
+  position: fixed; inset: 0; z-index: 3000;
+  background: var(--bg);
+  flex-direction: column;
+  overflow: hidden;
+}
+#tasks-page.visible { display: flex; }
+#tasks-page-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px;
+  height: 52px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+#tasks-page-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 14px;
+  font-weight: 700; color: var(--text-bright);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  white-space: nowrap;
+}
+#tasks-stats-row {
+  display: flex; gap: 10px; align-items: center; flex: 1;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-dim);
+}
+.tstat-pill {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 2px 10px;
+  font-size: 11px; white-space: nowrap;
+}
+.tstat-pill .tstat-num {
+  font-weight: 700; font-size: 13px;
+  color: var(--text-bright);
+}
+#close-tasks-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 22px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; transition: background 0.15s, color 0.15s;
+  margin-left: auto; flex-shrink: 0;
+}
+#close-tasks-btn:hover { background: var(--card); color: var(--text-bright); }
+#tasks-filters-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.tfilter-group { display: flex; align-items: center; gap: 4px; }
+.tfilter-input {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 13px;
+  padding: 5px 10px; border-radius: 5px; outline: none; width: 220px;
+  transition: border-color 0.15s;
+}
+.tfilter-input:focus { border-color: var(--olive); }
+.tfilter-select {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 12px;
+  padding: 5px 8px; border-radius: 5px; outline: none; cursor: pointer;
+}
+.tfilter-date-group { display: flex; align-items: center; gap: 5px; }
+.tfilter-date {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  padding: 5px 7px; border-radius: 5px; outline: none;
+  color-scheme: dark;
+}
+.tfilter-date-sep { color: var(--text-dim); font-size: 12px; }
+.tfilter-reset {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--font-main); font-size: 12px;
+  padding: 5px 10px; border-radius: 5px; cursor: pointer;
+  transition: all 0.15s;
+}
+.tfilter-reset:hover { border-color: #EF4444; color: #EF4444; }
+.tfilter-export {
+  background: rgba(74,83,64,0.2); border: 1px solid var(--olive);
+  color: var(--olive-light); font-family: var(--font-main); font-size: 12px;
+  padding: 5px 12px; border-radius: 5px; cursor: pointer;
+  transition: background 0.15s;
+}
+.tfilter-export:hover { background: rgba(74,83,64,0.45); }
+#tasks-table-wrap {
+  flex: 1; overflow: auto; padding: 0 20px 20px;
+}
+#tasks-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-main); font-size: 13px;
+  margin-top: 12px;
+}
+#tasks-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel);
+  border-bottom: 2px solid var(--border);
+  padding: 8px 10px; text-align: left;
+  font-family: var(--font-mono); font-size: 10px;
+  font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  white-space: nowrap; user-select: none;
+}
+#tasks-table thead th.th-sort { cursor: pointer; }
+#tasks-table thead th.th-sort:hover { color: var(--text-bright); }
+#tasks-table thead th.th-wide { min-width: 200px; }
+.sort-arrow { display: inline-block; margin-left: 3px; opacity: 0.4; font-size: 9px; }
+th.sort-asc .sort-arrow::after { content: '▲'; opacity: 1; }
+th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
+#tasks-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.1s;
+}
+#tasks-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+#tasks-table td {
+  padding: 8px 10px; vertical-align: middle;
+  color: var(--text); max-width: 320px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tcell-id {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-dim); white-space: nowrap;
+}
+.tcell-prof {
+  display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tcell-prof-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tcell-popisek { color: var(--text-bright); }
+.tcell-level {
+  font-size: 11px; color: var(--text-dim);
+  background: var(--card); border-radius: 3px;
+  padding: 1px 6px; white-space: nowrap; display: inline-block;
+}
+.tcell-prio {
+  font-size: 11px; padding: 1px 8px; border-radius: 10px;
+  white-space: nowrap; font-weight: 500;
+}
+.tcell-prio-low  { background: rgba(16,185,129,0.12); color: #10B981; }
+.tcell-prio-mid  { background: rgba(245,158,11,0.12); color: #F59E0B; }
+.tcell-prio-high { background: rgba(239,68,68,0.15); color: #EF4444; }
+.tcell-status select {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 12px;
+  padding: 2px 6px; border-radius: 4px; cursor: pointer; outline: none;
+}
+.tcell-prirazeno { font-size: 12px; color: var(--text-dim); }
+.tcell-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.tcell-actions { white-space: nowrap; }
+.trow-goto-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--font-main); font-size: 11px;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.trow-goto-btn:hover { border-color: var(--olive); color: var(--olive-light); background: rgba(74,83,64,0.2); }
+#tasks-empty {
+  display: none; text-align: center; padding: 60px 20px;
+  color: var(--text-dim); font-size: 14px;
+}
+
+/* ZONES MANAGER */
+#zones-manager {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: 280px;
+  flex-shrink: 0;
+}
+.zmgr-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
+.zmgr-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 2px;
+  border-radius: 4px;
+}
+.zmgr-row:hover { background: rgba(255,255,255,0.04); }
+.zmgr-swatch-wrap {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.zmgr-swatch {
+  width: 14px; height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.zmgr-swatch-wrap input[type=color] {
+  position: absolute; opacity: 0;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+  cursor: pointer; border: none; padding: 0;
+}
+.zmgr-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zmgr-name-input {
+  flex: 1; background: transparent; border: 1px solid transparent;
+  color: var(--text); font-family: var(--font-main); font-size: 12px;
+  padding: 1px 4px; border-radius: 3px; outline: none;
+  min-width: 0; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.zmgr-name-input:hover { border-color: var(--border); background: var(--bg); cursor: text; }
+.zmgr-name-input:focus { border-color: var(--olive); background: var(--bg); cursor: text; }
+.zmgr-active .zmgr-name-input { color: var(--text-bright); font-weight: 600; }
+.zmgr-active { background: rgba(74,83,64,0.12); border-radius: 4px; }
+.zmgr-hint { font-weight: 400; text-transform: none; color: var(--text-dim); opacity: 0.6; font-size: 9px; letter-spacing: 0; margin-left: 6px; }
+.zmgr-arrows { display: flex; gap: 1px; flex-shrink: 0; }
+.zmgr-arr {
+  background: none; border: none; color: var(--text-dim);
+  cursor: pointer; font-size: 12px; padding: 0 3px;
+  border-radius: 3px; line-height: 1;
+}
+.zmgr-arr:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text-bright); }
+.zmgr-arr:disabled { opacity: 0.25; cursor: default; }
+.zmgr-shape {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 10px; padding: 2px 4px;
+  border-radius: 3px; cursor: pointer; outline: none; max-width: 90px;
+}
+.zmgr-eye, .zmgr-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 12px; padding: 1px 4px;
+  border-radius: 3px; line-height: 1;
+}
+.zmgr-eye:hover { color: var(--text); }
+.zmgr-del:hover { background: rgba(239,68,68,0.2); color: #EF4444; }
+#add-zone-btn {
+  width: 100%; margin-top: 7px; padding: 5px;
+  background: rgba(74,83,64,0.25);
+  border: 1px dashed var(--olive);
+  color: var(--olive-light); border-radius: 4px;
+  cursor: pointer; font-size: 11px;
+  font-family: var(--font-main);
+  transition: background 0.15s;
+}
+#add-zone-btn:hover { background: rgba(74,83,64,0.5); }
+.zmgr-add-form {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px; margin-top: 5px;
+}
+.zmgr-input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 13px;
+  padding: 5px 8px; border-radius: 4px; outline: none; margin-bottom: 5px;
+}
+.zmgr-input:focus { border-color: var(--olive); }
+.zmgr-save-btn {
+  flex: 1; padding: 5px 10px; background: var(--olive);
+  border: none; color: white; border-radius: 4px;
+  cursor: pointer; font-family: var(--font-main); font-size: 12px;
+}
+.zmgr-save-btn:hover { background: var(--olive-hover); }
+.zmgr-cancel-btn {
+  flex: 1; padding: 5px 10px; background: var(--card);
+  border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 4px; cursor: pointer;
+  font-family: var(--font-main); font-size: 12px;
+}
+.zmgr-cancel-btn:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<!-- FILE INPUTS -->
+<input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
+<input type="file" id="import-json-input" accept=".json">
+
+<!-- TOP BAR -->
+<div id="top-bar">
+  <div id="logo">
+    <div class="logo-icon">SB</div>
+    <div>
+      <div class="logo-text">StavbaBoard</div>
+      <div class="logo-sub">Půdorysy v1.0</div>
+    </div>
+  </div>
+  <div id="level-tabs"></div>
+  <div id="add-level-btn" title="Přidat podlaží">+</div>
+  <button id="subddodavatele-btn" title="Subdodavatelé projektu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Subdodavatelé
+  </button>
+  <div id="toolbar-right">
+    <!-- Tool buttons -->
+    <button class="tb-btn tool-btn active" id="tool-select" data-tool="select" title="Výběr (V)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 2-4 7L5 3z"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-pan" data-tool="pan" title="Posun (H)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0m0 0v2M10 10V5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0v9l-1-1a2 2 0 0 0-3 0v0l5 6a4 4 0 0 0 3 1h3a4 4 0 0 0 4-4v-5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v1"/></svg>
+    </button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn tool-btn" id="tool-freehand" data-tool="freehand" title="Volná čára (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c3-3 6-3 9-1s6 2 9-1"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-rect" data-tool="rect" title="Obdélník (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-circle" data-tool="circle" title="Kruh (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-arrow" data-tool="arrow" title="Šipka (A)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-pin" data-tool="pin" title="Špendlík (P)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
+    </button>
+    <button class="tb-btn tool-btn" id="tool-text" data-tool="text" title="Text (T)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+    </button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn" id="zoom-in-btn" title="Přiblížit (+)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    </button>
+    <button class="tb-btn" id="zoom-out-btn" title="Oddálit (-)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    </button>
+    <button class="tb-btn" id="fit-btn" title="Zobrazit celý výkres (0)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    </button>
+    <button class="tb-btn" id="grid-btn" title="Mřížka (G)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+    </button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn" id="undo-btn" title="Zpět (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+    </button>
+    <button class="tb-btn" id="redo-btn" title="Znovu (Ctrl+Y)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+    </button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn" id="export-json-btn" title="Export JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <button class="tb-btn" id="import-json-btn" title="Import JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </button>
+    <button class="tb-btn" id="model-3d-btn" title="3D Model">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn" id="manage-profese-btn" title="Spravovat profese">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </button>
+    <button class="tb-btn" id="all-tasks-btn" title="Všechny úkoly dodavatelů">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div id="main-layout">
+  <!-- LEFT SIDEBAR -->
+  <div id="left-sidebar">
+    <div id="sidebar-header">
+      <span>Anotace</span>
+      <span id="annot-total-count" style="color: var(--text-bright); font-size: 12px;">0</span>
+    </div>
+    <div id="filter-row">
+      <select id="filter-profese" class="filter-select">
+        <option value="">Všechny profese</option>
+        <option value="Elektro">Elektro</option>
+        <option value="Voda">Voda</option>
+        <option value="Vzduchotechnika">VZT</option>
+        <option value="Konstrukce">Konstrukce</option>
+        <option value="Interiér">Interiér</option>
+        <option value="Koordinace">Koordinace</option>
+        <option value="Vlastní">Vlastní</option>
+      </select>
+      <select id="filter-status" class="filter-select">
+        <option value="">Všechny stavy</option>
+        <option value="Otevřeno">Otevřeno</option>
+        <option value="V řešení">V řešení</option>
+        <option value="Hotovo">Hotovo</option>
+      </select>
+    </div>
+    <div id="annot-list"></div>
+    <div id="prof-badges"></div>
+  </div>
+  <div id="sidebar-toggle">‹</div>
+
+  <!-- CANVAS AREA -->
+  <div id="canvas-area">
+    <div id="canvas-wrapper">
+      <canvas id="fabric-canvas"></canvas>
+    </div>
+    <canvas id="grid-overlay"></canvas>
+    <div id="drop-zone">
+      <div id="drop-zone-inner">
+        <div class="dz-icon">📐</div>
+        <h2>Otevřít výkres</h2>
+        <p>Přetáhněte soubor sem nebo klikněte pro výběr</p>
+        <div class="dz-formats">
+          <span>PDF</span><span>JPG</span><span>PNG</span>
+        </div>
+        <button class="dz-btn" id="dz-pick-btn">Vybrat soubor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div id="right-panel-header">Vlastnosti</div>
+    <div id="right-panel-content">
+      <div class="no-sel-state" id="no-sel-state">
+        <div class="ns-icon">✏️</div>
+        <p>Vyberte anotaci pro zobrazení vlastností nebo použijte nástroj pro kreslení nové.</p>
+      </div>
+      <div id="prop-form" style="display:none;">
+        <div class="field-group">
+          <label class="field-label">Profese</label>
+          <select class="field-select" id="prop-profese">
+            <option>Elektro</option>
+            <option>Voda</option>
+            <option>Vzduchotechnika</option>
+            <option>Konstrukce</option>
+            <option>Interiér</option>
+            <option>Koordinace</option>
+            <option>Vlastní</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Popisek</label>
+          <textarea class="field-textarea" id="prop-popisek" placeholder="Popis anotace..."></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Priorita</label>
+          <div class="priority-btns">
+            <button class="prio-btn" data-prio="Nízká">Nízká</button>
+            <button class="prio-btn" data-prio="Střední">Střední</button>
+            <button class="prio-btn" data-prio="Vysoká">Vysoká</button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Přiřazeno</label>
+          <input type="text" class="field-input" id="prop-prirazeno" placeholder="Jméno / tým...">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Status</label>
+          <div class="status-select-row">
+            <button class="status-btn" data-status="Otevřeno">Otevřeno</button>
+            <button class="status-btn" data-status="V řešení">V řešení</button>
+            <button class="status-btn" data-status="Hotovo">Hotovo</button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Termín splnění</label>
+          <input type="date" class="field-input" id="prop-deadline" style="color-scheme:dark;" title="Termín splnění">
+        </div>
+        <div class="field-group">
+          <label class="field-label">ID anotace</label>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 4px 0;" id="prop-annot-id">-</div>
+        </div>
+        <button id="delete-annot-btn">🗑 Smazat anotaci</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D MODEL PANEL -->
+  <div id="model-3d-panel">
+    <div id="model-3d-resize-handle" title="Táhněte pro změnu šířky"></div>
+    <div id="model-panel-header">
+      <span>3D Model budovy</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <label id="upload-3d-label" title="Nahrát 3D model (GLB/GLTF/OBJ)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <input type="file" id="upload-3d-input" accept=".glb,.gltf,.obj,.ifc,.dxf,.dwg" style="display:none;">
+        </label>
+        <button id="remove-3d-model-btn" title="Odebrat nahraný model" style="display:none">×3D</button>
+        <button id="close-3d-btn" title="Zavřít">×</button>
+      </div>
+    </div>
+    <div id="model-status-bar"></div>
+    <div id="three-canvas-container"></div>
+    <div id="model-legend"></div>
+    <div id="zones-manager"></div>
+  </div>
+</div>
+
+<!-- HOME PAGE (SUBDODAVATELE) -->
+<div id="home-page">
+
+  <!-- TASKS STRIP -->
+  <div id="home-tasks-strip">
+    <div id="home-tasks-header">
+      <span id="home-tasks-title">Úkoly</span>
+      <input type="text" id="ht-search" class="htfilter-input" placeholder="Hledat popis / ID...">
+      <select id="ht-subdod" class="htfilter-select">
+        <option value="">Všichni dodavatelé</option>
+      </select>
+      <select id="ht-profese" class="htfilter-select">
+        <option value="">Všechny profese</option>
+      </select>
+      <select id="ht-level" class="htfilter-select">
+        <option value="">Všechna podlaží</option>
+      </select>
+      <select id="ht-status" class="htfilter-select">
+        <option value="">Všechny stavy</option>
+        <option value="Otevřeno">Otevřeno</option>
+        <option value="V řešení">V řešení</option>
+        <option value="Hotovo">Hotovo</option>
+      </select>
+      <select id="ht-prio" class="htfilter-select">
+        <option value="">Všechny priority</option>
+        <option value="Vysoká">Vysoká</option>
+        <option value="Střední">Střední</option>
+        <option value="Nízká">Nízká</option>
+      </select>
+      <span class="htfilter-sep">Termín:</span>
+      <input type="date" id="ht-deadline-from" class="htfilter-date" title="Termín od" style="width:116px;">
+      <span class="htfilter-sep">–</span>
+      <input type="date" id="ht-deadline-to" class="htfilter-date" title="Termín do" style="width:116px;">
+      <button id="ht-reset-btn">✕</button>
+      <div id="ht-stats"></div>
+    </div>
+    <div id="home-tasks-list"></div>
+  </div>
+
+  <!-- STRIP RESIZE HANDLE -->
+  <div id="home-tasks-resizer"></div>
+
+  <!-- SUBDODAVATELE -->
+  <div id="home-subdod-section">
+    <div id="home-page-header">
+      <h1>Subdodavatelé projektu</h1>
+      <input type="text" id="home-search" placeholder="Hledat profesi nebo firmu...">
+    </div>
+    <div id="prof-grid"></div>
+  </div>
+
+</div>
+
+<!-- ALL TASKS PAGE -->
+<div id="tasks-page">
+  <div id="tasks-page-header">
+    <div id="tasks-page-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Všechny úkoly
+    </div>
+    <div id="tasks-stats-row"></div>
+    <button id="close-tasks-btn" title="Zavřít">×</button>
+  </div>
+  <div id="tasks-filters-bar">
+    <div class="tfilter-group">
+      <input type="text" id="tfilter-search" class="tfilter-input" placeholder="🔍 Hledat popis, ID, přiřazeného...">
+    </div>
+    <div class="tfilter-group">
+      <select id="tfilter-level" class="tfilter-select">
+        <option value="">Všechna podlaží</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="tfilter-profese" class="tfilter-select">
+        <option value="">Všechny profese</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="tfilter-status" class="tfilter-select">
+        <option value="">Všechny stavy</option>
+        <option value="Otevřeno">Otevřeno</option>
+        <option value="V řešení">V řešení</option>
+        <option value="Hotovo">Hotovo</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="tfilter-prio" class="tfilter-select">
+        <option value="">Všechny priority</option>
+        <option value="Vysoká">Vysoká</option>
+        <option value="Střední">Střední</option>
+        <option value="Nízká">Nízká</option>
+      </select>
+    </div>
+    <div class="tfilter-group tfilter-date-group">
+      <input type="date" id="tfilter-date-from" class="tfilter-date" title="Vytvořeno od">
+      <span class="tfilter-date-sep">–</span>
+      <input type="date" id="tfilter-date-to" class="tfilter-date" title="Vytvořeno do">
+    </div>
+    <button id="tfilter-reset-btn" class="tfilter-reset" title="Resetovat filtry">✕ Reset</button>
+    <button id="tasks-export-csv-btn" class="tfilter-export" title="Exportovat do CSV">↓ CSV</button>
+  </div>
+  <div id="tasks-table-wrap">
+    <table id="tasks-table">
+      <thead>
+        <tr>
+          <th class="th-sort" data-sort="annotId">ID <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="profese">Profese <span class="sort-arrow"></span></th>
+          <th class="th-sort th-wide" data-sort="popisek">Popis <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="levelName">Podlaží <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="priorita">Priorita <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="status">Status <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="prirazeno">Přiřazeno <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="createdAt">Vytvořeno <span class="sort-arrow"></span></th>
+          <th>Akce</th>
+        </tr>
+      </thead>
+      <tbody id="tasks-tbody"></tbody>
+    </table>
+    <div id="tasks-empty">Žádné úkoly neodpovídají filtrům.</div>
+  </div>
+</div>
+
+<!-- MANAGE PROFESE MODAL -->
+<div id="manage-profese-overlay">
+  <div id="manage-profese-panel">
+    <div id="manage-profese-header">
+      <h2>Správa profesí a subdodavatelů</h2>
+      <button id="close-manage-profese-btn" title="Zavřít">×</button>
+    </div>
+    <div id="profese-list-container"></div>
+    <div id="manage-profese-footer">
+      <button id="add-profese-btn">+ Přidat profesi</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div class="status-item">
+    <div class="status-dot-green"></div>
+    <span>Připraven</span>
+  </div>
+  <div class="status-sep">|</div>
+  <div class="status-item">
+    <span>Zoom:</span>
+    <span id="zoom-display">100%</span>
+  </div>
+  <div class="status-sep">|</div>
+  <div class="status-item" id="cursor-pos">X: 0 Y: 0</div>
+  <div class="status-sep">|</div>
+  <div class="status-item" id="status-level-info">Podlaží: -</div>
+  <div class="status-sep">|</div>
+  <div class="status-item" id="status-tool-info">Nástroj: Výběr</div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="context-menu">
+  <div class="ctx-item" id="ctx-select">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 2-4 7L5 3z"/></svg>
+    Vybrat
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctx-copy">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Kopírovat
+  </div>
+  <div class="ctx-item" id="ctx-paste">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+    Vložit
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-delete">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    Smazat
+  </div>
+</div>
+
+<!-- ANNOTATION TOOLTIP -->
+<div id="annot-tooltip">
+  <div class="tt-prof"></div>
+  <div class="tt-popisek"></div>
+  <div class="tt-badges"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">Potvrdit akci</div>
+    <div class="modal-body" id="modal-body">Opravdu chcete provést tuto akci?</div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-secondary" id="modal-cancel">Zrušit</button>
+      <button class="modal-btn modal-btn-primary" id="modal-confirm">Potvrdit</button>
+    </div>
+  </div>
+</div>
+<script>
+// ============================================================
+// CONFIGURATION & STATE
+// ============================================================
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PROFESE_COLORS = {
+  'Elektro': '#F59E0B',
+  'Voda': '#3B82F6',
+  'Vzduchotechnika': '#06B6D4',
+  'Konstrukce': '#EF4444',
+  'Interiér': '#8B5CF6',
+  'Koordinace': '#10B981',
+  'Vlastní': '#6B7280'
+};
+
+const DEFAULT_PROFESE = [
+  { name: 'Elektro', color: '#F59E0B', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Voda', color: '#3B82F6', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Vzduchotechnika', color: '#06B6D4', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Konstrukce', color: '#EF4444', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Interiér', color: '#8B5CF6', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Koordinace', color: '#10B981', firma: '', kontakt: '', telefon: '', email: '' },
+  { name: 'Vlastní', color: '#6B7280', firma: '', kontakt: '', telefon: '', email: '' }
+];
+
+function getProfColor(name) {
+  if (!appState.profese) return '#6B7280';
+  const p = appState.profese.find(x => x.name === name);
+  return p ? p.color : '#6B7280';
+}
+
+const LEVEL_TYPES = {
+  '1.NP': { icon: '→', color: '#3B82F6', cssClass: 'tab-type-np1' },
+  '2.NP': { icon: '↑', color: '#10B981', cssClass: 'tab-type-np2' },
+  '3.NP': { icon: '↑', color: '#10B981', cssClass: 'tab-type-np2' },
+  'Suterén': { icon: '↓', color: '#F59E0B', cssClass: 'tab-type-suteren' },
+  'Střecha': { icon: '▲', color: '#EF4444', cssClass: 'tab-type-strecha' }
+};
+
+const TOOL_NAMES = {
+  select: 'Výběr', pan: 'Posun', freehand: 'Volná čára',
+  rect: 'Obdélník', circle: 'Kruh', arrow: 'Šipka',
+  pin: 'Špendlík', text: 'Text'
+};
+
+window.appState = {
+  levels: [],
+  activeLevel: 0,
+  tool: 'select',
+  showGrid: false,
+  clipboard: null,
+  profese: JSON.parse(JSON.stringify(DEFAULT_PROFESE)),
+  zones3D: []
+};
+
+let fabricCanvas = null;
+let undoStack = [];
+let redoStack = [];
+let annotIdCounter = 1;
+let isDrawing = false;
+let drawStartX = 0, drawStartY = 0;
+let activeObject = null;
+let tempShape = null;
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+let lastViewportX = 0, lastViewportY = 0;
+let spacePressed = false;
+let threeRenderer = null, threeScene = null, threeCamera = null, threeControls = null;
+let threeImportedModel = null;
+let threeHighlightMesh = null;
+let threeRaycaster = new THREE.Raycaster();
+let animFrameId = null;
+let filterProfese = '', filterStatus = '';
+let contextMenuTarget = null;
+let pendingModalResolve = null;
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  const canvasEl = document.getElementById('fabric-canvas');
+  const area = document.getElementById('canvas-area');
+  canvasEl.width = area.clientWidth;
+  canvasEl.height = area.clientHeight;
+
+  fabricCanvas = new fabric.Canvas('fabric-canvas', {
+    selection: true,
+    backgroundColor: '#181818',
+    preserveObjectStacking: true,
+    stopContextMenu: true,
+    fireRightClick: true
+  });
+
+  setupEventListeners();
+  loadState();
+
+  if (appState.levels.length === 0) {
+    addLevel('1.NP', '1.NP');
+  } else {
+    renderLevelTabs();
+    switchLevel(appState.activeLevel);
+  }
+
+  drawGrid();
+  updateStatusBar();
+  setup3DUpload();
+  setup3DPanelResize();
+  setupTasksPage();
+  setupHomeTasksStrip();
+  requestAnimationFrame(autoSaveLoop);
+}
+
+// ============================================================
+// LEVELS
+// ============================================================
+function addLevel(name, type) {
+  const id = 'lvl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const level = {
+    id,
+    name: name || 'Podlaží ' + (appState.levels.length + 1),
+    type: type || '1.NP',
+    annotations: [],
+    backgroundImage: null,
+    fabricJSON: null,
+    viewportTransform: null
+  };
+  appState.levels.push(level);
+  appState.activeLevel = appState.levels.length - 1;
+  renderLevelTabs();
+  switchLevel(appState.activeLevel);
+  saveState();
+  return level;
+}
+
+function removeLevel(idx) {
+  if (appState.levels.length <= 1) {
+    showToast('Nelze smazat poslední podlaží', 'warn');
+    return;
+  }
+  appState.levels.splice(idx, 1);
+  if (appState.activeLevel >= appState.levels.length) {
+    appState.activeLevel = appState.levels.length - 1;
+  }
+  renderLevelTabs();
+  switchLevel(appState.activeLevel);
+  saveState();
+}
+
+function switchLevel(idx) {
+  // Save current canvas state
+  if (fabricCanvas && appState.levels[appState.activeLevel]) {
+    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+    appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
+  }
+
+  appState.activeLevel = idx;
+  const level = appState.levels[idx];
+  if (!level) return;
+
+  fabricCanvas.clear();
+  fabricCanvas.backgroundColor = '#181818';
+
+  if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
+    fabricCanvas.loadFromJSON(level.fabricJSON, () => {
+      if (level.viewportTransform) {
+        fabricCanvas.setViewportTransform(level.viewportTransform);
+      }
+      rebuildAllLabels();
+      fabricCanvas.renderAll();
+      updateAnnotList();
+    });
+  } else if (level.backgroundImage) {
+    loadBackgroundImage(level.backgroundImage, false);
+  } else {
+    if (level.viewportTransform) {
+      fabricCanvas.setViewportTransform(level.viewportTransform);
+    }
+    fabricCanvas.renderAll();
+  }
+
+  renderLevelTabs();
+  updateAnnotList();
+  updateStatusBar();
+  showDropZone(!level.backgroundImage && (!level.fabricJSON || !level.fabricJSON.objects || level.fabricJSON.objects.length === 0));
+  undoStack = [];
+  redoStack = [];
+
+  // Sync 3D panel if open
+  if (document.getElementById('model-3d-panel').classList.contains('open')) {
+    highlight3DFloor(idx);
+    renderZonesManager();
+  }
+}
+
+function getLevelTypeInfo(levelName) {
+  for (const [key, val] of Object.entries(LEVEL_TYPES)) {
+    if (levelName.includes(key)) return val;
+  }
+  return { icon: '→', color: '#6B7280', cssClass: 'tab-type-custom' };
+}
+
+function renderLevelTabs() {
+  const container = document.getElementById('level-tabs');
+  container.innerHTML = '';
+  appState.levels.forEach((level, idx) => {
+    const typeInfo = getLevelTypeInfo(level.name);
+    const tab = document.createElement('div');
+    tab.className = 'level-tab ' + typeInfo.cssClass + (idx === appState.activeLevel ? ' active' : '');
+    tab.dataset.idx = idx;
+    tab.innerHTML = `
+      <span class="tab-icon">${typeInfo.icon}</span>
+      <span class="tab-name">${escHtml(level.name)}</span>
+      <span class="tab-close" data-idx="${idx}" title="Zavřít podlaží">×</span>
+    `;
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) {
+        e.stopPropagation();
+        removeLevel(parseInt(e.target.dataset.idx));
+        return;
+      }
+      switchLevel(idx);
+    });
+    tab.addEventListener('dblclick', (e) => {
+      if (e.target.classList.contains('tab-close')) return;
+      startRenameTab(tab, idx);
+    });
+    container.appendChild(tab);
+  });
+}
+
+function startRenameTab(tabEl, idx) {
+  const nameSpan = tabEl.querySelector('.tab-name');
+  const currentName = appState.levels[idx].name;
+  const input = document.createElement('input');
+  input.className = 'tab-rename';
+  input.value = currentName;
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+  const finish = () => {
+    const newName = input.value.trim() || currentName;
+    appState.levels[idx].name = newName;
+    renderLevelTabs();
+    buildFloors();
+    updateModelLegend();
+    if (document.getElementById('model-3d-panel').classList.contains('open')) renderZonesManager();
+    saveState();
+  };
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentName; input.blur(); }
+  });
+}
+
+// ============================================================
+// FILE UPLOAD
+// ============================================================
+function showDropZone(show) {
+  const dz = document.getElementById('drop-zone');
+  if (show) dz.classList.remove('hidden');
+  else dz.classList.add('hidden');
+}
+
+async function loadFile(file, levelIdx) {
+  if (levelIdx === undefined) levelIdx = appState.activeLevel;
+  const level = appState.levels[levelIdx];
+  if (!level) return;
+
+  const ext = file.name.toLowerCase().split('.').pop();
+  showToast('Načítám soubor: ' + file.name, 'info');
+
+  if (ext === 'pdf') {
+    await loadPDF(file, levelIdx);
+  } else if (['jpg','jpeg','png','webp'].includes(ext)) {
+    await loadImage(file, levelIdx);
+  } else {
+    showToast('Nepodporovaný formát souboru', 'error');
+  }
+}
+
+async function loadPDF(file, levelIdx) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1.5 });
+
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = viewport.width;
+  offCanvas.height = viewport.height;
+  const ctx = offCanvas.getContext('2d');
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const dataUrl = offCanvas.toDataURL('image/png');
+
+  appState.levels[levelIdx].backgroundImage = dataUrl;
+  if (levelIdx === appState.activeLevel) {
+    loadBackgroundImage(dataUrl, true);
+  }
+  showToast('PDF načteno úspěšně', 'success');
+}
+
+async function loadImage(file, levelIdx) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      appState.levels[levelIdx].backgroundImage = dataUrl;
+      if (levelIdx === appState.activeLevel) {
+        loadBackgroundImage(dataUrl, true);
+      }
+      showToast('Obrázek načten', 'success');
+      resolve();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadBackgroundImage(dataUrl, fit) {
+  fabric.Image.fromURL(dataUrl, (img) => {
+    const cw = fabricCanvas.getWidth();
+    const ch = fabricCanvas.getHeight();
+    const scaleX = cw / img.width;
+    const scaleY = ch / img.height;
+    const scale = Math.min(scaleX, scaleY) * 0.95;
+
+    img.set({
+      left: (cw - img.width * scale) / 2,
+      top: (ch - img.height * scale) / 2,
+      scaleX: scale,
+      scaleY: scale,
+      selectable: false,
+      evented: false,
+      lockMovementX: true,
+      lockMovementY: true,
+      hasControls: false,
+      hasBorders: false,
+      name: '__background__',
+      isBackground: true
+    });
+
+    // Remove old background
+    const old = fabricCanvas.getObjects().find(o => o.isBackground);
+    if (old) fabricCanvas.remove(old);
+    fabricCanvas.insertAt(img, 0);
+    fabricCanvas.renderAll();
+    showDropZone(false);
+    saveCurrentLevel();
+  });
+}
+
+// ============================================================
+// DRAWING TOOLS
+// ============================================================
+function setTool(tool) {
+  appState.tool = tool;
+  // Update UI
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tool === tool);
+  });
+
+  fabricCanvas.isDrawingMode = (tool === 'freehand');
+  if (tool === 'freehand') {
+    const color = getActiveProfeseColor();
+    fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas);
+    fabricCanvas.freeDrawingBrush.color = color;
+    fabricCanvas.freeDrawingBrush.width = 3;
+  }
+
+  if (tool === 'select') {
+    fabricCanvas.selection = true;
+    fabricCanvas.defaultCursor = 'default';
+    fabricCanvas.hoverCursor = 'move';
+  } else if (tool === 'pan') {
+    fabricCanvas.selection = false;
+    fabricCanvas.defaultCursor = 'grab';
+    fabricCanvas.hoverCursor = 'grab';
+  } else if (tool === 'freehand') {
+    fabricCanvas.selection = false;
+    fabricCanvas.defaultCursor = 'crosshair';
+  } else {
+    fabricCanvas.selection = false;
+    fabricCanvas.defaultCursor = 'crosshair';
+    fabricCanvas.hoverCursor = 'crosshair';
+  }
+
+  document.getElementById('status-tool-info').textContent = 'Nástroj: ' + (TOOL_NAMES[tool] || tool);
+  fabricCanvas.renderAll();
+}
+
+function getActiveProfeseColor() {
+  const sel = document.getElementById('prop-profese');
+  const prof = sel ? sel.value : 'Elektro';
+  return getProfColor(prof);
+}
+
+function getActiveProfese() {
+  const sel = document.getElementById('prop-profese');
+  return sel ? sel.value : 'Elektro';
+}
+
+function createAnnotId() {
+  return 'A' + String(annotIdCounter++).padStart(4, '0');
+}
+
+// ============================================================
+// ANNOTATION LABELS (always-visible, zoom-compensated)
+// ============================================================
+function getLabelFirma(obj) {
+  const profObj = (appState.profese || []).find(p => p.name === obj.profese);
+  return profObj && profObj.firma ? profObj.firma : (obj.profese || '');
+}
+
+function labelLineTop(obj) {
+  // First line: full company name (or profession if no company)
+  return getLabelFirma(obj);
+}
+function labelLineBot(obj) {
+  // Second line: description truncated
+  return (obj.popisek || '').substring(0, 32) || obj.annotId;
+}
+
+function findLabel(annotId) {
+  return fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
+}
+
+function positionLabel(label, obj) {
+  if (!label || !obj) return;
+  const zoom = fabricCanvas.getZoom();
+  const vpt = fabricCanvas.viewportTransform;
+  const br = obj.getBoundingRect(true);
+  const cx = (br.left - vpt[4]) / zoom;
+  const cy = (br.top  - vpt[5]) / zoom;
+  const h = 34; // approx group height at scale=1
+  label.set({ left: cx, top: cy - h / zoom, scaleX: 1 / zoom, scaleY: 1 / zoom });
+  label.setCoords();
+}
+
+function createAnnotLabel(obj) {
+  const zoom  = fabricCanvas.getZoom();
+  const color = getProfColor(obj.profese || '');
+  const top1  = labelLineTop(obj);
+  const top2  = labelLineBot(obj);
+
+  // Measure text width to size background rect
+  const W = Math.max(Math.max(top1.length, top2.length) * 6.3 + 18, 80);
+  const H = 34;
+
+  const bg = new fabric.Rect({
+    left: 0, top: 0, width: W, height: H,
+    fill: 'rgba(18,18,18,0.88)',
+    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.07)', strokeWidth: 0.5
+  });
+  const stripe = new fabric.Rect({
+    left: 0, top: 0, width: 3, height: H,
+    fill: color, rx: 0, ry: 0
+  });
+  const txtTop = new fabric.Text(top1, {
+    left: 7, top: 4,
+    fontFamily: 'IBM Plex Mono, monospace', fontSize: 10,
+    fontWeight: '700', fill: color,
+    textTransform: 'uppercase'
+  });
+  const txtBot = new fabric.Text(top2, {
+    left: 7, top: 18,
+    fontFamily: 'IBM Plex Mono, monospace', fontSize: 9,
+    fill: '#cccccc'
+  });
+
+  const group = new fabric.Group([bg, stripe, txtTop, txtBot], {
+    left: obj.left || 0,
+    top: (obj.top || 0) - H - 4,
+    selectable: false,
+    evented: false,
+    hasControls: false,
+    hasBorders: false,
+    annotLabelFor: obj.annotId,
+    scaleX: 1 / zoom,
+    scaleY: 1 / zoom,
+    originX: 'left', originY: 'top'
+  });
+
+  fabricCanvas.add(group);
+  positionLabel(group, obj);
+  return group;
+}
+
+function updateAllLabelScales() {
+  if (!fabricCanvas) return;
+  const zoom = fabricCanvas.getZoom();
+  const vpt = fabricCanvas.viewportTransform;
+  fabricCanvas.getObjects().forEach(o => {
+    if (!o.annotLabelFor) return;
+    const annot = fabricCanvas.getObjects().find(a => a.annotId === o.annotLabelFor);
+    if (annot) {
+      const br = annot.getBoundingRect(true);
+      const cx = (br.left - vpt[4]) / zoom;
+      const cy = (br.top  - vpt[5]) / zoom;
+      const h = (o.height || 34);
+      o.set({ left: cx, top: cy - h / zoom, scaleX: 1 / zoom, scaleY: 1 / zoom });
+      o.setCoords();
+    }
+  });
+  fabricCanvas.renderAll();
+}
+
+function updateLabelFor(annotId) {
+  const label = findLabel(annotId);
+  const obj = fabricCanvas.getObjects().find(a => a.annotId === annotId);
+  if (!obj) return;
+  if (label) fabricCanvas.remove(label);
+  createAnnotLabel(obj);
+  fabricCanvas.renderAll();
+}
+
+function rebuildAllLabels() {
+  const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
+  existing.forEach(l => fabricCanvas.remove(l));
+  getAnnotObjects().forEach(obj => createAnnotLabel(obj));
+  updateAllLabelScales();
+}
+
+function addAnnotationProperties(obj, type) {
+  const id = createAnnotId();
+  obj.set({
+    annotId: id,
+    annotType: type,
+    profese: getActiveProfese(),
+    popisek: '',
+    priorita: 'Střední',
+    prirazeno: '',
+    status: 'Otevřeno',
+    createdAt: new Date().toISOString()
+  });
+  return obj;
+}
+
+// ============================================================
+// CANVAS EVENTS
+// ============================================================
+function setupEventListeners() {
+  const cw = fabricCanvas;
+
+  // Mouse down
+  cw.on('mouse:down', (opt) => {
+    const e = opt.e;
+    const pointer = cw.getPointer(e);
+
+    if (e.button === 2) {
+      // Right click
+      contextMenuTarget = opt.target;
+      showContextMenu(e.clientX, e.clientY);
+      return;
+    }
+
+    if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      lastViewportX = cw.viewportTransform[4];
+      lastViewportY = cw.viewportTransform[5];
+      cw.defaultCursor = 'grabbing';
+      cw.renderAll();
+      return;
+    }
+
+    if (appState.tool === 'select' || appState.tool === 'freehand') return;
+
+    isDrawing = true;
+    drawStartX = pointer.x;
+    drawStartY = pointer.y;
+
+    const color = getActiveProfeseColor();
+
+    if (appState.tool === 'pin') {
+      // Place pin immediately
+      isDrawing = false;
+      placePinAt(pointer.x, pointer.y);
+    } else if (appState.tool === 'text') {
+      isDrawing = false;
+      placeTextAt(pointer.x, pointer.y);
+    } else if (appState.tool === 'rect') {
+      tempShape = new fabric.Rect({
+        left: pointer.x, top: pointer.y,
+        width: 1, height: 1,
+        fill: color + '22',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true,
+        selectable: false,
+        evented: false,
+        originX: 'left', originY: 'top'
+      });
+      cw.add(tempShape);
+    } else if (appState.tool === 'circle') {
+      tempShape = new fabric.Ellipse({
+        left: pointer.x, top: pointer.y,
+        rx: 1, ry: 1,
+        fill: color + '22',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true,
+        selectable: false,
+        evented: false,
+        originX: 'center', originY: 'center'
+      });
+      cw.add(tempShape);
+    } else if (appState.tool === 'arrow') {
+      tempShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+        stroke: color,
+        strokeWidth: 2,
+        selectable: false,
+        evented: false
+      });
+      cw.add(tempShape);
+    }
+  });
+
+  // Mouse move
+  cw.on('mouse:move', (opt) => {
+    const e = opt.e;
+    const pointer = cw.getPointer(e);
+    document.getElementById('cursor-pos').textContent = 'X: ' + Math.round(pointer.x) + ' Y: ' + Math.round(pointer.y);
+
+    if (isPanning) {
+      const dx = e.clientX - panStartX;
+      const dy = e.clientY - panStartY;
+      const vpt = cw.viewportTransform.slice();
+      vpt[4] = lastViewportX + dx;
+      vpt[5] = lastViewportY + dy;
+      cw.setViewportTransform(vpt);
+      cw.renderAll();
+      return;
+    }
+
+    if (!isDrawing || !tempShape) return;
+
+    const dx = pointer.x - drawStartX;
+    const dy = pointer.y - drawStartY;
+
+    if (appState.tool === 'rect') {
+      const left = dx < 0 ? pointer.x : drawStartX;
+      const top = dy < 0 ? pointer.y : drawStartY;
+      tempShape.set({ left, top, width: Math.abs(dx), height: Math.abs(dy) });
+    } else if (appState.tool === 'circle') {
+      tempShape.set({ rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2 });
+    } else if (appState.tool === 'arrow') {
+      tempShape.set({ x2: pointer.x, y2: pointer.y });
+    }
+    cw.renderAll();
+  });
+
+  // Mouse up
+  cw.on('mouse:up', (opt) => {
+    const e = opt.e;
+
+    if (isPanning) {
+      isPanning = false;
+      if (appState.tool === 'pan') cw.defaultCursor = 'grab';
+      else cw.defaultCursor = 'default';
+      cw.renderAll();
+      saveCurrentLevel();
+      return;
+    }
+
+    if (!isDrawing || !tempShape) {
+      isDrawing = false;
+      return;
+    }
+
+    isDrawing = false;
+    const pointer = cw.getPointer(e);
+    const dx = pointer.x - drawStartX;
+    const dy = pointer.y - drawStartY;
+
+    if (Math.abs(dx) < 3 && Math.abs(dy) < 3 && appState.tool !== 'arrow') {
+      cw.remove(tempShape);
+      tempShape = null;
+      return;
+    }
+
+    cw.remove(tempShape);
+    tempShape = null;
+
+    const color = getActiveProfeseColor();
+
+    if (appState.tool === 'rect') {
+      const left = dx < 0 ? pointer.x : drawStartX;
+      const top = dy < 0 ? pointer.y : drawStartY;
+      const rect = new fabric.Rect({
+        left, top,
+        width: Math.abs(dx), height: Math.abs(dy),
+        fill: color + '22',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true
+      });
+      addAnnotationProperties(rect, 'rect');
+      cw.add(rect);
+      createAnnotLabel(rect);
+      cw.setActiveObject(rect);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: rect });
+      setTool('select');
+    } else if (appState.tool === 'circle') {
+      const ellipse = new fabric.Ellipse({
+        left: (drawStartX + pointer.x) / 2,
+        top: (drawStartY + pointer.y) / 2,
+        rx: Math.abs(dx) / 2,
+        ry: Math.abs(dy) / 2,
+        fill: color + '22',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true,
+        originX: 'center', originY: 'center'
+      });
+      addAnnotationProperties(ellipse, 'circle');
+      cw.add(ellipse);
+      createAnnotLabel(ellipse);
+      cw.setActiveObject(ellipse);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: ellipse });
+      setTool('select');
+    } else if (appState.tool === 'arrow') {
+      const lineObj = createArrow(drawStartX, drawStartY, pointer.x, pointer.y, color);
+      addAnnotationProperties(lineObj, 'arrow');
+      cw.add(lineObj);
+      createAnnotLabel(lineObj);
+      cw.setActiveObject(lineObj);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: lineObj });
+      setTool('select');
+    }
+
+    saveCurrentLevel();
+    cw.renderAll();
+  });
+
+  // Object selected
+  cw.on('selection:created', onObjectSelected);
+  cw.on('selection:updated', onObjectSelected);
+  cw.on('selection:cleared', onSelectionCleared);
+
+  // Double-click on annotation — close 3D panel if open, focus properties
+  cw.on('mouse:dblclick', (opt) => {
+    const obj = opt.target;
+    if (!obj || !obj.annotId) return;
+    const panel = document.getElementById('model-3d-panel');
+    if (panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    }
+  });
+
+  // Object moving — keep label in sync
+  cw.on('object:moving', (opt) => {
+    const obj = opt.target;
+    if (obj && obj.annotId) positionLabel(findLabel(obj.annotId), obj);
+  });
+
+  // Object modified
+  cw.on('object:modified', (opt) => {
+    const obj = opt && opt.target;
+    if (obj && obj.annotId) positionLabel(findLabel(obj.annotId), obj);
+    pushUndoState();
+    saveCurrentLevel();
+  });
+
+  // Path created (freehand)
+  cw.on('path:created', (opt) => {
+    const path = opt.path;
+    addAnnotationProperties(path, 'freehand');
+    createAnnotLabel(path);
+    pushUndoState();
+    updateAnnotList();
+    saveCurrentLevel();
+    cw.setActiveObject(path);
+    onObjectSelected({ target: path });
+    setTool('select');
+  });
+
+  // Wheel zoom
+  const wrapper = document.getElementById('canvas-wrapper');
+  wrapper.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY;
+    let zoom = cw.getZoom();
+    zoom *= 0.999 ** delta;
+    zoom = Math.min(Math.max(zoom, 0.05), 20);
+    const pointer = cw.getPointer(e, true);
+    cw.zoomToPoint({ x: e.offsetX, y: e.offsetY }, zoom);
+    updateZoomDisplay();
+    updateAllLabelScales();
+    cw.renderAll();
+  }, { passive: false });
+
+  // Keyboard
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  // Space for pan
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !e.target.matches('input, textarea, select')) {
+      spacePressed = true;
+      if (appState.tool !== 'pan') {
+        fabricCanvas.defaultCursor = 'grab';
+        fabricCanvas.hoverCursor = 'grab';
+      }
+    }
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      spacePressed = false;
+      if (appState.tool !== 'pan') {
+        fabricCanvas.defaultCursor = 'default';
+        fabricCanvas.hoverCursor = 'move';
+      }
+    }
+  });
+
+  // Toolbar buttons
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTool(btn.dataset.tool));
+  });
+
+  document.getElementById('zoom-in-btn').addEventListener('click', () => zoomBy(1.25));
+  document.getElementById('zoom-out-btn').addEventListener('click', () => zoomBy(0.8));
+  document.getElementById('fit-btn').addEventListener('click', fitToWindow);
+  document.getElementById('grid-btn').addEventListener('click', toggleGrid);
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
+  document.getElementById('model-3d-btn').addEventListener('click', toggle3DPanel);
+  document.getElementById('close-3d-btn').addEventListener('click', toggle3DPanel);
+  document.getElementById('export-json-btn').addEventListener('click', exportJSON);
+  document.getElementById('import-json-btn').addEventListener('click', () => document.getElementById('import-json-input').click());
+  document.getElementById('import-json-input').addEventListener('change', importJSON);
+
+  // Add level
+  document.getElementById('add-level-btn').addEventListener('click', () => {
+    const names = ['1.NP','2.NP','3.NP','Suterén','Střecha','Střecha 2'];
+    const used = appState.levels.map(l => l.name);
+    const next = names.find(n => !used.includes(n)) || ('Podlaží ' + (appState.levels.length + 1));
+    addLevel(next, next);
+  });
+
+  // Sidebar toggle
+  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    const sidebar = document.getElementById('left-sidebar');
+    const toggle = document.getElementById('sidebar-toggle');
+    sidebar.classList.toggle('collapsed');
+    toggle.textContent = sidebar.classList.contains('collapsed') ? '›' : '‹';
+    toggle.style.left = sidebar.classList.contains('collapsed') ? '0' : '240px';
+    setTimeout(() => fabricCanvas && resizeCanvas(), 200);
+  });
+
+  // Drop zone
+  document.getElementById('dz-pick-btn').addEventListener('click', () => document.getElementById('file-input').click());
+  document.getElementById('file-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  const dzInner = document.getElementById('drop-zone-inner');
+  dzInner.addEventListener('dragover', (e) => { e.preventDefault(); dzInner.classList.add('drag-over'); });
+  dzInner.addEventListener('dragleave', () => dzInner.classList.remove('drag-over'));
+  dzInner.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dzInner.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+
+  // Global drag over canvas
+  const canvasArea = document.getElementById('canvas-area');
+  canvasArea.addEventListener('dragover', (e) => { e.preventDefault(); });
+  canvasArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+
+  // Properties panel
+  document.getElementById('prop-profese').addEventListener('change', () => updateActiveAnnotProp('profese', document.getElementById('prop-profese').value));
+  document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
+  document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
+  document.getElementById('prop-deadline').addEventListener('change', () => updateActiveAnnotProp('deadline', document.getElementById('prop-deadline').value));
+
+  document.querySelectorAll('.prio-btn').forEach(btn => {
+    btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
+  });
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.addEventListener('click', () => updateActiveAnnotProp('status', btn.dataset.status));
+  });
+
+  document.getElementById('delete-annot-btn').addEventListener('click', deleteActiveAnnot);
+
+  // Filters
+  document.getElementById('filter-profese').addEventListener('change', (e) => { filterProfese = e.target.value; updateAnnotList(); });
+  document.getElementById('filter-status').addEventListener('change', (e) => { filterStatus = e.target.value; updateAnnotList(); });
+
+  // Context menu
+  document.getElementById('ctx-delete').addEventListener('click', () => { hideContextMenu(); deleteContextAnnot(); });
+  document.getElementById('ctx-copy').addEventListener('click', () => { hideContextMenu(); copySelected(); });
+  document.getElementById('ctx-paste').addEventListener('click', () => { hideContextMenu(); pasteSelected(); });
+  document.getElementById('ctx-select').addEventListener('click', () => { hideContextMenu(); if (contextMenuTarget) { fabricCanvas.setActiveObject(contextMenuTarget); fabricCanvas.renderAll(); } });
+  document.addEventListener('click', () => hideContextMenu());
+
+  // Modal
+  document.getElementById('modal-cancel').addEventListener('click', () => resolveModal(false));
+  document.getElementById('modal-confirm').addEventListener('click', () => resolveModal(true));
+  document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target === document.getElementById('modal-overlay')) resolveModal(false); });
+
+  // Subdodavatele home page toggle
+  document.getElementById('subddodavatele-btn').addEventListener('click', () => toggleHomePage());
+
+  // Manage profese
+  document.getElementById('manage-profese-btn').addEventListener('click', openManageProfese);
+  document.getElementById('close-manage-profese-btn').addEventListener('click', closeManageProfese);
+  document.getElementById('manage-profese-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('manage-profese-overlay')) closeManageProfese();
+  });
+  document.getElementById('add-profese-btn').addEventListener('click', addNewProfese);
+
+  // Home page search
+  document.getElementById('home-search').addEventListener('input', renderHomePage);
+
+  // Resize observer
+  const ro = new ResizeObserver(() => resizeCanvas());
+  ro.observe(document.getElementById('canvas-area'));
+
+  // Hover tooltip
+  const tooltip = document.getElementById('annot-tooltip');
+  cw.on('mouse:over', (opt) => {
+    const obj = opt.target;
+    if (!obj || !obj.annotId) return;
+    const color = getProfColor(obj.profese || '');
+    tooltip.style.borderLeft = '3px solid ' + color;
+    tooltip.querySelector('.tt-prof').style.color = color;
+    tooltip.querySelector('.tt-prof').textContent = obj.profese || '';
+    tooltip.querySelector('.tt-popisek').textContent = obj.popisek || '(bez popisu)';
+    const badgesEl = tooltip.querySelector('.tt-badges');
+    badgesEl.innerHTML = '';
+    const prioBadge = document.createElement('span');
+    prioBadge.className = 'tt-badge';
+    prioBadge.textContent = obj.priorita || 'Střední';
+    badgesEl.appendChild(prioBadge);
+    const statBadge = document.createElement('span');
+    statBadge.className = 'tt-badge';
+    statBadge.textContent = obj.status || 'Otevřeno';
+    badgesEl.appendChild(statBadge);
+    tooltip.style.display = 'block';
+  });
+  cw.on('mouse:out', (opt) => {
+    const obj = opt.target;
+    if (!obj || !obj.annotId) return;
+    tooltip.style.display = 'none';
+  });
+  cw.on('mouse:down', () => { tooltip.style.display = 'none'; });
+  cw.on('mouse:move', (opt) => {
+    if (tooltip.style.display === 'none') return;
+    const e = opt.e;
+    const ww = window.innerWidth;
+    let x = e.clientX + 14;
+    let y = e.clientY + 14;
+    if (x + 290 > ww) x = e.clientX - 294;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+  });
+}
+
+function onKeyDown(e) {
+  if (e.target.matches('input, textarea, select')) return;
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z') { e.preventDefault(); undo(); return; }
+    if (e.key === 'y') { e.preventDefault(); redo(); return; }
+    if (e.key === 'c') { e.preventDefault(); copySelected(); return; }
+    if (e.key === 'v') { e.preventDefault(); pasteSelected(); return; }
+    if (e.key === 'a') { e.preventDefault(); fabricCanvas.discardActiveObject(); fabricCanvas.getObjects().filter(o => !o.isBackground).forEach(o => fabricCanvas.setActiveObject(o)); fabricCanvas.renderAll(); return; }
+  }
+
+  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text' };
+  if (toolKeys[e.key.toLowerCase()]) { setTool(toolKeys[e.key.toLowerCase()]); return; }
+
+  if (e.key === '+' || e.key === '=') zoomBy(1.2);
+  if (e.key === '-') zoomBy(0.8);
+  if (e.key === '0') fitToWindow();
+  if (e.key === 'g' || e.key === 'G') toggleGrid();
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const active = fabricCanvas.getActiveObject();
+    if (active && !active.isBackground) {
+      const lbl = findLabel(active.annotId);
+      if (lbl) fabricCanvas.remove(lbl);
+      fabricCanvas.remove(active);
+      pushUndoState(); updateAnnotList(); saveCurrentLevel(); deselectAnnot();
+    }
+  }
+  if (e.key === 'Escape') {
+    fabricCanvas.discardActiveObject();
+    fabricCanvas.renderAll();
+  }
+}
+
+function onKeyUp(e) { /* handled in main listener */ }
+
+// ============================================================
+// ANNOTATIONS FUNCTIONS
+// ============================================================
+function placePinAt(x, y) {
+  const color = getActiveProfeseColor();
+  const pin = new fabric.Group([
+    new fabric.Circle({
+      radius: 10, fill: color, stroke: '#fff', strokeWidth: 1.5,
+      left: -10, top: -20
+    }),
+    new fabric.Triangle({
+      width: 12, height: 8, fill: color,
+      left: -6, top: -4
+    })
+  ], {
+    left: x, top: y, originX: 'center', originY: 'bottom',
+    hasControls: true, selectable: true
+  });
+  addAnnotationProperties(pin, 'pin');
+  fabricCanvas.add(pin);
+  createAnnotLabel(pin);
+  fabricCanvas.setActiveObject(pin);
+  pushUndoState();
+  updateAnnotList();
+  onObjectSelected({ target: pin });
+  setTool('select');
+  saveCurrentLevel();
+  fabricCanvas.renderAll();
+}
+
+function placeTextAt(x, y) {
+  const color = getActiveProfeseColor();
+  const txt = new fabric.IText('Popis', {
+    left: x, top: y,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 14,
+    fill: color,
+    stroke: '#111',
+    strokeWidth: 0.3,
+    background: 'rgba(17,17,17,0.7)'
+  });
+  addAnnotationProperties(txt, 'text');
+  fabricCanvas.add(txt);
+  createAnnotLabel(txt);
+  fabricCanvas.setActiveObject(txt);
+  txt.enterEditing();
+  pushUndoState();
+  updateAnnotList();
+  onObjectSelected({ target: txt });
+  saveCurrentLevel();
+  fabricCanvas.renderAll();
+}
+
+function createArrow(x1, y1, x2, y2, color) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const angle = Math.atan2(dy, dx);
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const headLen = Math.min(20, len * 0.3);
+  const ax1 = x2 - headLen * Math.cos(angle - Math.PI / 6);
+  const ay1 = y2 - headLen * Math.sin(angle - Math.PI / 6);
+  const ax2 = x2 - headLen * Math.cos(angle + Math.PI / 6);
+  const ay2 = y2 - headLen * Math.sin(angle + Math.PI / 6);
+
+  const line = new fabric.Polyline([
+    { x: x1, y: y1 }, { x: x2, y: y2 },
+    { x: ax1, y: ay1 }, { x: x2, y: y2 },
+    { x: ax2, y: ay2 }
+  ], {
+    stroke: color,
+    strokeWidth: 2.5,
+    fill: 'transparent',
+    selectable: true,
+    strokeLineJoin: 'round',
+    strokeLineCap: 'round'
+  });
+  return line;
+}
+
+function updateActiveAnnotProp(prop, value) {
+  const obj = fabricCanvas.getActiveObject();
+  if (!obj || obj.isBackground) return;
+
+  obj.set(prop, value);
+
+  // Update annotation label
+  if (prop === 'profese' || prop === 'popisek') {
+    updateLabelFor(obj.annotId);
+  }
+
+  // Update visual color
+  if (prop === 'profese') {
+    const color = getProfColor(value);
+    if (obj.type === 'rect' || obj.type === 'ellipse') {
+      obj.set({ stroke: color, fill: color + '22' });
+    } else if (obj.type === 'path' || obj.type === 'polyline') {
+      obj.set({ stroke: color });
+    } else if (obj.type === 'i-text' || obj.type === 'text') {
+      obj.set({ fill: color });
+    }
+    fabricCanvas.renderAll();
+  }
+
+  // Update priority buttons
+  if (prop === 'priorita') {
+    document.querySelectorAll('.prio-btn').forEach(btn => {
+      btn.className = 'prio-btn';
+      if (btn.dataset.prio === value) {
+        if (value === 'Nízká') btn.classList.add('active-low');
+        else if (value === 'Střední') btn.classList.add('active-mid');
+        else if (value === 'Vysoká') btn.classList.add('active-high');
+      }
+    });
+  }
+
+  // Update status buttons
+  if (prop === 'status') {
+    document.querySelectorAll('.status-btn').forEach(btn => {
+      btn.className = 'status-btn';
+      if (btn.dataset.status === value) {
+        if (value === 'Otevřeno') btn.classList.add('active-otevreno');
+        else if (value === 'V řešení') btn.classList.add('active-vreseni');
+        else if (value === 'Hotovo') btn.classList.add('active-hotovo');
+      }
+    });
+  }
+
+  saveCurrentLevel();
+  updateAnnotList();
+}
+
+function onObjectSelected(opt) {
+  const obj = opt.target;
+  if (!obj || obj.isBackground) {
+    deselectAnnot();
+    return;
+  }
+
+  document.getElementById('no-sel-state').style.display = 'none';
+  document.getElementById('prop-form').style.display = 'block';
+
+  document.getElementById('prop-profese').value = obj.profese || 'Elektro';
+  document.getElementById('prop-popisek').value = obj.popisek || '';
+  document.getElementById('prop-prirazeno').value = obj.prirazeno || '';
+  document.getElementById('prop-deadline').value = obj.deadline || '';
+  document.getElementById('prop-annot-id').textContent = obj.annotId || '-';
+
+  // Priorita buttons
+  document.querySelectorAll('.prio-btn').forEach(btn => {
+    btn.className = 'prio-btn';
+    if (btn.dataset.prio === (obj.priorita || 'Střední')) {
+      const v = btn.dataset.prio;
+      if (v === 'Nízká') btn.classList.add('active-low');
+      else if (v === 'Střední') btn.classList.add('active-mid');
+      else if (v === 'Vysoká') btn.classList.add('active-high');
+    }
+  });
+
+  // Status buttons
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.className = 'status-btn';
+    if (btn.dataset.status === (obj.status || 'Otevřeno')) {
+      const v = btn.dataset.status;
+      if (v === 'Otevřeno') btn.classList.add('active-otevreno');
+      else if (v === 'V řešení') btn.classList.add('active-vreseni');
+      else if (v === 'Hotovo') btn.classList.add('active-hotovo');
+    }
+  });
+
+  // Highlight in list
+  updateAnnotList();
+}
+
+function onSelectionCleared() {
+  deselectAnnot();
+  updateAnnotList();
+}
+
+function deselectAnnot() {
+  document.getElementById('no-sel-state').style.display = 'flex';
+  document.getElementById('prop-form').style.display = 'none';
+}
+
+function deleteActiveAnnot() {
+  const obj = fabricCanvas.getActiveObject();
+  if (!obj || obj.isBackground) return;
+  const lbl = findLabel(obj.annotId);
+  if (lbl) fabricCanvas.remove(lbl);
+  fabricCanvas.remove(obj);
+  pushUndoState();
+  updateAnnotList();
+  saveCurrentLevel();
+  deselectAnnot();
+}
+
+function deleteContextAnnot() {
+  if (!contextMenuTarget || contextMenuTarget.isBackground) return;
+  const lbl = findLabel(contextMenuTarget.annotId);
+  if (lbl) fabricCanvas.remove(lbl);
+  fabricCanvas.remove(contextMenuTarget);
+  pushUndoState();
+  updateAnnotList();
+  saveCurrentLevel();
+  deselectAnnot();
+}
+
+// ============================================================
+// ANNOTATION LIST
+// ============================================================
+function getAnnotObjects() {
+  return fabricCanvas.getObjects().filter(o => o.annotId && !o.isBackground && !o.annotLabelFor);
+}
+
+function updateAnnotList() {
+  const container = document.getElementById('annot-list');
+  container.innerHTML = '';
+  const activeObj = fabricCanvas.getActiveObject();
+
+  const objects = getAnnotObjects();
+  const filtered = objects.filter(o => {
+    if (filterProfese && o.profese !== filterProfese) return false;
+    if (filterStatus && o.status !== filterStatus) return false;
+    return true;
+  });
+
+  document.getElementById('annot-total-count').textContent = objects.length;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:12px;">Žádné anotace</div>';
+  } else {
+    filtered.forEach(obj => {
+      const color = getProfColor(obj.profese);
+      const isSelected = activeObj && (activeObj === obj || (activeObj._objects && activeObj._objects.includes(obj)));
+      const statusClass = obj.status === 'Otevřeno' ? 'status-otevreno' : obj.status === 'V řešení' ? 'status-vreseni' : 'status-hotovo';
+      const item = document.createElement('div');
+      item.className = 'annot-item' + (isSelected ? ' selected' : '');
+      item.innerHTML = `
+        <div class="annot-color-dot" style="background:${color}"></div>
+        <div class="annot-info">
+          <div class="annot-label">${escHtml(obj.popisek || getAnnotTypeName(obj.annotType || obj.type))}</div>
+          <div class="annot-meta">
+            <span>${escHtml(obj.profese || '—')}</span>
+            <span><span class="status-dot ${statusClass}"></span>${escHtml(obj.status || 'Otevřeno')}</span>
+          </div>
+        </div>
+        <div class="annot-id-tag">${obj.annotId || ''}</div>
+      `;
+      item.addEventListener('click', () => {
+        fabricCanvas.setActiveObject(obj);
+        fabricCanvas.renderAll();
+        onObjectSelected({ target: obj });
+        // Scroll to object
+        const center = obj.getCenterPoint();
+        const vpt = fabricCanvas.viewportTransform;
+        // Center view on object
+        const canvasCenter = { x: fabricCanvas.getWidth() / 2, y: fabricCanvas.getHeight() / 2 };
+        const newVpt = vpt.slice();
+        newVpt[4] = canvasCenter.x - center.x * vpt[0];
+        newVpt[5] = canvasCenter.y - center.y * vpt[3];
+        fabricCanvas.setViewportTransform(newVpt);
+        fabricCanvas.renderAll();
+      });
+      container.appendChild(item);
+    });
+  }
+
+  updateProfBadges(objects);
+}
+
+function getAnnotTypeName(type) {
+  const map = { rect: 'Obdélník', circle: 'Elipsa', ellipse: 'Elipsa', arrow: 'Šipka', freehand: 'Čára', path: 'Čára', pin: 'Špendlík', text: 'Text', 'i-text': 'Text', polyline: 'Šipka', group: 'Špendlík' };
+  return map[type] || type || 'Anotace';
+}
+
+function updateProfBadges(objects) {
+  const counts = {};
+  objects.forEach(o => { const p = o.profese || 'Vlastní'; counts[p] = (counts[p] || 0) + 1; });
+  const container = document.getElementById('prof-badges');
+  container.innerHTML = '';
+  Object.entries(counts).forEach(([prof, cnt]) => {
+    const color = getProfColor(prof);
+    const badge = document.createElement('div');
+    badge.className = 'prof-badge';
+    badge.style.color = color;
+    badge.style.borderColor = color + '66';
+    badge.style.background = color + '11';
+    badge.innerHTML = `<span>${escHtml(prof)}</span><span class="badge-count">${cnt}</span>`;
+    container.appendChild(badge);
+  });
+}
+
+// ============================================================
+// ZOOM & VIEWPORT
+// ============================================================
+function zoomBy(factor) {
+  let zoom = fabricCanvas.getZoom() * factor;
+  zoom = Math.min(Math.max(zoom, 0.05), 20);
+  const center = { x: fabricCanvas.getWidth() / 2, y: fabricCanvas.getHeight() / 2 };
+  fabricCanvas.zoomToPoint(center, zoom);
+  updateZoomDisplay();
+  updateAllLabelScales();
+  fabricCanvas.renderAll();
+}
+
+function fitToWindow() {
+  const objects = fabricCanvas.getObjects().filter(o => !o.isBackground || o.annotId);
+  const bg = fabricCanvas.getObjects().find(o => o.isBackground);
+  if (bg) {
+    const bounds = bg.getBoundingRect(true);
+    const scaleX = fabricCanvas.getWidth() / bounds.width;
+    const scaleY = fabricCanvas.getHeight() / bounds.height;
+    const scale = Math.min(scaleX, scaleY) * 0.9;
+    const vpt = [scale, 0, 0, scale,
+      (fabricCanvas.getWidth() - bounds.width * scale) / 2 - bounds.left * scale,
+      (fabricCanvas.getHeight() - bounds.height * scale) / 2 - bounds.top * scale
+    ];
+    fabricCanvas.setViewportTransform(vpt);
+  } else {
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+  }
+  updateZoomDisplay();
+  updateAllLabelScales();
+  fabricCanvas.renderAll();
+}
+
+function updateZoomDisplay() {
+  const z = Math.round(fabricCanvas.getZoom() * 100);
+  document.getElementById('zoom-display').textContent = z + '%';
+}
+
+// ============================================================
+// GRID
+// ============================================================
+function toggleGrid() {
+  appState.showGrid = !appState.showGrid;
+  document.getElementById('grid-btn').classList.toggle('active', appState.showGrid);
+  drawGrid();
+  saveState();
+}
+
+function drawGrid() {
+  const canvas = document.getElementById('grid-overlay');
+  const area = document.getElementById('canvas-area');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0'; canvas.style.left = '0';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = '2';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!appState.showGrid) return;
+
+  const spacing = 40;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+
+  for (let x = 0; x < canvas.width; x += spacing) {
+    ctx.beginPath();
+    ctx.setLineDash([1, spacing - 1]);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += spacing) {
+    ctx.beginPath();
+    ctx.setLineDash([1, spacing - 1]);
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+// ============================================================
+// UNDO / REDO
+// ============================================================
+function pushUndoState() {
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  undoStack.push(JSON.stringify(json));
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  redoStack.push(JSON.stringify(current));
+  const prev = JSON.parse(undoStack.pop());
+  fabricCanvas.loadFromJSON(prev, () => {
+    fabricCanvas.renderAll();
+    updateAnnotList();
+    deselectAnnot();
+  });
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  undoStack.push(JSON.stringify(current));
+  const next = JSON.parse(redoStack.pop());
+  fabricCanvas.loadFromJSON(next, () => {
+    fabricCanvas.renderAll();
+    updateAnnotList();
+    deselectAnnot();
+  });
+}
+
+// ============================================================
+// COPY / PASTE
+// ============================================================
+function copySelected() {
+  const obj = fabricCanvas.getActiveObject();
+  if (!obj || obj.isBackground) return;
+  obj.clone((cloned) => {
+    appState.clipboard = cloned;
+    showToast('Zkopírováno', 'info');
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+}
+
+function pasteSelected() {
+  if (!appState.clipboard) return;
+  appState.clipboard.clone((cloned) => {
+    cloned.set({ left: cloned.left + 20, top: cloned.top + 20, annotId: createAnnotId() });
+    fabricCanvas.add(cloned);
+    fabricCanvas.setActiveObject(cloned);
+    fabricCanvas.renderAll();
+    pushUndoState();
+    updateAnnotList();
+    saveCurrentLevel();
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+}
+
+// ============================================================
+// CONTEXT MENU
+// ============================================================
+function showContextMenu(x, y) {
+  const menu = document.getElementById('context-menu');
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('visible');
+}
+
+function hideContextMenu() {
+  document.getElementById('context-menu').classList.remove('visible');
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function showModal(title, body) {
+  return new Promise((resolve) => {
+    pendingModalResolve = resolve;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').textContent = body;
+    document.getElementById('modal-overlay').classList.add('visible');
+  });
+}
+
+function resolveModal(result) {
+  document.getElementById('modal-overlay').classList.remove('visible');
+  if (pendingModalResolve) { pendingModalResolve(result); pendingModalResolve = null; }
+}
+
+// ============================================================
+// TOAST NOTIFICATIONS
+// ============================================================
+let toastContainer = null;
+function showToast(message, type = 'info') {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.style.cssText = 'position:fixed;bottom:40px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:6px;';
+    document.body.appendChild(toastContainer);
+  }
+  const colors = { info: '#3B82F6', success: '#10B981', warn: '#F59E0B', error: '#EF4444' };
+  const toast = document.createElement('div');
+  toast.style.cssText = `background:#2a2a2a;border:1px solid ${colors[type] || colors.info};border-left:3px solid ${colors[type] || colors.info};color:#e0e0e0;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.2s;max-width:280px;`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity = '1'; });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toastContainer.removeChild(toast), 250);
+  }, 3000);
+}
+
+// ============================================================
+// 3D MODEL
+// ============================================================
+function toggle3DPanel() {
+  const panel = document.getElementById('model-3d-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    initThree();
+    renderZonesManager();
+  } else {
+    if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  }
+}
+
+function initThree() {
+  const container = document.getElementById('three-canvas-container');
+  if (threeRenderer) {
+    threeRenderer.setSize(container.clientWidth, container.clientHeight);
+    animate3D();
+    return;
+  }
+
+  threeScene = new THREE.Scene();
+  threeScene.background = new THREE.Color(0x111111);
+  threeScene.fog = new THREE.Fog(0x111111, 30, 100);
+
+  threeCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+  threeCamera.position.set(15, 12, 20);
+
+  threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+  threeRenderer.setSize(container.clientWidth, container.clientHeight);
+  threeRenderer.setPixelRatio(window.devicePixelRatio);
+  threeRenderer.shadowMap.enabled = true;
+  threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(threeRenderer.domElement);
+
+  threeControls = new THREE.OrbitControls(threeCamera, threeRenderer.domElement);
+  threeControls.enableDamping = true;
+  threeControls.dampingFactor = 0.05;
+  threeControls.minDistance = 5;
+  threeControls.maxDistance = 80;
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  threeScene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(10, 20, 10);
+  dirLight.castShadow = true;
+  threeScene.add(dirLight);
+  const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+  fillLight.position.set(-10, 5, -10);
+  threeScene.add(fillLight);
+
+  // Grid helper
+  const grid = new THREE.GridHelper(40, 20, 0x333333, 0x222222);
+  threeScene.add(grid);
+
+  // Build floors
+  buildFloors();
+
+  // Raycasting – click on floor to switch level
+  threeRenderer.domElement.addEventListener('pointerdown', (e) => { _3dPointerDownAt = { x: e.clientX, y: e.clientY }; });
+  threeRenderer.domElement.addEventListener('pointerup',   (e) => {
+    if (!_3dPointerDownAt) return;
+    const dx = Math.abs(e.clientX - _3dPointerDownAt.x);
+    const dy = Math.abs(e.clientY - _3dPointerDownAt.y);
+    _3dPointerDownAt = null;
+    if (dx > 5 || dy > 5) return; // was a drag, not a click
+    on3DClick(e);
+  });
+
+  // Hover highlight on floor meshes
+  threeRenderer.domElement.addEventListener('pointermove', on3DHover);
+
+  animate3D();
+  updateModelLegend();
+  renderZonesManager();
+  setTimeout(() => highlight3DFloor(appState.activeLevel), 100);
+}
+
+let _3dPointerDownAt = null;
+
+function on3DClick(event) {
+  if (!threeRenderer || !threeCamera || !threeScene) return;
+  const rect = threeRenderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((event.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+  threeRaycaster.setFromCamera(mouse, threeCamera);
+  const hits = threeRaycaster.intersectObjects(threeScene.children, true);
+  for (const h of hits) {
+    if (h.object.userData.levelIdx !== undefined) {
+      const idx = h.object.userData.levelIdx;
+      switchLevel(idx);
+      highlight3DFloor(idx);
+      showToast('↓ ' + appState.levels[idx].name, 'info');
+      return;
+    }
+  }
+}
+
+function on3DHover(event) {
+  if (!threeRenderer || !threeCamera || !threeScene) return;
+  const rect = threeRenderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((event.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+  threeRaycaster.setFromCamera(mouse, threeCamera);
+  const hits = threeRaycaster.intersectObjects(threeScene.children, true);
+  let foundFloor = false;
+  for (const h of hits) {
+    if (h.object.userData.levelIdx !== undefined) {
+      threeRenderer.domElement.style.cursor = 'pointer';
+      foundFloor = true;
+      break;
+    }
+  }
+  if (!foundFloor) threeRenderer.domElement.style.cursor = '';
+}
+
+function highlight3DFloor(idx) {
+  if (!threeScene) return;
+  threeScene.traverse(obj => {
+    if (obj.isMesh && obj.userData.levelIdx !== undefined) {
+      if (obj.userData.levelIdx === idx) {
+        obj.material.emissive = new THREE.Color(0x445533);
+        obj.material.emissiveIntensity = 0.5;
+      } else {
+        obj.material.emissive = new THREE.Color(0x000000);
+        obj.material.emissiveIntensity = 0;
+      }
+    }
+  });
+}
+
+function hexToThreeColor(hex) {
+  return parseInt(hex.replace('#', ''), 16);
+}
+
+function buildFloors() {
+  if (!threeScene) return;
+  const toRemove = [];
+  threeScene.traverse(obj => { if (obj.userData && obj.userData.isFloor) toRemove.push(obj); });
+  toRemove.forEach(obj => threeScene.remove(obj));
+
+  const defaultColors = {
+    '1.NP': 0x3B82F6, '2.NP': 0x10B981, '3.NP': 0x8B5CF6,
+    'Suterén': 0xF59E0B, 'Střecha': 0xEF4444
+  };
+
+  const FH = 3.2, FW = 12, FD = 8;
+  let topY = 0;
+
+  appState.levels.forEach((level, idx) => {
+    const isBasement = level.shape3D === 'basement' || (!level.shape3D && level.name.includes('Suterén'));
+    const isRoof    = level.shape3D === 'cone'     || (!level.shape3D && level.name.includes('Střecha'));
+    const isCyl     = level.shape3D === 'cylinder';
+    const yOffset   = isBasement ? -FH : idx * FH;
+
+    // Color: use override first, then keyword, then default
+    let colorHex = level.color3D;
+    if (!colorHex) {
+      for (const [key, c] of Object.entries(defaultColors)) {
+        if (level.name.includes(key)) { colorHex = '#' + c.toString(16).padStart(6, '0'); break; }
+      }
+    }
+    const color = colorHex ? hexToThreeColor(colorHex) : 0x4A5340;
+
+    const fW = isRoof ? FW * 0.7 : FW - idx * 0.5;
+    const fD = isRoof ? FD * 0.7 : FD - idx * 0.3;
+    const h  = isRoof ? 0.5 : FH - 0.1;
+
+    let geo;
+    if (isRoof)     geo = new THREE.ConeGeometry(fW * 0.5, 4, 4);
+    else if (isCyl) geo = new THREE.CylinderGeometry(fW * 0.4, fW * 0.45, h, 12);
+    else            geo = new THREE.BoxGeometry(fW, h, fD);
+
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(0, yOffset + h / 2, 0);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.userData = { isFloor: true, levelIdx: idx, levelName: level.name };
+
+    const edges = new THREE.EdgesGeometry(geo);
+    const lineSegs = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x444444 }));
+    lineSegs.position.copy(mesh.position);
+    lineSegs.userData = { isFloor: true };
+    threeScene.add(mesh); threeScene.add(lineSegs);
+
+    topY = Math.max(topY, yOffset + h);
+
+    const annotCount = level.annotations ? level.annotations.length : 0;
+    if (annotCount > 0) {
+      const dotGeo = new THREE.SphereGeometry(0.15, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xF59E0B });
+      for (let i = 0; i < Math.min(annotCount, 8); i++) {
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.set((Math.random()-0.5)*fW*0.8, yOffset+h+0.2, (Math.random()-0.5)*fD*0.8);
+        dot.userData = { isFloor: true };
+        threeScene.add(dot);
+      }
+    }
+  });
+
+  // Custom zones3D
+  (appState.zones3D || []).forEach((zone, zi) => {
+    if (zone.visible === false) return;
+    const color = hexToThreeColor(zone.color || '#6B7280');
+    const h = zone.height || 3;
+    const yOffset = topY + zi * h;
+    let geo;
+    if (zone.type === 'cone')     geo = new THREE.ConeGeometry(4, h, 4);
+    else if (zone.type === 'cylinder') geo = new THREE.CylinderGeometry(3.5, 3.8, h, 12);
+    else if (zone.type === 'hex') geo = new THREE.CylinderGeometry(4, 4, h, 6);
+    else                          geo = new THREE.BoxGeometry(FW, h, FD);
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.82 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(0, yOffset + h / 2, 0);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.userData = { isFloor: true, isZone3D: true, zoneName: zone.name };
+    const edges = new THREE.EdgesGeometry(geo);
+    const lineSegs = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x444444 }));
+    lineSegs.position.copy(mesh.position);
+    lineSegs.userData = { isFloor: true };
+    threeScene.add(mesh); threeScene.add(lineSegs);
+  });
+}
+
+function animate3D() {
+  animFrameId = requestAnimationFrame(animate3D);
+  if (threeControls) threeControls.update();
+  if (threeRenderer && threeScene && threeCamera) {
+    threeRenderer.render(threeScene, threeCamera);
+  }
+}
+
+function getLevelColor3D(level) {
+  if (level.color3D) return level.color3D;
+  const map = { '1.NP': '#3B82F6', '2.NP': '#10B981', '3.NP': '#8B5CF6', 'Suterén': '#F59E0B', 'Střecha': '#EF4444' };
+  for (const [k, c] of Object.entries(map)) { if (level.name.includes(k)) return c; }
+  return '#4A5340';
+}
+
+function updateModelLegend() {
+  const container = document.getElementById('model-legend');
+  container.innerHTML = '';
+  appState.levels.forEach(level => {
+    const color = getLevelColor3D(level);
+    const item = document.createElement('div');
+    item.className = 'model-legend-item';
+    item.innerHTML = `<div class="model-legend-color" style="background:${color}"></div><span>${escHtml(level.name)}</span>`;
+    container.appendChild(item);
+  });
+  (appState.zones3D || []).forEach(zone => {
+    if (zone.visible === false) return;
+    const item = document.createElement('div');
+    item.className = 'model-legend-item';
+    item.innerHTML = `<div class="model-legend-color" style="background:${escHtml(zone.color||'#6B7280')}"></div><span>${escHtml(zone.name)}</span>`;
+    container.appendChild(item);
+  });
+}
+
+// ============================================================
+// 3D ZONES MANAGER
+// ============================================================
+function renderZonesManager() {
+  const mgr = document.getElementById('zones-manager');
+  if (!mgr) return;
+  const shapeOpts = (sel) => ['box','cone','cylinder','hex'].map(v =>
+    `<option value="${v}"${v===sel?' selected':''}>${{box:'Podlaží',cone:'Střecha/Jehlán',cylinder:'Válec',hex:'Šestihran'}[v]}</option>`
+  ).join('');
+  const bsOpts = (sel) => ['','box','cone','cylinder','basement'].map(v =>
+    `<option value="${v}"${v===sel?' selected':''}>${{'':`Auto`,'box':'Podlaží','cone':'Střecha','cylinder':'Válec','basement':'Suterén'}[v]}</option>`
+  ).join('');
+
+  let html = `<div class="zmgr-section-title">Podlaží projektu
+    <span class="zmgr-hint">(dvojklik = přejmenovat)</span>
+  </div>`;
+
+  appState.levels.forEach((level, idx) => {
+    const col = getLevelColor3D(level);
+    const isActive = idx === appState.activeLevel;
+    html += `<div class="zmgr-row${isActive?' zmgr-active':''}">
+      <label class="zmgr-swatch-wrap" title="Barva podlaží v 3D">
+        <div class="zmgr-swatch" style="background:${col}"></div>
+        <input type="color" value="${col}" onchange="appState.levels[${idx}].color3D=this.value;buildFloors();updateModelLegend();renderZonesManager();saveState();">
+      </label>
+      <input class="zmgr-name-input" value="${escHtml(level.name)}"
+        onchange="renameLevelFrom3D(${idx},this.value)"
+        onclick="switchLevel(${idx});renderZonesManager();"
+        title="Klik = přepnout, upravit = přejmenovat">
+      <select class="zmgr-shape" title="Tvar v 3D" onchange="appState.levels[${idx}].shape3D=this.value;buildFloors();saveState();">
+        ${bsOpts(level.shape3D||'')}
+      </select>
+      <div class="zmgr-arrows">
+        <button class="zmgr-arr" title="Posunout nahoru" onclick="reorderLevel(${idx},-1)" ${idx===0?'disabled':''}>↑</button>
+        <button class="zmgr-arr" title="Posunout dolů" onclick="reorderLevel(${idx},+1)" ${idx===appState.levels.length-1?'disabled':''}>↓</button>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="zmgr-section-title" style="margin-top:10px;">Vlastní 3D zóny</div>`;
+  (appState.zones3D || []).forEach((zone, zi) => {
+    const vis = zone.visible !== false;
+    html += `<div class="zmgr-row">
+      <label class="zmgr-swatch-wrap" title="Barva zóny">
+        <div class="zmgr-swatch" style="background:${zone.color||'#6B7280'}"></div>
+        <input type="color" value="${zone.color||'#6B7280'}" onchange="appState.zones3D[${zi}].color=this.value;buildFloors();updateModelLegend();renderZonesManager();saveState();">
+      </label>
+      <input class="zmgr-name-input" value="${escHtml(zone.name)}" onchange="appState.zones3D[${zi}].name=this.value;updateModelLegend();renderZonesManager();saveState();" title="Název zóny">
+      <select class="zmgr-shape" onchange="appState.zones3D[${zi}].type=this.value;buildFloors();saveState();">
+        ${shapeOpts(zone.type||'box')}
+      </select>
+      <button class="zmgr-eye" onclick="appState.zones3D[${zi}].visible=!appState.zones3D[${zi}].visible;buildFloors();updateModelLegend();renderZonesManager();saveState();" title="${vis?'Skrýt':'Zobrazit'}">${vis?'●':'○'}</button>
+      <button class="zmgr-del" onclick="appState.zones3D.splice(${zi},1);buildFloors();updateModelLegend();renderZonesManager();saveState();" title="Smazat">×</button>
+    </div>`;
+  });
+
+  html += `<div id="add-zone-form-wrap"></div>
+  <button id="add-zone-btn" onclick="showAddZoneForm()">+ Přidat zónu</button>`;
+  mgr.innerHTML = html;
+}
+
+function renameLevelFrom3D(idx, newName) {
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  appState.levels[idx].name = trimmed;
+  renderLevelTabs();
+  buildFloors();
+  updateModelLegend();
+  updateStatusBar();
+  saveState();
+}
+
+function reorderLevel(fromIdx, direction) {
+  const toIdx = fromIdx + direction;
+  if (toIdx < 0 || toIdx >= appState.levels.length) return;
+  const arr = appState.levels;
+  [arr[fromIdx], arr[toIdx]] = [arr[toIdx], arr[fromIdx]];
+  if (appState.activeLevel === fromIdx) appState.activeLevel = toIdx;
+  else if (appState.activeLevel === toIdx) appState.activeLevel = fromIdx;
+  renderLevelTabs();
+  buildFloors();
+  updateModelLegend();
+  renderZonesManager();
+  saveState();
+}
+
+function showAddZoneForm() {
+  const wrap = document.getElementById('add-zone-form-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="zmgr-add-form">
+    <input id="nz-name" class="zmgr-input" placeholder="Název zóny" value="Nová zóna">
+    <div style="display:flex;gap:6px;align-items:center;margin:4px 0;">
+      <label style="font-size:11px;color:var(--text-dim);">Barva:</label>
+      <input type="color" id="nz-color" value="#6B7280" style="width:32px;height:22px;border:1px solid var(--border);background:none;cursor:pointer;border-radius:3px;">
+    </div>
+    <select id="nz-type" class="zmgr-shape" style="width:100%;margin-bottom:4px;">
+      <option value="box">Podlaží (kvádr)</option>
+      <option value="cone">Střecha/Jehlán</option>
+      <option value="cylinder">Válec</option>
+      <option value="hex">Šestihran</option>
+    </select>
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;">
+      <label style="font-size:11px;color:var(--text-dim);">Výška:</label>
+      <input type="number" id="nz-height" value="3" min="1" max="20" step="0.5" style="width:60px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:3px;font-size:12px;">
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="zmgr-save-btn" onclick="commitAddZone()">Přidat</button>
+      <button class="zmgr-cancel-btn" onclick="renderZonesManager()">Zrušit</button>
+    </div>
+  </div>`;
+}
+
+function commitAddZone() {
+  const name   = document.getElementById('nz-name').value.trim() || 'Zóna';
+  const color  = document.getElementById('nz-color').value;
+  const type   = document.getElementById('nz-type').value;
+  const height = parseFloat(document.getElementById('nz-height').value) || 3;
+  if (!appState.zones3D) appState.zones3D = [];
+  appState.zones3D.push({ name, color, type, height, visible: true });
+  buildFloors();
+  updateModelLegend();
+  renderZonesManager();
+  saveState();
+}
+
+// ============================================================
+// 3D PANEL RESIZE
+// ============================================================
+function setup3DPanelResize() {
+  const panel  = document.getElementById('model-3d-panel');
+  const handle = document.getElementById('model-3d-resize-handle');
+  if (!panel || !handle) return;
+
+  let dragging = false, startX = 0, startW = 0;
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    startX   = e.clientX;
+    startW   = panel.offsetWidth;
+    panel.classList.add('resizing');
+    handle.setPointerCapture(e.pointerId);
+  });
+
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const delta = startX - e.clientX;          // moving left = wider
+    const newW  = Math.min(Math.max(260, startW + delta), window.innerWidth * 0.88);
+    panel.style.width = newW + 'px';
+    // keep panel visible: update right offset during drag
+    panel.style.right  = '0px';
+    // resize the Three.js renderer
+    if (threeRenderer && threeCamera) {
+      const c = document.getElementById('three-canvas-container');
+      threeRenderer.setSize(c.clientWidth, c.clientHeight);
+      threeCamera.aspect = c.clientWidth / c.clientHeight;
+      threeCamera.updateProjectionMatrix();
+    }
+  });
+
+  handle.addEventListener('pointerup', () => {
+    dragging = false;
+    panel.classList.remove('resizing');
+    // snap back the transition
+    panel.style.transition = '';
+  });
+}
+
+// ============================================================
+// HOME PAGE STRIP RESIZE
+// ============================================================
+function setupHomeStripResize() {
+  const resizer = document.getElementById('home-tasks-resizer');
+  const strip   = document.getElementById('home-tasks-strip');
+  if (!resizer || !strip) return;
+
+  let dragging = false, startY = 0, startH = 0;
+
+  resizer.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    startY   = e.clientY;
+    startH   = strip.offsetHeight;
+    resizer.setPointerCapture(e.pointerId);
+    document.body.style.cursor = 'ns-resize';
+  });
+
+  resizer.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const newH = Math.min(Math.max(120, startH + (e.clientY - startY)), window.innerHeight * 0.75);
+    strip.style.maxHeight = newH + 'px';
+    strip.style.minHeight = newH + 'px';
+  });
+
+  resizer.addEventListener('pointerup', () => {
+    dragging = false;
+    document.body.style.cursor = '';
+  });
+}
+
+// ============================================================
+// HOME PAGE TASKS STRIP
+// ============================================================
+function setupHomeTasksStrip() {
+  setupHomeStripResize();
+
+  const ids = ['ht-search','ht-subdod','ht-profese','ht-level','ht-status','ht-prio','ht-deadline-from','ht-deadline-to'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input',  renderHomeTasksStrip);
+      el.addEventListener('change', renderHomeTasksStrip);
+    }
+  });
+  document.getElementById('ht-reset-btn').addEventListener('click', () => {
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    renderHomeTasksStrip();
+  });
+}
+
+function populateHomeStripFilters() {
+  // Subdodavatele (firmy from profese)
+  const subdodSel = document.getElementById('ht-subdod');
+  if (!subdodSel) return;
+  const curSub = subdodSel.value;
+  subdodSel.innerHTML = '<option value="">Všichni dodavatelé</option>';
+  const firms = new Set();
+  (appState.profese || []).forEach(p => { if (p.firma) firms.add(p.firma); });
+  firms.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f; opt.textContent = f;
+    if (curSub === f) opt.selected = true;
+    subdodSel.appendChild(opt);
+  });
+
+  // Profese
+  const profSel = document.getElementById('ht-profese');
+  const curProf = profSel ? profSel.value : '';
+  if (profSel) {
+    profSel.innerHTML = '<option value="">Všechny profese</option>';
+    (appState.profese || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name; opt.textContent = p.name;
+      if (curProf === p.name) opt.selected = true;
+      profSel.appendChild(opt);
+    });
+  }
+
+  // Podlaží
+  const lvlSel = document.getElementById('ht-level');
+  const curLvl = lvlSel ? lvlSel.value : '';
+  if (lvlSel) {
+    lvlSel.innerHTML = '<option value="">Všechna podlaží</option>';
+    appState.levels.forEach((l, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i); opt.textContent = l.name;
+      if (curLvl === String(i)) opt.selected = true;
+      lvlSel.appendChild(opt);
+    });
+  }
+}
+
+function getHomeTaskFilters() {
+  const v = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+  return {
+    search:  v('ht-search').toLowerCase().trim(),
+    firma:   v('ht-subdod'),
+    profese: v('ht-profese'),
+    levelIdx: v('ht-level'),
+    status:  v('ht-status'),
+    prio:    v('ht-prio'),
+    dlFrom:  v('ht-deadline-from'),
+    dlTo:    v('ht-deadline-to')
+  };
+}
+
+function renderHomeTasksStrip() {
+  const list = document.getElementById('home-tasks-list');
+  const statsEl = document.getElementById('ht-stats');
+  if (!list) return;
+
+  populateHomeStripFilters();
+
+  const all = getAllAnnotations();  // reuse from tasks-page module
+  const f = getHomeTaskFilters();
+  const today = new Date().toISOString().slice(0,10);
+
+  const filtered = all.filter(r => {
+    if (f.search) {
+      const hay = ((r.popisek||'') + ' ' + (r.annotId||'') + ' ' + (r.prirazeno||'')).toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    if (f.firma) {
+      const prof = (appState.profese||[]).find(p => p.name === r.profese);
+      if (!prof || prof.firma !== f.firma) return false;
+    }
+    if (f.profese  && r.profese   !== f.profese)          return false;
+    if (f.levelIdx !== '' && String(r.levelIdx) !== f.levelIdx) return false;
+    if (f.status   && r.status    !== f.status)           return false;
+    if (f.prio     && r.priorita  !== f.prio)             return false;
+    if (f.dlFrom   && r.deadline  && r.deadline < f.dlFrom) return false;
+    if (f.dlTo     && r.deadline  && r.deadline > f.dlTo)   return false;
+    return true;
+  });
+
+  // Sort: overdue first, then by deadline, then by priority
+  const PORD = { 'Vysoká':0, 'Střední':1, 'Nízká':2 };
+  filtered.sort((a,b) => {
+    const da = a.deadline||'9999'; const db = b.deadline||'9999';
+    if (da !== db) return da < db ? -1 : 1;
+    return (PORD[a.priorita]||1) - (PORD[b.priorita]||1);
+  });
+
+  // Stats
+  const byStatus = {};
+  filtered.forEach(r => { byStatus[r.status||'Otevřeno'] = (byStatus[r.status||'Otevřeno']||0)+1; });
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <span class="ht-stat"><b>${filtered.length}</b>/${all.length}</span>
+      ${byStatus['Otevřeno']  ? `<span class="ht-stat" style="border-color:#EF4444"><b style="color:#EF4444">${byStatus['Otevřeno']}</b> otevřeno</span>` : ''}
+      ${byStatus['V řešení']  ? `<span class="ht-stat" style="border-color:#F59E0B"><b style="color:#F59E0B">${byStatus['V řešení']}</b> v řešení</span>` : ''}
+      ${byStatus['Hotovo']    ? `<span class="ht-stat" style="border-color:#10B981"><b style="color:#10B981">${byStatus['Hotovo']}</b> hotovo</span>` : ''}
+    `;
+  }
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="ht-empty">Žádné úkoly neodpovídají filtrům.</div>';
+    return;
+  }
+
+  const STATUS_COLORS = { 'Otevřeno':'#EF4444', 'V řešení':'#F59E0B', 'Hotovo':'#10B981' };
+
+  list.innerHTML = filtered.map(r => {
+    const color   = getProfColor(r.profese||'');
+    const statusC = STATUS_COLORS[r.status||'Otevřeno'] || '#6B7280';
+    const profObj = (appState.profese||[]).find(p => p.name === r.profese);
+    const firma   = profObj ? (profObj.firma || '') : '';
+
+    let dlClass = '', dlText = '';
+    if (r.deadline) {
+      dlText = r.deadline;
+      if (r.deadline < today)              dlClass = 'overdue';
+      else if (r.deadline <= addDays(today,7)) dlClass = 'due-soon';
+    }
+
+    return `<div class="ht-card" style="border-left-color:${color}"
+        onclick="goToAnnotation(${r.levelIdx},'${escHtml(r.annotId)}')"
+        title="${escHtml(r.popisek||'(bez popisu)')}">
+      <div class="ht-card-top">
+        <span class="ht-card-prof" style="color:${color}">${escHtml(r.profese||'—')}</span>
+        ${firma ? `<span style="font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;" title="${escHtml(firma)}">${escHtml(firma)}</span>` : ''}
+        <span class="ht-card-id">${escHtml(r.annotId)}</span>
+      </div>
+      <div class="ht-card-desc">${escHtml(r.popisek||'(bez popisu)')}</div>
+      <div class="ht-card-meta">
+        <span class="ht-card-level">${escHtml(r.levelName)}</span>
+        <span class="ht-status-dot" style="background:${statusC}"></span>
+        <span style="font-size:10px;color:${statusC}">${escHtml(r.status||'Otevřeno')}</span>
+        ${dlText ? `<span class="ht-card-deadline ${dlClass}" style="margin-left:auto">📅 ${dlText}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+
+// ============================================================
+// 3D MODEL UPLOAD
+// ============================================================
+function setup3DUpload() {
+  const input = document.getElementById('upload-3d-input');
+  const removeBtn = document.getElementById('remove-3d-model-btn');
+  if (!input) return;
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    input.value = '';
+    load3DModelFile(file);
+  });
+  if (removeBtn) {
+    removeBtn.addEventListener('click', remove3DModel);
+  }
+}
+
+function set3DStatus(msg) {
+  const bar = document.getElementById('model-status-bar');
+  if (bar) bar.textContent = msg;
+}
+
+function load3DModelFile(file) {
+  if (!threeScene) {
+    // panel not open yet — open it first then retry
+    toggle3DPanel();
+    setTimeout(() => load3DModelFile(file), 400);
+    return;
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  set3DStatus('Nahrávám model: ' + file.name + '…');
+
+  if (ext === 'glb' || ext === 'gltf') {
+    if (typeof THREE.GLTFLoader === 'undefined') {
+      showToast('GLTFLoader se nepodařilo načíst', 'error'); return;
+    }
+    const loader = new THREE.GLTFLoader();
+    const url = URL.createObjectURL(file);
+    loader.load(url, (gltf) => {
+      URL.revokeObjectURL(url);
+      applyImportedModel(gltf.scene, file.name);
+    }, undefined, (err) => {
+      URL.revokeObjectURL(url);
+      showToast('Chyba při načítání modelu', 'error');
+      set3DStatus('');
+    });
+  } else if (ext === 'obj') {
+    if (typeof THREE.OBJLoader === 'undefined') {
+      showToast('OBJLoader se nepodařilo načíst', 'error'); return;
+    }
+    const loader = new THREE.OBJLoader();
+    const url = URL.createObjectURL(file);
+    loader.load(url, (obj) => {
+      URL.revokeObjectURL(url);
+      applyImportedModel(obj, file.name);
+    }, undefined, () => {
+      URL.revokeObjectURL(url);
+      showToast('Chyba při načítání OBJ modelu', 'error');
+      set3DStatus('');
+    });
+  } else if (ext === 'ifc') {
+    loadIFCFile(file);
+  } else if (ext === 'dxf') {
+    loadDXFFile(file);
+  } else if (ext === 'dwg') {
+    showToast('Formát DWG není podporován v prohlížeči. Exportujte prosím soubor jako DXF z CAD programu.', 'warn');
+    set3DStatus('');
+  } else if (ext === 'daluxbim' || file.name.toLowerCase().includes('dalux')) {
+    showToast('DaluxBIM formát není podporován přímo. Exportujte model jako IFC z aplikace Dalux.', 'warn');
+    set3DStatus('');
+  } else {
+    showToast('Nepodporovaný formát. Použijte GLB, GLTF, OBJ, IFC nebo DXF.', 'warn');
+    set3DStatus('');
+  }
+}
+
+async function loadIFCFile(file) {
+  set3DStatus('Načítám IFC model…');
+  try {
+    if (typeof WebIFC === 'undefined') {
+      showToast('web-ifc knihovna se nepodařilo načíst. Zkuste obnovit stránku.', 'error');
+      set3DStatus(''); return;
+    }
+    const buffer = await file.arrayBuffer();
+    const ifcApi = new WebIFC.IfcAPI();
+    ifcApi.SetWasmPath('https://unpkg.com/web-ifc@0.0.44/');
+    await ifcApi.Init();
+    const modelID = ifcApi.OpenModel(new Uint8Array(buffer));
+    const group = new THREE.Group();
+    group.name = file.name;
+    ifcApi.StreamAllMeshes(modelID, (mesh) => {
+      for (let i = 0; i < mesh.geometries.size(); i++) {
+        const pg = mesh.geometries.get(i);
+        const geom = ifcApi.GetGeometry(modelID, pg.geometryExpressID);
+        const verts = ifcApi.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
+        const idxArr = ifcApi.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
+        const pos = new Float32Array((verts.length / 6) * 3);
+        for (let j = 0, k = 0; j < verts.length; j += 6, k += 3) {
+          pos[k] = verts[j]; pos[k+1] = verts[j+1]; pos[k+2] = verts[j+2];
+        }
+        const threeGeom = new THREE.BufferGeometry();
+        threeGeom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        threeGeom.setIndex(new THREE.BufferAttribute(new Uint32Array(idxArr), 1));
+        threeGeom.computeVertexNormals();
+        const c = pg.color;
+        const mat = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(c.x, c.y, c.z),
+          transparent: c.w < 0.99, opacity: c.w, side: THREE.DoubleSide
+        });
+        const mesh3 = new THREE.Mesh(threeGeom, mat);
+        const matrix = new THREE.Matrix4();
+        matrix.fromArray(pg.flatTransformation);
+        mesh3.applyMatrix4(matrix);
+        group.add(mesh3);
+        geom.delete();
+      }
+    });
+    ifcApi.CloseModel(modelID);
+    if (group.children.length === 0) {
+      showToast('IFC model neobsahuje žádnou geometrii.', 'warn');
+      set3DStatus(''); return;
+    }
+    applyImportedModel(group, file.name);
+    showToast('IFC model načten: ' + group.children.length + ' objektů', 'success');
+  } catch (err) {
+    console.error('IFC load error:', err);
+    showToast('Chyba při načítání IFC: ' + (err.message || err), 'error');
+    set3DStatus('');
+  }
+}
+
+function loadDXFFile(file) {
+  set3DStatus('Načítám DXF model…');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const group = parseDXFToThree(e.target.result);
+      group.name = file.name;
+      if (group.children.length === 0) {
+        showToast('DXF neobsahuje podporované entity (LINE, LWPOLYLINE, CIRCLE, ARC).', 'warn');
+        set3DStatus(''); return;
+      }
+      applyImportedModel(group, file.name);
+      showToast('DXF model načten', 'success');
+    } catch(err) {
+      showToast('Chyba při parsování DXF: ' + (err.message || err), 'error');
+      set3DStatus('');
+    }
+  };
+  reader.onerror = () => { showToast('Chyba při čtení souboru', 'error'); set3DStatus(''); };
+  reader.readAsText(file, 'utf-8');
+}
+
+function parseDXFToThree(text) {
+  const group = new THREE.Group();
+  const lines = text.split(/\r?\n/);
+  const segments = []; // flat array [x1,y1,z1, x2,y2,z2, ...]
+  let i = 0;
+
+  // Find ENTITIES section
+  while (i < lines.length) {
+    if (lines[i].trim() === '2' && i+1 < lines.length && lines[i+1].trim() === 'ENTITIES') {
+      i += 2; break;
+    }
+    i++;
+  }
+
+  while (i < lines.length) {
+    const ln = lines[i].trim();
+    if (ln === 'ENDSEC' || ln === 'EOF') break;
+    if (ln !== '0') { i++; continue; }
+    i++;
+    if (i >= lines.length) break;
+    const type = lines[i].trim();
+    i++;
+
+    // Collect all group code/value pairs for this entity (until next 0)
+    const codes = {};
+    while (i < lines.length && lines[i].trim() !== '0') {
+      const code = lines[i].trim(); i++;
+      if (i >= lines.length) break;
+      const val = lines[i].trim(); i++;
+      if (!codes[code]) codes[code] = [];
+      codes[code].push(val);
+    }
+
+    const fv = (c, idx) => parseFloat((codes[c] && codes[c][idx] !== undefined) ? codes[c][idx] : '0');
+
+    if (type === 'LINE') {
+      segments.push(fv('10',0), fv('20',0), fv('30',0), fv('11',0), fv('21',0), fv('31',0));
+    } else if (type === 'LWPOLYLINE') {
+      const xs = codes['10'] || [];
+      const ys = codes['20'] || [];
+      const closed = parseInt((codes['70'] && codes['70'][0]) || '0') & 1;
+      for (let k = 0; k < xs.length - 1; k++) {
+        segments.push(parseFloat(xs[k]), parseFloat(ys[k]), 0, parseFloat(xs[k+1]), parseFloat(ys[k+1]), 0);
+      }
+      if (closed && xs.length > 1) {
+        segments.push(parseFloat(xs[xs.length-1]), parseFloat(ys[ys.length-1]), 0, parseFloat(xs[0]), parseFloat(ys[0]), 0);
+      }
+    } else if (type === 'POLYLINE' || type === 'VERTEX') {
+      // handled via VERTEX entities collected below — skip for now
+    } else if (type === 'CIRCLE') {
+      const cx = fv('10',0), cy = fv('20',0), cz = fv('30',0), r = fv('40',0);
+      const N = 36;
+      for (let k = 0; k < N; k++) {
+        const a1 = (k/N)*Math.PI*2, a2 = ((k+1)/N)*Math.PI*2;
+        segments.push(cx+r*Math.cos(a1), cy+r*Math.sin(a1), cz, cx+r*Math.cos(a2), cy+r*Math.sin(a2), cz);
+      }
+    } else if (type === 'ARC') {
+      const cx = fv('10',0), cy = fv('20',0), cz = fv('30',0), r = fv('40',0);
+      let a1 = fv('50',0)*Math.PI/180, a2 = fv('51',0)*Math.PI/180;
+      if (a2 <= a1) a2 += Math.PI*2;
+      const N = Math.max(4, Math.ceil((a2-a1)/(Math.PI/18)));
+      for (let k = 0; k < N; k++) {
+        const t1 = a1+(a2-a1)*k/N, t2 = a1+(a2-a1)*(k+1)/N;
+        segments.push(cx+r*Math.cos(t1), cy+r*Math.sin(t1), cz, cx+r*Math.cos(t2), cy+r*Math.sin(t2), cz);
+      }
+    } else if (type === 'SPLINE' && codes['10'] && codes['10'].length >= 2) {
+      const xs = codes['10'], ys = codes['20'] || [], zs = codes['30'] || [];
+      for (let k = 0; k < xs.length - 1; k++) {
+        segments.push(parseFloat(xs[k]), parseFloat(ys[k]||0), parseFloat(zs[k]||0),
+                      parseFloat(xs[k+1]), parseFloat(ys[k+1]||0), parseFloat(zs[k+1]||0));
+      }
+    }
+  }
+
+  if (segments.length > 0) {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0x88ccff });
+    group.add(new THREE.LineSegments(geom, mat));
+  }
+  return group;
+}
+
+function applyImportedModel(modelObj, fileName) {
+  // Remove previous imported model
+  if (threeImportedModel) threeScene.remove(threeImportedModel);
+
+  threeImportedModel = modelObj;
+  threeImportedModel.userData.isImportedModel = true;
+
+  // Auto-scale to fit the scene (target ~12 units wide)
+  const box = new THREE.Box3().setFromObject(threeImportedModel);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim > 0) {
+    const scale = 12 / maxDim;
+    threeImportedModel.scale.setScalar(scale);
+  }
+
+  // Center at origin, sit on ground
+  box.setFromObject(threeImportedModel);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  threeImportedModel.position.sub(center);
+  box.setFromObject(threeImportedModel);
+  threeImportedModel.position.y -= box.min.y;
+
+  // Transparent / wireframe overlay style
+  threeImportedModel.traverse(child => {
+    if (child.isMesh) {
+      child.material = new THREE.MeshLambertMaterial({
+        color: 0x5a7a5a,
+        transparent: true,
+        opacity: 0.35,
+        wireframe: false
+      });
+      child.userData.isImportedMesh = true;
+    }
+  });
+
+  threeScene.add(threeImportedModel);
+  document.getElementById('remove-3d-model-btn').style.display = 'flex';
+  set3DStatus('Model: ' + fileName);
+  showToast('Model nahrán: ' + fileName, 'success');
+}
+
+function remove3DModel() {
+  if (threeImportedModel && threeScene) {
+    threeScene.remove(threeImportedModel);
+    threeImportedModel = null;
+  }
+  document.getElementById('remove-3d-model-btn').style.display = 'none';
+  set3DStatus('');
+  showToast('Model odebrán', 'info');
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+function resizeCanvas() {
+  const area = document.getElementById('canvas-area');
+  fabricCanvas.setWidth(area.clientWidth);
+  fabricCanvas.setHeight(area.clientHeight);
+  fabricCanvas.renderAll();
+  drawGrid();
+
+  if (threeRenderer && threeCamera) {
+    const container = document.getElementById('three-canvas-container');
+    threeRenderer.setSize(container.clientWidth, container.clientHeight);
+    threeCamera.aspect = container.clientWidth / container.clientHeight;
+    threeCamera.updateProjectionMatrix();
+  }
+}
+
+// ============================================================
+// ALL TASKS PAGE
+// ============================================================
+let tasksSort = { col: 'createdAt', dir: 'desc' };
+
+function openTasksPage() {
+  // Flush current canvas to state first
+  saveCurrentLevel();
+  populateTaskFilters();
+  renderTasksPage();
+  document.getElementById('tasks-page').classList.add('visible');
+}
+
+function closeTasksPage() {
+  document.getElementById('tasks-page').classList.remove('visible');
+}
+
+function getAllAnnotations() {
+  const rows = [];
+  appState.levels.forEach((level, levelIdx) => {
+    const annots = level.annotations || [];
+    annots.forEach(a => {
+      rows.push({ ...a, levelName: level.name, levelIdx });
+    });
+  });
+  return rows;
+}
+
+function populateTaskFilters() {
+  // Levels
+  const lvlSel = document.getElementById('tfilter-level');
+  const curLvl = lvlSel.value;
+  lvlSel.innerHTML = '<option value="">Všechna podlaží</option>';
+  appState.levels.forEach((l, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = l.name;
+    if (curLvl === String(i)) opt.selected = true;
+    lvlSel.appendChild(opt);
+  });
+  // Profese
+  const profSel = document.getElementById('tfilter-profese');
+  const curProf = profSel.value;
+  profSel.innerHTML = '<option value="">Všechny profese</option>';
+  (appState.profese || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = p.name;
+    if (curProf === p.name) opt.selected = true;
+    profSel.appendChild(opt);
+  });
+}
+
+function getTaskFilters() {
+  return {
+    search:  (document.getElementById('tfilter-search').value  || '').toLowerCase().trim(),
+    levelIdx: document.getElementById('tfilter-level').value,
+    profese: document.getElementById('tfilter-profese').value,
+    status:  document.getElementById('tfilter-status').value,
+    prio:    document.getElementById('tfilter-prio').value,
+    dateFrom: document.getElementById('tfilter-date-from').value,
+    dateTo:   document.getElementById('tfilter-date-to').value
+  };
+}
+
+function filterAnnotations(rows, f) {
+  return rows.filter(r => {
+    if (f.search) {
+      const hay = ((r.popisek||'') + ' ' + (r.annotId||'') + ' ' + (r.prirazeno||'')).toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    if (f.levelIdx !== '' && String(r.levelIdx) !== f.levelIdx) return false;
+    if (f.profese && r.profese !== f.profese) return false;
+    if (f.status  && r.status  !== f.status)  return false;
+    if (f.prio    && r.priorita !== f.prio)   return false;
+    if (f.dateFrom && r.createdAt) {
+      if (r.createdAt.slice(0,10) < f.dateFrom) return false;
+    }
+    if (f.dateTo && r.createdAt) {
+      if (r.createdAt.slice(0,10) > f.dateTo) return false;
+    }
+    return true;
+  });
+}
+
+const PRIO_ORDER = { 'Vysoká': 0, 'Střední': 1, 'Nízká': 2 };
+const STATUS_ORDER = { 'Otevřeno': 0, 'V řešení': 1, 'Hotovo': 2 };
+
+function sortAnnotations(rows, col, dir) {
+  return [...rows].sort((a, b) => {
+    let va = a[col] ?? '', vb = b[col] ?? '';
+    if (col === 'priorita') { va = PRIO_ORDER[va] ?? 1; vb = PRIO_ORDER[vb] ?? 1; }
+    if (col === 'status')   { va = STATUS_ORDER[va] ?? 0; vb = STATUS_ORDER[vb] ?? 0; }
+    if (typeof va === 'number') return dir === 'asc' ? va - vb : vb - va;
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return dir === 'asc' ? va.localeCompare(vb, 'cs') : vb.localeCompare(va, 'cs');
+  });
+}
+
+function renderTasksPage() {
+  const all = getAllAnnotations();
+  const filters = getTaskFilters();
+  const filtered = filterAnnotations(all, filters);
+  const sorted = sortAnnotations(filtered, tasksSort.col, tasksSort.dir);
+
+  // Stats
+  const statsRow = document.getElementById('tasks-stats-row');
+  const counts = { total: all.length, filtered: filtered.length };
+  const byStatus = {};
+  filtered.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
+  statsRow.innerHTML = `
+    <div class="tstat-pill"><span class="tstat-num">${counts.filtered}</span>&nbsp;/ ${counts.total} celkem</div>
+    ${byStatus['Otevřeno']  ? `<div class="tstat-pill" style="border-color:#EF4444"><span class="tstat-num" style="color:#EF4444">${byStatus['Otevřeno']}</span>&nbsp;Otevřeno</div>` : ''}
+    ${byStatus['V řešení']  ? `<div class="tstat-pill" style="border-color:#F59E0B"><span class="tstat-num" style="color:#F59E0B">${byStatus['V řešení']}</span>&nbsp;V řešení</div>` : ''}
+    ${byStatus['Hotovo']    ? `<div class="tstat-pill" style="border-color:#10B981"><span class="tstat-num" style="color:#10B981">${byStatus['Hotovo']}</span>&nbsp;Hotovo</div>` : ''}
+  `;
+
+  // Sort arrows
+  document.querySelectorAll('#tasks-table th.th-sort').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === tasksSort.col) th.classList.add(tasksSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  const tbody = document.getElementById('tasks-tbody');
+  const empty = document.getElementById('tasks-empty');
+
+  if (sorted.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = sorted.map(r => {
+    const color  = getProfColor(r.profese || '');
+    const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
+    const dateStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
+    const statusOpts = ['Otevřeno','V řešení','Hotovo'].map(s =>
+      `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
+    ).join('');
+    return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
+      <td class="tcell-id">${escHtml(r.annotId)}</td>
+      <td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${color}"></span>${escHtml(r.profese||'—')}</span></td>
+      <td class="tcell-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek || '(bez popisu)')}</td>
+      <td><span class="tcell-level">${escHtml(r.levelName)}</span></td>
+      <td><span class="tcell-prio ${prioClass}">${escHtml(r.priorita||'Střední')}</span></td>
+      <td class="tcell-status">
+        <select onchange="updateAnnotStatusFromTable('${escHtml(r.annotId)}',${r.levelIdx},this.value)">
+          ${statusOpts}
+        </select>
+      </td>
+      <td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>
+      <td class="tcell-date">${dateStr}</td>
+      <td class="tcell-actions">
+        <button class="trow-goto-btn" onclick="goToAnnotation(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function goToAnnotation(levelIdx, annotId) {
+  closeTasksPage();
+  switchLevel(levelIdx);
+  // Wait for loadFromJSON then select the annotation
+  setTimeout(() => {
+    const objs = fabricCanvas.getObjects();
+    const target = objs.find(o => o.annotId === annotId);
+    if (target) {
+      fabricCanvas.setActiveObject(target);
+      // Pan to center the object
+      const br = target.getBoundingRect(true);
+      const zoom = fabricCanvas.getZoom();
+      const vpt = fabricCanvas.viewportTransform.slice();
+      vpt[4] = fabricCanvas.getWidth()  / 2 - (br.left + br.width  / 2) * zoom;
+      vpt[5] = fabricCanvas.getHeight() / 2 - (br.top  + br.height / 2) * zoom;
+      fabricCanvas.setViewportTransform(vpt);
+      updateAllLabelScales();
+      fabricCanvas.renderAll();
+      onObjectSelected({ target });
+    }
+  }, 350);
+}
+
+function updateAnnotStatusFromTable(annotId, levelIdx, newStatus) {
+  // Update saved annotations in state
+  const level = appState.levels[levelIdx];
+  if (level && level.annotations) {
+    const ann = level.annotations.find(a => a.annotId === annotId);
+    if (ann) ann.status = newStatus;
+  }
+  // If it's the current level, update the canvas object too
+  if (levelIdx === appState.activeLevel) {
+    const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
+    if (obj) {
+      obj.set('status', newStatus);
+      saveCurrentLevel();
+      updateAnnotList();
+    }
+  } else {
+    saveState();
+  }
+  renderTasksPage();
+}
+
+function setupTasksPage() {
+  document.getElementById('all-tasks-btn').addEventListener('click', openTasksPage);
+  document.getElementById('close-tasks-btn').addEventListener('click', closeTasksPage);
+  document.getElementById('tfilter-reset-btn').addEventListener('click', () => {
+    ['tfilter-search','tfilter-level','tfilter-profese','tfilter-status','tfilter-prio','tfilter-date-from','tfilter-date-to']
+      .forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    renderTasksPage();
+  });
+  ['tfilter-search','tfilter-level','tfilter-profese','tfilter-status','tfilter-prio','tfilter-date-from','tfilter-date-to']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', renderTasksPage);
+      if (el) el.addEventListener('change', renderTasksPage);
+    });
+  document.querySelectorAll('#tasks-table th.th-sort').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (tasksSort.col === col) {
+        tasksSort.dir = tasksSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        tasksSort.col = col;
+        tasksSort.dir = 'asc';
+      }
+      renderTasksPage();
+    });
+  });
+  document.getElementById('tasks-export-csv-btn').addEventListener('click', exportTasksCSV);
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('tasks-page').classList.contains('visible')) {
+      closeTasksPage();
+    }
+  });
+}
+
+function exportTasksCSV() {
+  const all = getAllAnnotations();
+  const filters = getTaskFilters();
+  const filtered = filterAnnotations(all, filters);
+  const sorted = sortAnnotations(filtered, tasksSort.col, tasksSort.dir);
+  const headers = ['ID','Profese','Popis','Podlaží','Priorita','Status','Přiřazeno','Vytvořeno'];
+  const csvRows = [headers.join(';')];
+  sorted.forEach(r => {
+    const row = [
+      r.annotId, r.profese||'', r.popisek||'', r.levelName,
+      r.priorita||'', r.status||'', r.prirazeno||'',
+      r.createdAt ? r.createdAt.slice(0,10) : ''
+    ].map(v => '"' + String(v).replace(/"/g,'""') + '"');
+    csvRows.push(row.join(';'));
+  });
+  const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ukoly-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+function saveCurrentLevel() {
+  if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
+  appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
+
+  // Extract annotations for sidebar
+  const annotObjects = getAnnotObjects();
+  appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
+    annotId: o.annotId, profese: o.profese, popisek: o.popisek,
+    priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
+    createdAt: o.createdAt || null, deadline: o.deadline || null
+  }));
+
+  saveState();
+}
+
+let saveTimer = null;
+function saveState() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      // Don't save backgroundImage (too large) directly, strip it from state
+      const stateToSave = {
+        levels: appState.levels.map(l => ({
+          id: l.id, name: l.name, type: l.type,
+          annotations: l.annotations,
+          fabricJSON: l.fabricJSON,
+          viewportTransform: l.viewportTransform,
+          hasBackground: !!l.backgroundImage,
+          color3D: l.color3D, shape3D: l.shape3D
+        })),
+        activeLevel: appState.activeLevel,
+        tool: appState.tool,
+        showGrid: appState.showGrid,
+        zones3D: appState.zones3D
+      };
+      localStorage.setItem('stavba_pudorysy_state', JSON.stringify(stateToSave));
+      localStorage.setItem('stavba_pudorysy_annotCounter', String(annotIdCounter));
+      localStorage.setItem('stavba_pudorysy_profese', JSON.stringify(appState.profese));
+    } catch(e) {
+      // localStorage full or error - silently fail
+    }
+  }, 500);
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('stavba_pudorysy_state');
+    const savedCounter = localStorage.getItem('stavba_pudorysy_annotCounter');
+    const savedProfese = localStorage.getItem('stavba_pudorysy_profese');
+    if (savedCounter) annotIdCounter = parseInt(savedCounter) || 1;
+    if (savedProfese) {
+      try {
+        const parsed = JSON.parse(savedProfese);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          appState.profese = parsed;
+        }
+      } catch(e) { /* use defaults */ }
+    }
+    rebuildProfeseSelects();
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      appState.levels = parsed.levels || [];
+      appState.activeLevel = parsed.activeLevel || 0;
+      appState.tool = parsed.tool || 'select';
+      appState.showGrid = parsed.showGrid || false;
+      appState.zones3D = parsed.zones3D || [];
+
+      if (appState.showGrid) {
+        document.getElementById('grid-btn').classList.add('active');
+        drawGrid();
+      }
+
+      setTool(appState.tool);
+    }
+  } catch(e) {
+    appState.levels = [];
+    appState.activeLevel = 0;
+  }
+}
+
+// ============================================================
+// EXPORT / IMPORT
+// ============================================================
+function exportJSON() {
+  saveCurrentLevel();
+  const data = {
+    version: '1.0',
+    app: 'StavbaBoard Půdorysy',
+    exportDate: new Date().toISOString(),
+    levels: appState.levels.map(l => ({
+      id: l.id, name: l.name, type: l.type,
+      annotations: l.annotations,
+      fabricJSON: l.fabricJSON
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'stavba-pudorysy-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Export dokončen', 'success');
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const confirmed = await showModal('Import dat', 'Importování přepíše stávající data. Pokračovat?');
+      if (!confirmed) return;
+
+      appState.levels = data.levels.map(l => ({
+        ...l,
+        backgroundImage: null
+      }));
+      appState.activeLevel = 0;
+      annotIdCounter = 1;
+
+      renderLevelTabs();
+      switchLevel(0);
+      saveState();
+      showToast('Import úspěšný', 'success');
+    } catch(err) {
+      showToast('Chyba při importu: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ============================================================
+// STATUS BAR
+// ============================================================
+function updateStatusBar() {
+  const level = appState.levels[appState.activeLevel];
+  document.getElementById('status-level-info').textContent = 'Podlaží: ' + (level ? level.name : '-');
+  updateZoomDisplay();
+}
+
+// ============================================================
+// AUTO-SAVE LOOP
+// ============================================================
+let lastAutoSave = 0;
+function autoSaveLoop(ts) {
+  if (ts - lastAutoSave > 5000) {
+    saveCurrentLevel();
+    lastAutoSave = ts;
+  }
+  requestAnimationFrame(autoSaveLoop);
+}
+
+// ============================================================
+// UTILITY
+// ============================================================
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ============================================================
+// PROFESE MANAGEMENT
+// ============================================================
+function rebuildProfeseSelects() {
+  const profese = appState.profese || DEFAULT_PROFESE;
+  ['prop-profese', 'filter-profese'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const currentVal = sel.value;
+    if (id === 'filter-profese') {
+      sel.innerHTML = '<option value="">Všechny profese</option>';
+    } else {
+      sel.innerHTML = '';
+    }
+    profese.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+    // Restore previous value if still valid
+    if (profese.find(p => p.name === currentVal)) {
+      sel.value = currentVal;
+    }
+  });
+}
+
+function getTotalAnnotCountForProfese(profName) {
+  let count = 0;
+  appState.levels.forEach(level => {
+    if (level.annotations) {
+      count += level.annotations.filter(a => a.profese === profName).length;
+    }
+  });
+  return count;
+}
+
+function renderProfeseList() {
+  const container = document.getElementById('profese-list-container');
+  if (!container) return;
+  container.innerHTML = '';
+  const profese = appState.profese || [];
+  profese.forEach((prof, idx) => {
+    const row = document.createElement('div');
+    row.className = 'profese-row';
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <div class="profese-row-summary">
+        <div class="profese-row-dot" style="background:${escHtml(prof.color)}"></div>
+        <div class="profese-row-name">${escHtml(prof.name)}</div>
+        <div class="profese-row-firma">${escHtml(prof.firma) || ''}</div>
+        <div class="profese-row-actions">
+          <button class="profese-action-btn prof-edit-btn" data-idx="${idx}">Upravit</button>
+          <button class="profese-action-btn danger prof-delete-btn" data-idx="${idx}">Smazat</button>
+        </div>
+      </div>
+      <div class="profese-edit-form" id="prof-edit-form-${idx}">
+        <div class="profese-form-grid">
+          <div class="profese-form-field">
+            <label>Název profese</label>
+            <input type="text" class="pf-name" value="${escHtml(prof.name)}" placeholder="Název profese">
+          </div>
+          <div class="profese-form-field">
+            <label>Barva</label>
+            <div class="profese-color-row">
+              <input type="color" class="pf-color" value="${escHtml(prof.color)}">
+              <span style="font-size:12px;color:var(--text-dim);">${escHtml(prof.color)}</span>
+            </div>
+          </div>
+          <div class="profese-form-field">
+            <label>Firma</label>
+            <input type="text" class="pf-firma" value="${escHtml(prof.firma)}" placeholder="Název firmy">
+          </div>
+          <div class="profese-form-field">
+            <label>Kontakt</label>
+            <input type="text" class="pf-kontakt" value="${escHtml(prof.kontakt)}" placeholder="Jméno kontaktní osoby">
+          </div>
+          <div class="profese-form-field">
+            <label>Telefon</label>
+            <input type="tel" class="pf-telefon" value="${escHtml(prof.telefon)}" placeholder="+420 ...">
+          </div>
+          <div class="profese-form-field">
+            <label>Email</label>
+            <input type="email" class="pf-email" value="${escHtml(prof.email)}" placeholder="email@firma.cz">
+          </div>
+        </div>
+        <div class="profese-form-actions">
+          <button class="profese-cancel-btn prof-cancel-btn" data-idx="${idx}">Zrušit</button>
+          <button class="profese-save-btn prof-save-btn" data-idx="${idx}">Uložit</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+
+  // Bind events
+  container.querySelectorAll('.prof-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      const form = document.getElementById('prof-edit-form-' + idx);
+      // Close any other open forms
+      container.querySelectorAll('.profese-edit-form.open').forEach(f => {
+        if (f !== form) f.classList.remove('open');
+      });
+      form.classList.toggle('open');
+      // Sync color display
+      const colorInput = form.querySelector('.pf-color');
+      const colorSpan = colorInput.nextElementSibling;
+      colorInput.addEventListener('input', () => { colorSpan.textContent = colorInput.value; });
+    });
+  });
+
+  container.querySelectorAll('.prof-cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      document.getElementById('prof-edit-form-' + idx).classList.remove('open');
+    });
+  });
+
+  container.querySelectorAll('.prof-save-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      const form = document.getElementById('prof-edit-form-' + idx);
+      const name = form.querySelector('.pf-name').value.trim();
+      if (!name) { showToast('Název profese nesmí být prázdný', 'warn'); return; }
+      const color = form.querySelector('.pf-color').value;
+      const firma = form.querySelector('.pf-firma').value.trim();
+      const kontakt = form.querySelector('.pf-kontakt').value.trim();
+      const telefon = form.querySelector('.pf-telefon').value.trim();
+      const email = form.querySelector('.pf-email').value.trim();
+      appState.profese[idx] = { name, color, firma, kontakt, telefon, email };
+      saveState();
+      rebuildProfeseSelects();
+      renderProfeseList();
+      renderHomePage();
+      showToast('Profese uložena', 'success');
+    });
+  });
+
+  container.querySelectorAll('.prof-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.idx);
+      const prof = appState.profese[idx];
+      const count = getTotalAnnotCountForProfese(prof.name);
+      if (count > 0) {
+        showToast(`Nelze smazat: profese "${prof.name}" má ${count} anotaci(í)`, 'warn');
+        return;
+      }
+      const confirmed = await showModal('Smazat profesi', `Opravdu smazat profesi "${prof.name}"?`);
+      if (!confirmed) return;
+      appState.profese.splice(idx, 1);
+      saveState();
+      rebuildProfeseSelects();
+      renderProfeseList();
+      renderHomePage();
+      showToast('Profese smazána', 'info');
+    });
+  });
+}
+
+function openManageProfese() {
+  renderProfeseList();
+  document.getElementById('manage-profese-overlay').classList.add('visible');
+}
+
+function closeManageProfese() {
+  document.getElementById('manage-profese-overlay').classList.remove('visible');
+}
+
+function addNewProfese() {
+  const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', email: '' };
+  appState.profese.push(newProf);
+  saveState();
+  rebuildProfeseSelects();
+  renderProfeseList();
+  // Open edit form for the newly added item
+  const idx = appState.profese.length - 1;
+  setTimeout(() => {
+    const form = document.getElementById('prof-edit-form-' + idx);
+    if (form) {
+      form.classList.add('open');
+      const colorInput = form.querySelector('.pf-color');
+      const colorSpan = colorInput.nextElementSibling;
+      colorInput.addEventListener('input', () => { colorSpan.textContent = colorInput.value; });
+      const container = document.getElementById('profese-list-container');
+      container.scrollTop = container.scrollHeight;
+    }
+  }, 50);
+}
+
+// ============================================================
+// HOME PAGE (SUBDODAVATELE)
+// ============================================================
+function renderHomePage() {
+  const grid = document.getElementById('prof-grid');
+  if (!grid) return;
+  const searchVal = (document.getElementById('home-search') ? document.getElementById('home-search').value : '').toLowerCase();
+  grid.innerHTML = '';
+  const profese = appState.profese || [];
+  const filtered = profese.filter(p =>
+    !searchVal ||
+    p.name.toLowerCase().includes(searchVal) ||
+    (p.firma || '').toLowerCase().includes(searchVal) ||
+    (p.kontakt || '').toLowerCase().includes(searchVal)
+  );
+
+  filtered.forEach((prof, rawIdx) => {
+    const idx = appState.profese.indexOf(prof);
+    const annotCount = getTotalAnnotCountForProfese(prof.name);
+    const card = document.createElement('div');
+    card.className = 'prof-card';
+    const firmaHtml = prof.firma
+      ? `<div class="prof-card-firma">${escHtml(prof.firma)}</div>`
+      : `<div class="prof-card-firma"><span class="placeholder">— nevyplněno —</span></div>`;
+    const kontaktHtml = prof.kontakt
+      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${escHtml(prof.kontakt)}</div>`
+      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
+    const telefonHtml = prof.telefon
+      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><a href="tel:${escHtml(prof.telefon)}">${escHtml(prof.telefon)}</a></div>`
+      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
+    const emailHtml = prof.email
+      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a href="mailto:${escHtml(prof.email)}">${escHtml(prof.email)}</a></div>`
+      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
+
+    card.innerHTML = `
+      <div class="prof-card-header" style="background:${escHtml(prof.color)}"></div>
+      <div class="prof-card-body">
+        <div class="prof-card-name">${escHtml(prof.name)}</div>
+        ${firmaHtml}
+        <div class="prof-card-info">
+          ${kontaktHtml}
+          ${telefonHtml}
+          ${emailHtml}
+        </div>
+        <div class="prof-card-footer">
+          <div class="prof-annot-badge" style="color:${escHtml(prof.color)};border-color:${escHtml(prof.color)}66;background:${escHtml(prof.color)}11;">
+            ${annotCount} anotací
+          </div>
+          <button class="prof-card-edit-btn" data-idx="${idx}">Upravit</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Add "Přidat subdodavatele" card
+  const addCard = document.createElement('div');
+  addCard.className = 'prof-card-add';
+  addCard.innerHTML = `<div class="add-icon">+</div><span>Přidat subdodavatele</span>`;
+  addCard.addEventListener('click', () => {
+    toggleHomePage(false);
+    openManageProfese();
+    setTimeout(addNewProfese, 100);
+  });
+  grid.appendChild(addCard);
+
+  // Bind edit buttons
+  grid.querySelectorAll('.prof-card-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      toggleHomePage(false);
+      openManageProfese();
+      setTimeout(() => {
+        const form = document.getElementById('prof-edit-form-' + idx);
+        if (form) {
+          form.classList.add('open');
+          const colorInput = form.querySelector('.pf-color');
+          const colorSpan = colorInput.nextElementSibling;
+          colorInput.addEventListener('input', () => { colorSpan.textContent = colorInput.value; });
+          form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    });
+  });
+}
+
+function toggleHomePage(forceState) {
+  const hp = document.getElementById('home-page');
+  const btn = document.getElementById('subddodavatele-btn');
+  if (forceState === true) {
+    hp.classList.add('visible');
+    btn.classList.add('active');
+    renderHomePage();
+    renderHomeTasksStrip();
+  } else if (forceState === false) {
+    hp.classList.remove('visible');
+    btn.classList.remove('active');
+  } else {
+    const isVisible = hp.classList.contains('visible');
+    if (isVisible) {
+      hp.classList.remove('visible');
+      btn.classList.remove('active');
+    } else {
+      hp.classList.add('visible');
+      btn.classList.add('active');
+      renderHomePage();
+      renderHomeTasksStrip();
+    }
+  }
+}
+
+// ============================================================
+// STARTUP
+// ============================================================
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
