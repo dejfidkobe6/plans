@@ -1,0 +1,23 @@
+name: Deploy to plans.besix.cz
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: green.thinline.cz
+          username: plans_besix_cz
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /
