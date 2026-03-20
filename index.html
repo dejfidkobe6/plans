@@ -2015,6 +2015,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn" id="fit-btn" title="Zobrazit celý výkres (0)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
     </button>
+    <button class="tb-btn" id="change-drawing-btn" title="Změnit výkres" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </button>
     <button class="tb-btn" id="grid-btn" title="Mřížka (G)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
     </button>
@@ -2622,6 +2625,7 @@ function switchLevel(idx) {
   updateAnnotList();
   updateStatusBar();
   showDropZone(!level.backgroundImage && (!level.fabricJSON || !level.fabricJSON.objects || level.fabricJSON.objects.length === 0));
+  updateChangeDrawingBtn();
   undoStack = [];
   redoStack = [];
 
@@ -2700,6 +2704,15 @@ function showDropZone(show) {
   const dz = document.getElementById('drop-zone');
   if (show) dz.classList.remove('hidden');
   else dz.classList.add('hidden');
+  updateChangeDrawingBtn();
+}
+
+function updateChangeDrawingBtn() {
+  const btn = document.getElementById('change-drawing-btn');
+  if (!btn) return;
+  const level = appState.levels[appState.activeLevel];
+  const hasDrawing = level && !!level.backgroundImage;
+  btn.style.display = hasDrawing ? '' : 'none';
 }
 
 async function loadFile(file, levelIdx) {
@@ -3301,6 +3314,7 @@ function setupEventListeners() {
 
   // Drop zone
   document.getElementById('dz-pick-btn').addEventListener('click', () => document.getElementById('file-input').click());
+  document.getElementById('change-drawing-btn').addEventListener('click', () => document.getElementById('file-input').click());
   document.getElementById('file-input').addEventListener('change', (e) => {
     if (e.target.files[0]) loadFile(e.target.files[0]);
     e.target.value = '';
