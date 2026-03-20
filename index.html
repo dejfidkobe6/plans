@@ -4994,7 +4994,7 @@ function renderTasksPage() {
     const color  = getProfColor(r.profese || '');
     const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
     const dateStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
-    const statusOpts = ['Otevřeno','V řešení','Hotovo'].map(s =>
+    const statusOpts = ['Otevřeno','V řešení','Hotovo','Urgence'].map(s =>
       `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
     ).join('');
     return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
@@ -5201,7 +5201,7 @@ function renderAnotacePage() {
     const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
     const createdStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
     const deadlineStr = r.deadline || '—';
-    const statusOpts = ['Otevřeno','V řešení','Hotovo'].map(s =>
+    const statusOpts = ['Otevřeno','V řešení','Hotovo','Urgence'].map(s =>
       `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
     ).join('');
     return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
