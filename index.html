@@ -3181,6 +3181,9 @@ function setupEventListeners() {
       panel.classList.remove('open');
       if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
     }
+    fabricCanvas.setActiveObject(obj);
+    onObjectSelected({ target: obj });
+    document.getElementById('right-panel-content').scrollTop = 0;
   });
 
   // Object moving — keep label in sync
