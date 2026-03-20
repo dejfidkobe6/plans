@@ -1613,9 +1613,281 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   font-family: var(--font-main); font-size: 12px;
 }
 .zmgr-cancel-btn:hover { color: var(--text); }
+
+/* ============================================================
+   AUTH SCREEN
+   ============================================================ */
+#auth-screen {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+}
+#auth-screen.hidden { display: none; }
+.auth-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 360px;
+  padding: 32px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.auth-logo {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 28px; justify-content: center;
+}
+.auth-logo-icon {
+  width: 36px; height: 36px;
+  background: var(--olive);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: #fff;
+}
+.auth-logo-text { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.auth-logo-sub { font-size: 10px; color: var(--text-dim); }
+.auth-tabs {
+  display: flex; margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.auth-tab {
+  flex: 1; text-align: center; padding: 8px 0;
+  cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500;
+  color: var(--text-dim); border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s; margin-bottom: -1px;
+}
+.auth-tab.active { color: var(--text-bright); border-bottom-color: var(--olive); }
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-form.hidden { display: none; }
+.auth-label { font-size: 12px; font-family: var(--font-mono); color: var(--text-dim); margin-bottom: 4px; display: block; }
+.auth-input {
+  width: 100%; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 14px;
+  padding: 8px 10px; border-radius: 5px; outline: none;
+  transition: border-color 0.15s;
+}
+.auth-input:focus { border-color: var(--olive); }
+.auth-btn {
+  width: 100%; padding: 10px; margin-top: 4px;
+  background: var(--olive); border: none; border-radius: 5px;
+  color: #fff; font-family: var(--font-main); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+  letter-spacing: 0.04em;
+}
+.auth-btn:hover { background: var(--olive-hover); }
+.auth-error {
+  font-size: 12px; color: #EF4444; font-family: var(--font-mono);
+  text-align: center; min-height: 16px;
+}
+
+/* ============================================================
+   PROJECT SCREEN
+   ============================================================ */
+#project-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+}
+#project-screen.hidden { display: none; }
+#project-screen-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#project-screen-header .ps-logo { display: flex; align-items: center; gap: 10px; }
+#project-screen-header .ps-logo-icon {
+  width: 30px; height: 30px; background: var(--olive); border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: #fff;
+}
+#project-screen-header .ps-logo-text { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-bright); }
+#project-screen-header .ps-user-info {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+}
+#project-screen-header .ps-logout-btn {
+  padding: 5px 12px; background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); border-radius: 4px; cursor: pointer;
+  font-family: var(--font-main); font-size: 12px; transition: all 0.15s;
+}
+#project-screen-header .ps-logout-btn:hover { border-color: #EF4444; color: #EF4444; }
+#project-screen-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 40px 24px; overflow-y: auto;
+}
+#project-screen-body h2 {
+  font-family: var(--font-main); font-size: 22px; font-weight: 600;
+  color: var(--text-bright); margin-bottom: 8px;
+}
+#project-screen-body .ps-subtitle {
+  font-size: 13px; color: var(--text-dim); margin-bottom: 32px;
+  font-family: var(--font-mono);
+}
+#project-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px; width: 100%; max-width: 900px;
+}
+.project-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex; flex-direction: column; gap: 8px;
+  position: relative;
+}
+.project-card:hover { border-color: var(--olive); background: rgba(74,83,64,0.1); }
+.project-card.new-project-card {
+  border-style: dashed; align-items: center; justify-content: center;
+  min-height: 100px; color: var(--text-dim);
+}
+.project-card.new-project-card:hover { color: var(--olive-light); border-color: var(--olive); }
+.project-card.new-project-card .np-icon {
+  font-size: 28px; line-height: 1; margin-bottom: 6px;
+}
+.project-card.new-project-card .np-label { font-size: 13px; font-family: var(--font-main); font-weight: 500; }
+.project-card-name { font-size: 15px; font-weight: 600; color: var(--text-bright); font-family: var(--font-main); }
+.project-card-date { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); }
+.project-card-delete {
+  position: absolute; top: 8px; right: 8px;
+  width: 22px; height: 22px; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(239,68,68,0.15); border-radius: 4px;
+  color: #EF4444; font-size: 14px; cursor: pointer;
+  border: none;
+}
+.project-card:hover .project-card-delete { display: flex; }
+.project-card-delete:hover { background: rgba(239,68,68,0.35); }
+
+/* New project input dialog */
+#new-project-dialog {
+  position: fixed; inset: 0; z-index: 10001;
+  background: rgba(0,0,0,0.7); display: flex;
+  align-items: center; justify-content: center;
+}
+#new-project-dialog.hidden { display: none; }
+.npd-box {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 28px; width: 340px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.npd-box h3 { font-family: var(--font-main); font-size: 16px; font-weight: 600; color: var(--text-bright); margin-bottom: 16px; }
+.npd-input {
+  width: 100%; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-main); font-size: 14px;
+  padding: 8px 10px; border-radius: 5px; outline: none; margin-bottom: 16px;
+}
+.npd-input:focus { border-color: var(--olive); }
+.npd-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.npd-btn { padding: 7px 16px; border-radius: 4px; border: none; cursor: pointer; font-family: var(--font-main); font-size: 13px; font-weight: 500; transition: background 0.15s; }
+.npd-btn-cancel { background: var(--card); color: var(--text-dim); }
+.npd-btn-cancel:hover { color: var(--text); }
+.npd-btn-create { background: var(--olive); color: #fff; }
+.npd-btn-create:hover { background: var(--olive-hover); }
+
+/* TOP BAR user info */
+#topbar-user-info {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; border-left: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 11px;
+}
+#topbar-user-name { color: var(--text-dim); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+#topbar-project-name { color: var(--olive-light); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.topbar-sep-dot { color: var(--border); }
+#topbar-switch-project-btn, #topbar-logout-btn {
+  padding: 3px 8px; background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); border-radius: 3px; cursor: pointer;
+  font-family: var(--font-main); font-size: 10px; transition: all 0.15s;
+}
+#topbar-switch-project-btn:hover { border-color: var(--olive); color: var(--olive-light); }
+#topbar-logout-btn:hover { border-color: #EF4444; color: #EF4444; }
 </style>
 </head>
 <body>
+
+<!-- ============================================================
+     AUTH SCREEN
+     ============================================================ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">SB</div>
+      <div>
+        <div class="auth-logo-text">StavbaBoard</div>
+        <div class="auth-logo-sub">Půdorysy v1.0</div>
+      </div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Přihlásit se</div>
+      <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Registrovat</div>
+    </div>
+    <!-- LOGIN FORM -->
+    <div class="auth-form" id="login-form">
+      <div>
+        <label class="auth-label">E-mail</label>
+        <input class="auth-input" type="email" id="login-email" placeholder="vas@email.cz" autocomplete="email">
+      </div>
+      <div>
+        <label class="auth-label">Heslo</label>
+        <input class="auth-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="login-error"></div>
+      <button class="auth-btn" onclick="doLogin()">Přihlásit se</button>
+    </div>
+    <!-- REGISTER FORM -->
+    <div class="auth-form hidden" id="register-form">
+      <div>
+        <label class="auth-label">Jméno</label>
+        <input class="auth-input" type="text" id="reg-name" placeholder="Jan Novák" autocomplete="name">
+      </div>
+      <div>
+        <label class="auth-label">E-mail</label>
+        <input class="auth-input" type="email" id="reg-email" placeholder="vas@email.cz" autocomplete="email">
+      </div>
+      <div>
+        <label class="auth-label">Heslo</label>
+        <input class="auth-input" type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div>
+        <label class="auth-label">Potvrdit heslo</label>
+        <input class="auth-input" type="password" id="reg-password2" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div class="auth-error" id="register-error"></div>
+      <button class="auth-btn" onclick="doRegister()">Registrovat</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PROJECT SCREEN
+     ============================================================ -->
+<div id="project-screen" class="hidden">
+  <div id="project-screen-header">
+    <div class="ps-logo">
+      <div class="ps-logo-icon">SB</div>
+      <div class="ps-logo-text">StavbaBoard Půdorysy</div>
+    </div>
+    <div class="ps-user-info">
+      <span id="ps-user-label"></span>
+      <button class="ps-logout-btn" onclick="doLogout()">Odhlásit</button>
+    </div>
+  </div>
+  <div id="project-screen-body">
+    <h2>Vyberte projekt</h2>
+    <div class="ps-subtitle">Vyberte existující projekt nebo vytvořte nový</div>
+    <div id="project-grid"></div>
+  </div>
+</div>
+
+<!-- NEW PROJECT DIALOG -->
+<div id="new-project-dialog" class="hidden">
+  <div class="npd-box">
+    <h3>Nový projekt</h3>
+    <input class="npd-input" type="text" id="new-project-name" placeholder="Název projektu..." maxlength="60">
+    <div class="npd-actions">
+      <button class="npd-btn npd-btn-cancel" onclick="closeNewProjectDialog()">Zrušit</button>
+      <button class="npd-btn npd-btn-create" onclick="doCreateProject()">Vytvořit</button>
+    </div>
+  </div>
+</div>
+
 <!-- FILE INPUTS -->
 <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
 <input type="file" id="import-json-input" accept=".json">
@@ -1699,6 +1971,13 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn" id="all-tasks-btn" title="Všechny úkoly dodavatelů">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </button>
+  </div>
+  <div id="topbar-user-info">
+    <span id="topbar-user-name"></span>
+    <span class="topbar-sep-dot">·</span>
+    <span id="topbar-project-name"></span>
+    <button id="topbar-switch-project-btn" onclick="showProjectScreen()" title="Přepnout projekt">Projekt</button>
+    <button id="topbar-logout-btn" onclick="doLogout()" title="Odhlásit se">Odhlásit</button>
   </div>
 </div>
 
@@ -2121,14 +2400,12 @@ function init() {
   });
 
   setupEventListeners();
-  loadState();
-
-  if (appState.levels.length === 0) {
-    addLevel('1.NP', '1.NP');
-  } else {
-    renderLevelTabs();
-    switchLevel(appState.activeLevel);
-  }
+  // State is loaded per-project when openProject() is called.
+  // Keyboard shortcuts for auth forms
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('reg-password2').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+  document.getElementById('new-project-name').addEventListener('keydown', e => { if (e.key === 'Enter') doCreateProject(); });
 
   drawGrid();
   updateStatusBar();
@@ -4768,9 +5045,10 @@ function saveState() {
         showGrid: appState.showGrid,
         zones3D: appState.zones3D
       };
-      localStorage.setItem('stavba_pudorysy_state', JSON.stringify(stateToSave));
-      localStorage.setItem('stavba_pudorysy_annotCounter', String(annotIdCounter));
-      localStorage.setItem('stavba_pudorysy_profese', JSON.stringify(appState.profese));
+      const pid = currentProject ? currentProject.id : '_default';
+      localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(stateToSave));
+      localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
+      localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
     } catch(e) {
       // localStorage full or error - silently fail
     }
@@ -4779,9 +5057,10 @@ function saveState() {
 
 function loadState() {
   try {
-    const saved = localStorage.getItem('stavba_pudorysy_state');
-    const savedCounter = localStorage.getItem('stavba_pudorysy_annotCounter');
-    const savedProfese = localStorage.getItem('stavba_pudorysy_profese');
+    const pid = currentProject ? currentProject.id : '_default';
+    const saved = localStorage.getItem(LS_PROJECT_STATE(pid));
+    const savedCounter = localStorage.getItem(LS_PROJECT_COUNTER(pid));
+    const savedProfese = localStorage.getItem(LS_PROJECT_PROFESE(pid));
     if (savedCounter) annotIdCounter = parseInt(savedCounter) || 1;
     if (savedProfese) {
       try {
@@ -5198,9 +5477,228 @@ function toggleHomePage(forceState) {
 }
 
 // ============================================================
+// AUTH & PROJECT MANAGEMENT
+// ============================================================
+
+// --- Storage keys ---
+const LS_USERS = 'sb_users';
+const LS_SESSION = 'sb_session'; // {userId, userName, userEmail}
+const LS_PROJECTS = (uid) => `sb_projects_${uid}`;
+const LS_PROJECT_STATE = (pid) => `stavba_pudorysy_state_${pid}`;
+const LS_PROJECT_COUNTER = (pid) => `stavba_pudorysy_counter_${pid}`;
+const LS_PROJECT_PROFESE = (pid) => `stavba_pudorysy_profese_${pid}`;
+
+let currentUser = null;   // {id, name, email}
+let currentProject = null; // {id, name, createdAt}
+
+// --- Helpers ---
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); } catch(e) { return []; }
+}
+function saveUsers(users) {
+  localStorage.setItem(LS_USERS, JSON.stringify(users));
+}
+function getSession() {
+  try { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); } catch(e) { return null; }
+}
+function saveSession(user) {
+  localStorage.setItem(LS_SESSION, JSON.stringify(user));
+}
+function clearSession() {
+  localStorage.removeItem(LS_SESSION);
+}
+function getUserProjects(userId) {
+  try { return JSON.parse(localStorage.getItem(LS_PROJECTS(userId)) || '[]'); } catch(e) { return []; }
+}
+function saveUserProjects(userId, projects) {
+  localStorage.setItem(LS_PROJECTS(userId), JSON.stringify(projects));
+}
+function simpleHash(str) {
+  // Very basic hash for demo purposes (not cryptographically secure)
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = (Math.imul(31, h) + str.charCodeAt(i)) | 0; }
+  return String(h >>> 0);
+}
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// --- Auth Tab Switch ---
+function switchAuthTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('register-error').textContent = '';
+}
+
+// --- Login ---
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  if (!email || !password) { errEl.textContent = 'Vyplňte e-mail a heslo.'; return; }
+  const users = getUsers();
+  const user = users.find(u => u.email === email && u.passHash === simpleHash(password));
+  if (!user) { errEl.textContent = 'Špatný e-mail nebo heslo.'; return; }
+  currentUser = { id: user.id, name: user.name, email: user.email };
+  saveSession(currentUser);
+  document.getElementById('auth-screen').classList.add('hidden');
+  showProjectScreen();
+}
+
+// --- Register ---
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pass = document.getElementById('reg-password').value;
+  const pass2 = document.getElementById('reg-password2').value;
+  const errEl = document.getElementById('register-error');
+  if (!name || !email || !pass) { errEl.textContent = 'Vyplňte všechna pole.'; return; }
+  if (pass !== pass2) { errEl.textContent = 'Hesla se neshodují.'; return; }
+  if (pass.length < 4) { errEl.textContent = 'Heslo musí mít alespoň 4 znaky.'; return; }
+  const users = getUsers();
+  if (users.find(u => u.email === email)) { errEl.textContent = 'Tento e-mail již existuje.'; return; }
+  const newUser = { id: uid(), name, email, passHash: simpleHash(pass) };
+  users.push(newUser);
+  saveUsers(users);
+  currentUser = { id: newUser.id, name: newUser.name, email: newUser.email };
+  saveSession(currentUser);
+  document.getElementById('auth-screen').classList.add('hidden');
+  showProjectScreen();
+}
+
+// --- Logout ---
+function doLogout() {
+  currentUser = null;
+  currentProject = null;
+  clearSession();
+  // Reset app state
+  appState.levels = [];
+  appState.activeLevel = 0;
+  if (fabricCanvas) { fabricCanvas.clear(); fabricCanvas.backgroundColor = '#181818'; fabricCanvas.renderAll(); }
+  document.getElementById('level-tabs').innerHTML = '';
+  document.getElementById('project-screen').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  // Clear login fields
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+// --- Project Screen ---
+function showProjectScreen() {
+  if (!currentUser) return;
+  document.getElementById('ps-user-label').textContent = currentUser.name + ' (' + currentUser.email + ')';
+  renderProjectGrid();
+  document.getElementById('project-screen').classList.remove('hidden');
+}
+
+function renderProjectGrid() {
+  const projects = getUserProjects(currentUser.id);
+  const grid = document.getElementById('project-grid');
+  grid.innerHTML = '';
+
+  // New project card
+  const newCard = document.createElement('div');
+  newCard.className = 'project-card new-project-card';
+  newCard.innerHTML = '<div class="np-icon">+</div><div class="np-label">Nový projekt</div>';
+  newCard.onclick = openNewProjectDialog;
+  grid.appendChild(newCard);
+
+  // Existing projects
+  projects.slice().reverse().forEach(proj => {
+    const card = document.createElement('div');
+    card.className = 'project-card';
+    const dateStr = new Date(proj.createdAt).toLocaleDateString('cs-CZ');
+    card.innerHTML = `
+      <div class="project-card-name">${escHtml(proj.name)}</div>
+      <div class="project-card-date">Vytvořeno: ${dateStr}</div>
+      <button class="project-card-delete" title="Smazat projekt" onclick="deleteProject(event,'${proj.id}')">×</button>
+    `;
+    card.onclick = (e) => { if (e.target.classList.contains('project-card-delete')) return; openProject(proj); };
+    grid.appendChild(card);
+  });
+}
+
+// --- New Project Dialog ---
+function openNewProjectDialog() {
+  document.getElementById('new-project-name').value = '';
+  document.getElementById('new-project-dialog').classList.remove('hidden');
+  setTimeout(() => document.getElementById('new-project-name').focus(), 50);
+}
+function closeNewProjectDialog() {
+  document.getElementById('new-project-dialog').classList.add('hidden');
+}
+function doCreateProject() {
+  const name = document.getElementById('new-project-name').value.trim();
+  if (!name) { document.getElementById('new-project-name').focus(); return; }
+  const projects = getUserProjects(currentUser.id);
+  const proj = { id: uid(), name, createdAt: new Date().toISOString() };
+  projects.push(proj);
+  saveUserProjects(currentUser.id, projects);
+  closeNewProjectDialog();
+  openProject(proj);
+}
+
+// --- Open Project ---
+function openProject(proj) {
+  currentProject = proj;
+  document.getElementById('project-screen').classList.add('hidden');
+  updateTopbarUserInfo();
+  // Re-init canvas state for this project
+  if (fabricCanvas) {
+    fabricCanvas.clear();
+    fabricCanvas.backgroundColor = '#181818';
+    fabricCanvas.renderAll();
+  }
+  appState.levels = [];
+  appState.activeLevel = 0;
+  appState.profese = JSON.parse(JSON.stringify(DEFAULT_PROFESE));
+  annotIdCounter = 1;
+  undoStack = []; redoStack = [];
+  loadState();
+  if (appState.levels.length === 0) {
+    addLevel('1.NP', '1.NP');
+  } else {
+    renderLevelTabs();
+    switchLevel(appState.activeLevel);
+  }
+}
+
+// --- Delete Project ---
+function deleteProject(e, projId) {
+  e.stopPropagation();
+  if (!confirm('Opravdu smazat tento projekt? Tato akce je nevratná.')) return;
+  const projects = getUserProjects(currentUser.id).filter(p => p.id !== projId);
+  saveUserProjects(currentUser.id, projects);
+  // Remove project data
+  localStorage.removeItem(LS_PROJECT_STATE(projId));
+  localStorage.removeItem(LS_PROJECT_COUNTER(projId));
+  localStorage.removeItem(LS_PROJECT_PROFESE(projId));
+  renderProjectGrid();
+}
+
+// --- Update Top Bar ---
+function updateTopbarUserInfo() {
+  document.getElementById('topbar-user-name').textContent = currentUser ? currentUser.name : '';
+  document.getElementById('topbar-project-name').textContent = currentProject ? currentProject.name : '';
+}
+
+// ============================================================
 // STARTUP
 // ============================================================
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  const session = getSession();
+  if (session) {
+    currentUser = session;
+    document.getElementById('auth-screen').classList.add('hidden');
+    showProjectScreen();
+  }
+  // auth screen is visible by default until user logs in
+});
 </script>
 </body>
 </html>
