@@ -601,6 +601,7 @@ option { background: var(--card); color: var(--text); }
 .status-btn.active-otevreno { background: rgba(245,158,11,0.2); border-color: #F59E0B; color: #F59E0B; }
 .status-btn.active-vreseni { background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #3B82F6; }
 .status-btn.active-hotovo { background: rgba(16,185,129,0.2); border-color: #10B981; color: #10B981; }
+.status-btn.active-urgence { background: rgba(239,68,68,0.2); border-color: #EF4444; color: #EF4444; }
 
 /* DELETE BTN */
 #delete-annot-btn {
@@ -2075,6 +2076,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <option value="Otevřeno">Otevřeno</option>
         <option value="V řešení">V řešení</option>
         <option value="Hotovo">Hotovo</option>
+        <option value="Urgence">Urgence</option>
       </select>
     </div>
     <div id="annot-list"></div>
@@ -2144,6 +2146,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
             <button class="status-btn" data-status="Otevřeno">Otevřeno</button>
             <button class="status-btn" data-status="V řešení">V řešení</button>
             <button class="status-btn" data-status="Hotovo">Hotovo</button>
+            <button class="status-btn" data-status="Urgence">🔴 Urgence</button>
           </div>
         </div>
         <div class="field-group">
@@ -2224,6 +2227,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <option value="Otevřeno">Otevřeno</option>
         <option value="V řešení">V řešení</option>
         <option value="Hotovo">Hotovo</option>
+        <option value="Urgence">Urgence</option>
       </select>
     </div>
     <div class="tfilter-group">
@@ -2293,6 +2297,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <option value="Otevřeno">Otevřeno</option>
         <option value="V řešení">V řešení</option>
         <option value="Hotovo">Hotovo</option>
+        <option value="Urgence">Urgence</option>
       </select>
     </div>
     <div class="tfilter-group">
@@ -2436,6 +2441,34 @@ function getProfColor(name) {
   if (!appState.profese) return '#6B7280';
   const p = appState.profese.find(x => x.name === name);
   return p ? p.color : '#6B7280';
+}
+
+function applyStatusButtons(value) {
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.className = 'status-btn';
+    if (btn.dataset.status === value) {
+      if (value === 'Otevřeno')  btn.classList.add('active-otevreno');
+      else if (value === 'V řešení') btn.classList.add('active-vreseni');
+      else if (value === 'Hotovo')   btn.classList.add('active-hotovo');
+      else if (value === 'Urgence')  btn.classList.add('active-urgence');
+    }
+  });
+}
+
+function getAnnotColor(obj) {
+  if (obj && obj.status === 'Urgence') return '#EF4444';
+  return getProfColor(obj ? (obj.profese || '') : '');
+}
+
+function applyAnnotColorToCanvas(obj) {
+  const color = getAnnotColor(obj);
+  if (obj.type === 'rect' || obj.type === 'ellipse') {
+    obj.set({ stroke: color, fill: color + '22' });
+  } else if (obj.type === 'path' || obj.type === 'polyline') {
+    obj.set({ stroke: color });
+  } else if (obj.type === 'i-text' || obj.type === 'text') {
+    obj.set({ fill: color });
+  }
 }
 
 const LEVEL_TYPES = {
@@ -2845,7 +2878,7 @@ function positionLabel(label, obj) {
 
 function createAnnotLabel(obj) {
   const zoom  = fabricCanvas.getZoom();
-  const color = getProfColor(obj.profese || '');
+  const color = getAnnotColor(obj);
   const top1  = labelLineTop(obj);
   const top2  = labelLineBot(obj);
 
@@ -3506,15 +3539,9 @@ function updateActiveAnnotProp(prop, value) {
   }
 
   // Update visual color
-  if (prop === 'profese') {
-    const color = getProfColor(value);
-    if (obj.type === 'rect' || obj.type === 'ellipse') {
-      obj.set({ stroke: color, fill: color + '22' });
-    } else if (obj.type === 'path' || obj.type === 'polyline') {
-      obj.set({ stroke: color });
-    } else if (obj.type === 'i-text' || obj.type === 'text') {
-      obj.set({ fill: color });
-    }
+  if (prop === 'profese' || prop === 'status') {
+    applyAnnotColorToCanvas(obj);
+    updateLabelFor(obj.annotId);
     fabricCanvas.renderAll();
   }
 
@@ -3532,14 +3559,7 @@ function updateActiveAnnotProp(prop, value) {
 
   // Update status buttons
   if (prop === 'status') {
-    document.querySelectorAll('.status-btn').forEach(btn => {
-      btn.className = 'status-btn';
-      if (btn.dataset.status === value) {
-        if (value === 'Otevřeno') btn.classList.add('active-otevreno');
-        else if (value === 'V řešení') btn.classList.add('active-vreseni');
-        else if (value === 'Hotovo') btn.classList.add('active-hotovo');
-      }
-    });
+    applyStatusButtons(value);
   }
 
   saveCurrentLevel();
@@ -3574,15 +3594,7 @@ function onObjectSelected(opt) {
   });
 
   // Status buttons
-  document.querySelectorAll('.status-btn').forEach(btn => {
-    btn.className = 'status-btn';
-    if (btn.dataset.status === (obj.status || 'Otevřeno')) {
-      const v = btn.dataset.status;
-      if (v === 'Otevřeno') btn.classList.add('active-otevreno');
-      else if (v === 'V řešení') btn.classList.add('active-vreseni');
-      else if (v === 'Hotovo') btn.classList.add('active-hotovo');
-    }
-  });
+  applyStatusButtons(obj.status || 'Otevřeno');
 
   // Highlight in list
   updateAnnotList();
@@ -5040,6 +5052,9 @@ function updateAnnotStatusFromTable(annotId, levelIdx, newStatus) {
     const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
     if (obj) {
       obj.set('status', newStatus);
+      applyAnnotColorToCanvas(obj);
+      updateLabelFor(obj.annotId);
+      fabricCanvas.renderAll();
       saveCurrentLevel();
       updateAnnotList();
     }
@@ -5237,7 +5252,14 @@ function updateAnnotStatusFromAnotacePage(annotId, levelIdx, newStatus) {
   }
   if (levelIdx === appState.activeLevel) {
     const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
-    if (obj) { obj.set('status', newStatus); saveCurrentLevel(); updateAnnotList(); }
+    if (obj) {
+      obj.set('status', newStatus);
+      applyAnnotColorToCanvas(obj);
+      updateLabelFor(obj.annotId);
+      fabricCanvas.renderAll();
+      saveCurrentLevel();
+      updateAnnotList();
+    }
   } else {
     saveState();
   }
