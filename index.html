@@ -100,32 +100,24 @@ body {
 #logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 0 16px;
   border-right: 1px solid var(--border);
-  min-width: 180px;
+  flex-shrink: 0;
 }
-#logo .logo-icon {
-  width: 28px; height: 28px;
-  background: var(--olive);
-  border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: white;
+#logo svg {
+  height: 30px;
+  width: auto;
+  flex-shrink: 0;
 }
-#logo .logo-text {
+#logo .logo-plans {
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-bright);
-  line-height: 1.2;
-}
-#logo .logo-sub {
-  font-size: 9px;
-  color: var(--text-dim);
-  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* LEVEL TABS */
@@ -909,6 +901,82 @@ option { background: var(--card); color: var(--text); }
 #subddodavatele-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
 #subddodavatele-btn.active { background: rgba(74,83,64,0.6); color: var(--text-bright); }
 #subddodavatele-btn svg { width: 16px; height: 16px; }
+
+/* ANOTACE BUTTON */
+#anotace-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px; height: 100%;
+  border: none; background: rgba(74,83,64,0.25);
+  color: var(--olive-light);
+  font-family: var(--font-main); font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0; white-space: nowrap;
+}
+#anotace-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
+#anotace-btn.active { background: rgba(74,83,64,0.6); color: var(--text-bright); }
+#anotace-btn svg { width: 16px; height: 16px; }
+
+/* ANOTACE PAGE */
+#anotace-page {
+  display: none; position: fixed; inset: 0; z-index: 3000;
+  background: var(--bg); flex-direction: column; overflow: hidden;
+}
+#anotace-page.visible { display: flex; }
+#anotace-page-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px; height: 52px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+#anotace-page-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 14px;
+  font-weight: 700; color: var(--text-bright);
+  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+}
+#anotace-stats-row {
+  display: flex; gap: 10px; align-items: center; flex: 1;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+}
+#close-anotace-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 22px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; transition: background 0.15s, color 0.15s;
+  margin-left: auto; flex-shrink: 0;
+}
+#close-anotace-btn:hover { background: var(--card); color: var(--text-bright); }
+#anotace-filters-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--panel); flex-shrink: 0;
+}
+#anotace-table-wrap {
+  flex: 1; overflow-y: auto; overflow-x: auto;
+}
+#anotace-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+#anotace-table th {
+  position: sticky; top: 0; background: var(--panel);
+  padding: 8px 12px; text-align: left;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border); white-space: nowrap; z-index: 2;
+}
+#anotace-table th.th-sort { cursor: pointer; user-select: none; }
+#anotace-table th.th-sort:hover { color: var(--text-bright); }
+#anotace-table th.sort-asc .sort-arrow::after { content: ' ▲'; }
+#anotace-table th.sort-desc .sort-arrow::after { content: ' ▼'; }
+#anotace-table td {
+  padding: 7px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text); vertical-align: middle; white-space: nowrap;
+}
+#anotace-table td.ac-popisek { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#anotace-table tbody tr:hover { background: var(--card); }
+#anotace-empty { display: none; padding: 40px; text-align: center; color: var(--text-dim); font-family: var(--font-mono); }
 
 /* HOME PAGE OVERLAY */
 #home-page {
@@ -1907,17 +1975,28 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <!-- TOP BAR -->
 <div id="top-bar">
   <div id="logo">
-    <div class="logo-icon">SB</div>
-    <div>
-      <div class="logo-text">StavbaBoard</div>
-      <div class="logo-sub">Půdorysy v1.0</div>
-    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="20 20 330 308" fill="white">
+      <polygon points="178,184 188,183 68,55 56,60"/>
+      <polygon points="177,180 183,174 128,38 118,44"/>
+      <polygon points="179,176 185,174 164,26 172,26"/>
+      <polygon points="183,174 190,176 190,26 198,28"/>
+      <polygon points="188,175 194,181 264,50 256,44"/>
+      <polygon points="191,183 193,191 346,128 342,120"/>
+      <polygon points="190,200 187,209 265,318 273,312"/>
+      <polygon points="180,207 174,201 48,310 54,318"/>
+      <polygon points="172,194 170,202 24,150 26,142"/>
+    </svg>
+    <div class="logo-plans">PLANS</div>
   </div>
   <div id="level-tabs"></div>
   <div id="add-level-btn" title="Přidat podlaží">+</div>
   <button id="subddodavatele-btn" title="Subdodavatelé projektu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Subdodavatelé
+  </button>
+  <button id="anotace-btn" title="Všechny anotace">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Anotace
   </button>
   <div id="toolbar-right">
     <!-- Tool buttons -->
@@ -2125,45 +2204,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <!-- HOME PAGE (SUBDODAVATELE) -->
 <div id="home-page">
 
-  <!-- TASKS STRIP -->
-  <div id="home-tasks-strip">
-    <div id="home-tasks-header">
-      <span id="home-tasks-title">Úkoly</span>
-      <input type="text" id="ht-search" class="htfilter-input" placeholder="Hledat popis / ID...">
-      <select id="ht-subdod" class="htfilter-select">
-        <option value="">Všichni dodavatelé</option>
-      </select>
-      <select id="ht-profese" class="htfilter-select">
-        <option value="">Všechny profese</option>
-      </select>
-      <select id="ht-level" class="htfilter-select">
-        <option value="">Všechna podlaží</option>
-      </select>
-      <select id="ht-status" class="htfilter-select">
-        <option value="">Všechny stavy</option>
-        <option value="Otevřeno">Otevřeno</option>
-        <option value="V řešení">V řešení</option>
-        <option value="Hotovo">Hotovo</option>
-      </select>
-      <select id="ht-prio" class="htfilter-select">
-        <option value="">Všechny priority</option>
-        <option value="Vysoká">Vysoká</option>
-        <option value="Střední">Střední</option>
-        <option value="Nízká">Nízká</option>
-      </select>
-      <span class="htfilter-sep">Termín:</span>
-      <input type="date" id="ht-deadline-from" class="htfilter-date" title="Termín od" style="width:116px;">
-      <span class="htfilter-sep">–</span>
-      <input type="date" id="ht-deadline-to" class="htfilter-date" title="Termín do" style="width:116px;">
-      <button id="ht-reset-btn">✕</button>
-      <div id="ht-stats"></div>
-    </div>
-    <div id="home-tasks-list"></div>
-  </div>
-
-  <!-- STRIP RESIZE HANDLE -->
-  <div id="home-tasks-resizer"></div>
-
   <!-- SUBDODAVATELE -->
   <div id="home-subdod-section">
     <div id="home-page-header">
@@ -2241,6 +2281,76 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <tbody id="tasks-tbody"></tbody>
     </table>
     <div id="tasks-empty">Žádné úkoly neodpovídají filtrům.</div>
+  </div>
+</div>
+
+<!-- ANOTACE PAGE -->
+<div id="anotace-page">
+  <div id="anotace-page-header">
+    <div id="anotace-page-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Anotace
+    </div>
+    <div id="anotace-stats-row"></div>
+    <button id="close-anotace-btn" title="Zavřít">×</button>
+  </div>
+  <div id="anotace-filters-bar">
+    <div class="tfilter-group">
+      <input type="text" id="afilter-search" class="tfilter-input" placeholder="🔍 Hledat popis, ID, přiřazeného...">
+    </div>
+    <div class="tfilter-group">
+      <select id="afilter-level" class="tfilter-select">
+        <option value="">Všechna podlaží</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="afilter-profese" class="tfilter-select">
+        <option value="">Všechny profese</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="afilter-status" class="tfilter-select">
+        <option value="">Všechny stavy</option>
+        <option value="Otevřeno">Otevřeno</option>
+        <option value="V řešení">V řešení</option>
+        <option value="Hotovo">Hotovo</option>
+      </select>
+    </div>
+    <div class="tfilter-group">
+      <select id="afilter-prio" class="tfilter-select">
+        <option value="">Všechny priority</option>
+        <option value="Vysoká">Vysoká</option>
+        <option value="Střední">Střední</option>
+        <option value="Nízká">Nízká</option>
+      </select>
+    </div>
+    <div class="tfilter-group tfilter-date-group">
+      <input type="date" id="afilter-deadline-from" class="tfilter-date" title="Termín od">
+      <span class="tfilter-date-sep">–</span>
+      <input type="date" id="afilter-deadline-to" class="tfilter-date" title="Termín do">
+    </div>
+    <button id="afilter-reset-btn" class="tfilter-reset" title="Resetovat filtry">✕ Reset</button>
+    <button id="anotace-export-csv-btn" class="tfilter-export" title="Exportovat do CSV">↓ CSV</button>
+  </div>
+  <div id="anotace-table-wrap">
+    <table id="anotace-table">
+      <thead>
+        <tr>
+          <th class="th-sort" data-sort="annotId">ID <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="profese">Profese <span class="sort-arrow"></span></th>
+          <th class="th-sort ac-popisek" data-sort="popisek">Popis <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="levelName">Podlaží <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="priorita">Priorita <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="status">Status <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="prirazeno">Přiřazeno <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="deadline">Termín <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="createdAt">Vytvořeno <span class="sort-arrow"></span></th>
+          <th>Akce</th>
+        </tr>
+      </thead>
+      <tbody id="anotace-tbody"></tbody>
+    </table>
+    <div id="anotace-empty">Žádné anotace neodpovídají filtrům.</div>
   </div>
 </div>
 
@@ -2424,7 +2534,7 @@ function init() {
   setup3DUpload();
   setup3DPanelResize();
   setupTasksPage();
-  setupHomeTasksStrip();
+  setupAnotacePage();
   requestAnimationFrame(autoSaveLoop);
 }
 
@@ -4995,6 +5105,219 @@ function setupTasksPage() {
   });
 }
 
+// ============================================================
+// ANOTACE PAGE
+// ============================================================
+let anotaceSort = { col: 'createdAt', dir: 'desc' };
+
+function openAnotacePage() {
+  saveCurrentLevel();
+  populateAnotaceFilters();
+  renderAnotacePage();
+  document.getElementById('anotace-page').classList.add('visible');
+  document.getElementById('anotace-btn').classList.add('active');
+}
+
+function closeAnotacePage() {
+  document.getElementById('anotace-page').classList.remove('visible');
+  document.getElementById('anotace-btn').classList.remove('active');
+}
+
+function populateAnotaceFilters() {
+  const lvlSel = document.getElementById('afilter-level');
+  const curLvl = lvlSel.value;
+  lvlSel.innerHTML = '<option value="">Všechna podlaží</option>';
+  appState.levels.forEach((l, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i); opt.textContent = l.name;
+    if (curLvl === String(i)) opt.selected = true;
+    lvlSel.appendChild(opt);
+  });
+  const profSel = document.getElementById('afilter-profese');
+  const curProf = profSel.value;
+  profSel.innerHTML = '<option value="">Všechny profese</option>';
+  (appState.profese || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name; opt.textContent = p.name;
+    if (curProf === p.name) opt.selected = true;
+    profSel.appendChild(opt);
+  });
+}
+
+function getAnotaceFilters() {
+  return {
+    search:   (document.getElementById('afilter-search').value || '').toLowerCase().trim(),
+    levelIdx: document.getElementById('afilter-level').value,
+    profese:  document.getElementById('afilter-profese').value,
+    status:   document.getElementById('afilter-status').value,
+    prio:     document.getElementById('afilter-prio').value,
+    dlFrom:   document.getElementById('afilter-deadline-from').value,
+    dlTo:     document.getElementById('afilter-deadline-to').value
+  };
+}
+
+function filterAnotace(rows, f) {
+  return rows.filter(r => {
+    if (f.search) {
+      const hay = ((r.popisek||'') + ' ' + (r.annotId||'') + ' ' + (r.prirazeno||'')).toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    if (f.levelIdx !== '' && String(r.levelIdx) !== f.levelIdx) return false;
+    if (f.profese && r.profese !== f.profese) return false;
+    if (f.status  && r.status  !== f.status)  return false;
+    if (f.prio    && r.priorita !== f.prio)   return false;
+    if (f.dlFrom  && r.deadline && r.deadline < f.dlFrom) return false;
+    if (f.dlTo    && r.deadline && r.deadline > f.dlTo)   return false;
+    return true;
+  });
+}
+
+function renderAnotacePage() {
+  const all      = getAllAnnotations();
+  const filtered = filterAnotace(all, getAnotaceFilters());
+  const sorted   = sortAnnotations(filtered, anotaceSort.col, anotaceSort.dir);
+
+  // Stats
+  const statsRow = document.getElementById('anotace-stats-row');
+  const byStatus = {};
+  filtered.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
+  statsRow.innerHTML = `
+    <div class="tstat-pill"><span class="tstat-num">${filtered.length}</span>&nbsp;/ ${all.length} celkem</div>
+    ${byStatus['Otevřeno'] ? `<div class="tstat-pill" style="border-color:#EF4444"><span class="tstat-num" style="color:#EF4444">${byStatus['Otevřeno']}</span>&nbsp;Otevřeno</div>` : ''}
+    ${byStatus['V řešení'] ? `<div class="tstat-pill" style="border-color:#F59E0B"><span class="tstat-num" style="color:#F59E0B">${byStatus['V řešení']}</span>&nbsp;V řešení</div>` : ''}
+    ${byStatus['Hotovo']   ? `<div class="tstat-pill" style="border-color:#10B981"><span class="tstat-num" style="color:#10B981">${byStatus['Hotovo']}</span>&nbsp;Hotovo</div>` : ''}
+  `;
+
+  // Sort arrows
+  document.querySelectorAll('#anotace-table th.th-sort').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === anotaceSort.col) th.classList.add(anotaceSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  const tbody = document.getElementById('anotace-tbody');
+  const empty = document.getElementById('anotace-empty');
+  if (sorted.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = sorted.map(r => {
+    const color    = getProfColor(r.profese || '');
+    const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
+    const createdStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
+    const deadlineStr = r.deadline || '—';
+    const statusOpts = ['Otevřeno','V řešení','Hotovo'].map(s =>
+      `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
+    ).join('');
+    return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
+      <td class="tcell-id">${escHtml(r.annotId)}</td>
+      <td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${color}"></span>${escHtml(r.profese||'—')}</span></td>
+      <td class="ac-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek || '(bez popisu)')}</td>
+      <td><span class="tcell-level">${escHtml(r.levelName)}</span></td>
+      <td><span class="tcell-prio ${prioClass}">${escHtml(r.priorita||'Střední')}</span></td>
+      <td class="tcell-status">
+        <select onchange="updateAnnotStatusFromAnotacePage('${escHtml(r.annotId)}',${r.levelIdx},this.value)">${statusOpts}</select>
+      </td>
+      <td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>
+      <td class="tcell-date">${escHtml(deadlineStr)}</td>
+      <td class="tcell-date">${escHtml(createdStr)}</td>
+      <td class="tcell-actions">
+        <button class="trow-goto-btn" onclick="goToAnnotationFromAnotacePage(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function goToAnnotationFromAnotacePage(levelIdx, annotId) {
+  closeAnotacePage();
+  switchLevel(levelIdx);
+  setTimeout(() => {
+    const objs = fabricCanvas.getObjects();
+    const target = objs.find(o => o.annotId === annotId);
+    if (target) {
+      fabricCanvas.setActiveObject(target);
+      const br = target.getBoundingRect(true);
+      const zoom = fabricCanvas.getZoom();
+      const vpt = fabricCanvas.viewportTransform.slice();
+      vpt[4] = fabricCanvas.getWidth()  / 2 - (br.left + br.width  / 2) * zoom;
+      vpt[5] = fabricCanvas.getHeight() / 2 - (br.top  + br.height / 2) * zoom;
+      fabricCanvas.setViewportTransform(vpt);
+      updateAllLabelScales();
+      fabricCanvas.renderAll();
+      onObjectSelected({ target });
+    }
+  }, 350);
+}
+
+function updateAnnotStatusFromAnotacePage(annotId, levelIdx, newStatus) {
+  const level = appState.levels[levelIdx];
+  if (level && level.annotations) {
+    const ann = level.annotations.find(a => a.annotId === annotId);
+    if (ann) ann.status = newStatus;
+  }
+  if (levelIdx === appState.activeLevel) {
+    const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
+    if (obj) { obj.set('status', newStatus); saveCurrentLevel(); updateAnnotList(); }
+  } else {
+    saveState();
+  }
+  renderAnotacePage();
+}
+
+function exportAnotaceCSV() {
+  const all      = getAllAnnotations();
+  const filtered = filterAnotace(all, getAnotaceFilters());
+  const sorted   = sortAnnotations(filtered, anotaceSort.col, anotaceSort.dir);
+  const headers  = ['ID','Profese','Popis','Podlaží','Priorita','Status','Přiřazeno','Termín','Vytvořeno'];
+  const csvRows  = [headers.join(';')];
+  sorted.forEach(r => {
+    const row = [
+      r.annotId, r.profese||'', r.popisek||'', r.levelName,
+      r.priorita||'', r.status||'', r.prirazeno||'',
+      r.deadline||'', r.createdAt ? r.createdAt.slice(0,10) : ''
+    ].map(v => '"' + String(v).replace(/"/g,'""') + '"');
+    csvRows.push(row.join(';'));
+  });
+  const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'anotace-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setupAnotacePage() {
+  document.getElementById('anotace-btn').addEventListener('click', openAnotacePage);
+  document.getElementById('close-anotace-btn').addEventListener('click', closeAnotacePage);
+  document.getElementById('afilter-reset-btn').addEventListener('click', () => {
+    ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio','afilter-deadline-from','afilter-deadline-to']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    renderAnotacePage();
+  });
+  ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio','afilter-deadline-from','afilter-deadline-to']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', renderAnotacePage);
+      if (el) el.addEventListener('change', renderAnotacePage);
+    });
+  document.querySelectorAll('#anotace-table th.th-sort').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (anotaceSort.col === col) {
+        anotaceSort.dir = anotaceSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        anotaceSort.col = col;
+        anotaceSort.dir = 'asc';
+      }
+      renderAnotacePage();
+    });
+  });
+  document.getElementById('anotace-export-csv-btn').addEventListener('click', exportAnotaceCSV);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('anotace-page').classList.contains('visible')) {
+      closeAnotacePage();
+    }
+  });
+}
+
 function exportTasksCSV() {
   const all = getAllAnnotations();
   const filters = getTaskFilters();
@@ -5470,7 +5793,6 @@ function toggleHomePage(forceState) {
     hp.classList.add('visible');
     btn.classList.add('active');
     renderHomePage();
-    renderHomeTasksStrip();
   } else if (forceState === false) {
     hp.classList.remove('visible');
     btn.classList.remove('active');
@@ -5483,7 +5805,6 @@ function toggleHomePage(forceState) {
       hp.classList.add('visible');
       btn.classList.add('active');
       renderHomePage();
-      renderHomeTasksStrip();
     }
   }
 }
