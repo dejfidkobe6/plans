@@ -1637,11 +1637,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   margin-bottom: 28px;
 }
 .auth-logo-img {
-  width: 220px; height: auto;
+  width: 100%;
   display: flex; align-items: center; justify-content: center;
 }
-.auth-logo-img svg {
-  width: 100%; height: auto;
+.auth-logo-img img {
+  width: 100%; height: auto; object-fit: contain;
 }
 .auth-logo-name {
   font-family: var(--font-mono); font-size: 18px; font-weight: 600;
@@ -1811,30 +1811,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="auth-box">
     <div class="auth-logo">
       <div class="auth-logo-img">
-        <!-- BeSix logo SVG (symbol + wordmark) in white -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 340" fill="white">
-          <!-- Starburst symbol, center ~(185, 195) -->
-          <!-- Upper-left blade ~10 o'clock -->
-          <polygon points="178,184 188,183 68,55 56,60"/>
-          <!-- Upper-left blade ~11 o'clock -->
-          <polygon points="177,180 183,174 128,38 118,44"/>
-          <!-- Upper blade left ~11:30 -->
-          <polygon points="179,176 185,174 164,26 172,26"/>
-          <!-- Upper blade center ~12 o'clock -->
-          <polygon points="183,174 190,176 190,26 198,28"/>
-          <!-- Upper-right blade ~1 o'clock -->
-          <polygon points="188,175 194,181 264,50 256,44"/>
-          <!-- Right blade ~2:30 -->
-          <polygon points="191,183 193,191 346,128 342,120"/>
-          <!-- Lower-right ~4 o'clock -->
-          <polygon points="190,200 187,209 265,318 273,312"/>
-          <!-- Lower-left arrow blade ~7 o'clock -->
-          <polygon points="180,207 174,201 48,310 54,318"/>
-          <!-- Left blade ~8:30 o'clock -->
-          <polygon points="172,194 170,202 24,150 26,142"/>
-          <!-- BeSix wordmark -->
-          <text x="310" y="242" font-family="Arial, Helvetica, sans-serif" font-size="118" font-weight="800" fill="white">BeSix</text>
-        </svg>
+        <img src="besix_logo_bila.png" alt="BeSix">
       </div>
       <div class="auth-logo-name">PLANS</div>
     </div>
