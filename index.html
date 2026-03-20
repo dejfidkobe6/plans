@@ -1633,18 +1633,21 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
 }
 .auth-logo {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 28px; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  margin-bottom: 28px;
 }
-.auth-logo-icon {
-  width: 36px; height: 36px;
-  background: var(--olive);
-  border-radius: 6px;
+.auth-logo-img {
+  width: 80px; height: 80px;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: #fff;
+  filter: brightness(0) invert(1);
 }
-.auth-logo-text { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--text-bright); }
-.auth-logo-sub { font-size: 10px; color: var(--text-dim); }
+.auth-logo-img img, .auth-logo-img svg {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.auth-logo-name {
+  font-family: var(--font-mono); font-size: 18px; font-weight: 600;
+  color: var(--text-bright); letter-spacing: 0.15em; text-transform: uppercase;
+}
 .auth-tabs {
   display: flex; margin-bottom: 24px;
   border-bottom: 1px solid var(--border);
@@ -1808,11 +1811,13 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <div id="auth-screen">
   <div class="auth-box">
     <div class="auth-logo">
-      <div class="auth-logo-icon">SB</div>
-      <div>
-        <div class="auth-logo-text">StavbaBoard</div>
-        <div class="auth-logo-sub">Půdorysy v1.0</div>
+      <div class="auth-logo-img" id="auth-logo-placeholder">
+        <!-- LOGO PLACEHOLDER – vlož sem <img src="logo.svg"> nebo inline SVG -->
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="80" height="80" rx="8" fill="none"/>
+        </svg>
       </div>
+      <div class="auth-logo-name">PLANS</div>
     </div>
     <div class="auth-tabs">
       <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Přihlásit se</div>
