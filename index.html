@@ -1964,7 +1964,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <div id="top-bar">
   <div id="logo">
     <img src="besix_logo_bila.png" alt="BeSix">
-    <div class="logo-plans">PLANS</div>
+    <div class="logo-plans" id="logo-project-name">PLANS</div>
   </div>
   <div id="level-tabs"></div>
   <div id="add-level-btn" title="Přidat podlaží">+</div>
@@ -6033,6 +6033,7 @@ function deleteProject(e, projId) {
 function updateTopbarUserInfo() {
   document.getElementById('topbar-user-name').textContent = currentUser ? currentUser.name : '';
   document.getElementById('topbar-project-name').textContent = currentProject ? currentProject.name : '';
+  document.getElementById('logo-project-name').textContent = currentProject ? currentProject.name : 'PLANS';
 }
 
 // ============================================================
