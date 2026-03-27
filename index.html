@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StavbaBoard Půdorysy</title>
+<title>BeSix Plans</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1764,13 +1764,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   padding: 14px 24px; background: var(--panel);
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-#project-screen-header .ps-logo { display: flex; align-items: center; gap: 10px; }
+#project-screen-header .ps-logo { display: flex; align-items: center; gap: 12px; }
 #project-screen-header .ps-logo-icon {
-  width: 30px; height: 30px; background: var(--olive); border-radius: 5px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: #fff;
+  height: 32px; width: auto; display: block;
 }
-#project-screen-header .ps-logo-text { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-bright); }
+#project-screen-header .ps-logo-text { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--olive-light); letter-spacing: 0.03em; }
 #project-screen-header .ps-user-info {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
@@ -1931,8 +1929,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <div id="project-screen" class="hidden">
   <div id="project-screen-header">
     <div class="ps-logo">
-      <div class="ps-logo-icon">SB</div>
-      <div class="ps-logo-text">StavbaBoard Půdorysy</div>
+      <img class="ps-logo-icon" src="besix_logo_bila.png" alt="BeSix">
+      <div class="ps-logo-text">BeSix Plans</div>
     </div>
     <div class="ps-user-info">
       <span id="ps-user-label"></span>
@@ -5452,7 +5450,7 @@ function exportJSON() {
   saveCurrentLevel();
   const data = {
     version: '1.0',
-    app: 'StavbaBoard Půdorysy',
+    app: 'BeSix Plans',
     exportDate: new Date().toISOString(),
     levels: appState.levels.map(l => ({
       id: l.id, name: l.name, type: l.type,
