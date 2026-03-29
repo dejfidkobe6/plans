@@ -819,6 +819,70 @@ option { background: var(--card); color: var(--text); }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
 /* MODAL */
+/* ---- Annot edit modal ---- */
+#annot-edit-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 10001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#annot-edit-overlay.visible { display: flex; }
+#annot-edit-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 440px; max-width: 95vw;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#annot-edit-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 600; color: var(--text-bright);
+}
+#annot-edit-close {
+  background: none; border: none; color: var(--text-dim);
+  font-size: 20px; cursor: pointer; line-height: 1;
+}
+#annot-edit-close:hover { color: var(--text-bright); }
+#annot-edit-body { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.ae-field { display: flex; flex-direction: column; gap: 5px; }
+.ae-field label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.ae-field select,
+.ae-field input[type="text"],
+.ae-field input[type="date"],
+.ae-field textarea {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text); font-family: var(--font-main); font-size: 13px;
+  padding: 7px 10px;
+}
+.ae-field select:focus,
+.ae-field input:focus,
+.ae-field textarea:focus { border-color: var(--olive); outline: none; }
+.ae-field textarea { resize: vertical; min-height: 64px; }
+.ae-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#annot-edit-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+#annot-edit-cancel {
+  padding: 8px 16px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text-dim); font-family: var(--font-main);
+  font-size: 13px; cursor: pointer;
+}
+#annot-edit-cancel:hover { color: var(--text-bright); }
+#annot-edit-save {
+  padding: 8px 18px; background: var(--olive); border: none;
+  border-radius: 5px; color: #fff; font-family: var(--font-main);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+#annot-edit-save:hover { background: var(--olive-hover); }
+
 #modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.7);
@@ -1635,6 +1699,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .tcell-prirazeno { font-size: 12px; color: var(--text-dim); }
 .tcell-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
 .tcell-actions { white-space: nowrap; }
+.trow-edit-btn {
+  padding: 4px 9px; font-size: 11px; border-radius: 4px; cursor: pointer;
+  background: rgba(74,83,64,0.2); border: 1px solid var(--border);
+  color: var(--olive-light); font-family: var(--font-main);
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.trow-edit-btn:hover { background: rgba(74,83,64,0.45); border-color: var(--olive); }
 .trow-goto-btn {
   background: none; border: 1px solid var(--border);
   color: var(--text-dim); font-family: var(--font-main); font-size: 11px;
@@ -2626,6 +2698,57 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
   </div>
 </div>
+
+<!-- ANNOT EDIT MODAL -->
+<div id="annot-edit-overlay">
+  <div id="annot-edit-box">
+    <div id="annot-edit-header">
+      <span id="annot-edit-title">Upravit anotaci</span>
+      <button id="annot-edit-close">×</button>
+    </div>
+    <div id="annot-edit-body">
+      <div class="ae-field">
+        <label>Profese</label>
+        <select id="ae-profese"></select>
+      </div>
+      <div class="ae-field">
+        <label>Popis</label>
+        <textarea id="ae-popisek" rows="3" placeholder="Popis anotace..."></textarea>
+      </div>
+      <div class="ae-row2">
+        <div class="ae-field">
+          <label>Priorita</label>
+          <select id="ae-priorita">
+            <option>Vysoká</option>
+            <option>Střední</option>
+            <option>Nízká</option>
+          </select>
+        </div>
+        <div class="ae-field">
+          <label>Status</label>
+          <select id="ae-status">
+            <option>Otevřeno</option>
+            <option>V řešení</option>
+            <option>Hotovo</option>
+            <option>Urgence</option>
+          </select>
+        </div>
+      </div>
+      <div class="ae-field">
+        <label>Přiřazeno</label>
+        <input type="text" id="ae-prirazeno" placeholder="Jméno / tým...">
+      </div>
+      <div class="ae-field">
+        <label>Termín</label>
+        <input type="date" id="ae-deadline" style="color-scheme:dark;">
+      </div>
+    </div>
+    <div id="annot-edit-footer">
+      <button id="annot-edit-cancel">Zrušit</button>
+      <button id="annot-edit-save">Uložit změny</button>
+    </div>
+  </div>
+</div>
 <script>
 // ============================================================
 // CONFIGURATION & STATE
@@ -2763,6 +2886,7 @@ function init() {
   setupTasksPage();
   setupAnotacePage();
   setupDrawingEditor();
+  setupAnnotEditModal();
   requestAnimationFrame(autoSaveLoop);
 }
 
@@ -5555,6 +5679,7 @@ function renderAnotacePage() {
       <td class="tcell-date">${escHtml(deadlineStr)}</td>
       <td class="tcell-date">${escHtml(createdStr)}</td>
       <td class="tcell-actions">
+        <button class="trow-edit-btn" onclick="openAnnotEditModal('${escHtml(r.annotId)}',${r.levelIdx})">✎ Upravit</button>
         <button class="trow-goto-btn" onclick="goToAnnotationFromAnotacePage(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
       </td>
     </tr>`;
@@ -5602,6 +5727,85 @@ function updateAnnotStatusFromAnotacePage(annotId, levelIdx, newStatus) {
     saveState();
   }
   renderAnotacePage();
+}
+
+// ============================================================
+// ANNOT EDIT MODAL (z přehledu anotací)
+// ============================================================
+let annotEditTarget = null; // { annotId, levelIdx }
+
+function openAnnotEditModal(annotId, levelIdx) {
+  const level = appState.levels[levelIdx];
+  if (!level) return;
+  const ann = (level.annotations || []).find(a => a.annotId === annotId);
+  if (!ann) return;
+  annotEditTarget = { annotId, levelIdx };
+
+  // Naplň dropdown profese
+  const profSel = document.getElementById('ae-profese');
+  const profese = appState.profese || [];
+  profSel.innerHTML = profese.map(p =>
+    `<option value="${escHtml(p.name)}"${p.name === ann.profese ? ' selected' : ''}>${escHtml(p.name)}</option>`
+  ).join('');
+
+  document.getElementById('ae-popisek').value   = ann.popisek   || '';
+  document.getElementById('ae-priorita').value  = ann.priorita  || 'Střední';
+  document.getElementById('ae-status').value    = ann.status    || 'Otevřeno';
+  document.getElementById('ae-prirazeno').value = ann.prirazeno || '';
+  document.getElementById('ae-deadline').value  = ann.deadline  || '';
+  document.getElementById('annot-edit-title').textContent = 'Upravit anotaci ' + annotId;
+  document.getElementById('annot-edit-overlay').classList.add('visible');
+  document.getElementById('ae-popisek').focus();
+}
+
+function closeAnnotEditModal() {
+  document.getElementById('annot-edit-overlay').classList.remove('visible');
+  annotEditTarget = null;
+}
+
+function saveAnnotEdit() {
+  if (!annotEditTarget) return;
+  const { annotId, levelIdx } = annotEditTarget;
+  const level = appState.levels[levelIdx];
+  if (!level) return;
+  const ann = (level.annotations || []).find(a => a.annotId === annotId);
+  if (!ann) return;
+
+  ann.profese   = document.getElementById('ae-profese').value;
+  ann.popisek   = document.getElementById('ae-popisek').value;
+  ann.priorita  = document.getElementById('ae-priorita').value;
+  ann.status    = document.getElementById('ae-status').value;
+  ann.prirazeno = document.getElementById('ae-prirazeno').value;
+  ann.deadline  = document.getElementById('ae-deadline').value;
+
+  // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
+  if (levelIdx === appState.activeLevel) {
+    const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
+    if (obj) {
+      obj.set({ profese: ann.profese, popisek: ann.popisek, priorita: ann.priorita,
+                 status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline });
+      applyAnnotColorToCanvas(obj);
+      updateLabelFor(annotId);
+      fabricCanvas.renderAll();
+    }
+    saveCurrentLevel();
+    updateAnnotList();
+  } else {
+    saveState();
+  }
+
+  closeAnnotEditModal();
+  renderAnotacePage();
+  showToast('Anotace uložena', 'success');
+}
+
+function setupAnnotEditModal() {
+  document.getElementById('annot-edit-close').addEventListener('click', closeAnnotEditModal);
+  document.getElementById('annot-edit-cancel').addEventListener('click', closeAnnotEditModal);
+  document.getElementById('annot-edit-save').addEventListener('click', saveAnnotEdit);
+  document.getElementById('annot-edit-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('annot-edit-overlay')) closeAnnotEditModal();
+  });
 }
 
 function exportAnotaceCSV() {
