@@ -3514,6 +3514,7 @@ function setupCropOverlay() {
   const overlay = document.getElementById('crop-overlay');
   overlay.addEventListener('mousedown', e => {
     if (!cropState) return;
+    if (e.target.closest('#crop-actions')) return; // tlačítka neresetují výběr
     e.preventDefault();
     const r = overlay.getBoundingClientRect();
     cropState.startX = cropState.endX = e.clientX - r.left;
