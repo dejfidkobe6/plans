@@ -74,13 +74,21 @@ function getPlansAppId(): int {
 // Project membership helper
 // ============================================================
 function getProjectMembership(int $projectId, int $userId): array|false {
-    $stmt = getDB()->prepare('
-        SELECT id, role FROM project_members
-        WHERE project_id = ? AND user_id = ?
-        LIMIT 1
-    ');
+    $db   = getDB();
+    $stmt = $db->prepare('SELECT id, role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
     $stmt->execute([$projectId, $userId]);
-    return $stmt->fetch();
+    $row = $stmt->fetch();
+    if ($row) return $row;
+
+    // Fallback: pokud je user creator projektu, auto-migruj ho do project_members
+    $check = $db->prepare('SELECT id FROM projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
+    $check->execute([$projectId, $userId]);
+    if ($check->fetch()) {
+        $db->prepare('INSERT IGNORE INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
+           ->execute([$projectId, $userId, $userId]);
+        return ['id' => 0, 'role' => 'owner'];
+    }
+    return false;
 }
 
 // ============================================================

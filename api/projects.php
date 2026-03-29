@@ -22,19 +22,18 @@ $appId  = getPlansAppId();
 $method = $_SERVER['REQUEST_METHOD'];
 
 // ============================================================
-// GET /api/projects.php  – seznam projektů uživatele
+// GET /api/projects.php  – seznam projektů uživatele (vlastní + jako člen)
 // ============================================================
 if ($method === 'GET') {
     $stmt = getDB()->prepare('
-        SELECT id, name, created_at
-        FROM projects
-        WHERE app_id = ? AND created_by = ? AND is_active = 1
-        ORDER BY created_at DESC
+        SELECT p.id, p.name, p.created_at, pm.role
+        FROM projects p
+        JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+        WHERE p.app_id = ? AND p.is_active = 1
+        ORDER BY p.created_at DESC
     ');
-    $stmt->execute([$appId, $userId]);
+    $stmt->execute([$userId, $appId]);
     $projects = $stmt->fetchAll();
-    // Přidáme role=owner pro všechny (creator = owner)
-    foreach ($projects as &$p) $p['role'] = 'owner';
     jsonOk(['projects' => $projects]);
 }
 
@@ -56,6 +55,12 @@ if ($method === 'POST') {
     ')->execute([$appId, $name, $userId, $invite_code]);
 
     $projectId = (int)$db->lastInsertId();
+
+    // Přidej tvůrce jako owner do project_members
+    $db->prepare('
+        INSERT INTO project_members (project_id, user_id, role, invited_by)
+        VALUES (?, ?, "owner", ?)
+    ')->execute([$projectId, $userId, $userId]);
 
     jsonOk(['project' => [
         'id'         => $projectId,
