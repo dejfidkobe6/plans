@@ -86,9 +86,12 @@ if ($method === 'POST') {
       <p style='color:#999;font-size:12px'>Platnost pozvánky vyprší za 7 dní. Pokud pozvánku neočekáváš, ignoruj tento email.</p>
     </div>";
 
-    sendMail($email, $subject, $html);
+    $mailSent = false;
+    if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
+        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { /* log silently */ }
+    }
 
-    jsonOk(['message' => 'Pozvánka odeslána']);
+    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena (email bude odeslán po aktivaci)']);
 }
 
 // ============================================================
