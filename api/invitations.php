@@ -108,8 +108,8 @@ if ($method === 'POST') {
 
       <!-- Logo hlavička -->
       <tr><td align="center" style="padding:40px 32px 28px;">
-        <img src="https://plans.besix.cz/logo.png" alt="BeSix" width="72" height="72"
-             style="display:block;margin:0 auto 14px;" onerror="this.style.display='none'">
+        <img src="https://plans.besix.cz/besix_logo_bila.png" alt="BeSix" width="72" height="72"
+             style="display:block;margin:0 auto 14px;">
         <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:1px;line-height:1;">BeSix</div>
         <div style="font-size:10px;font-weight:700;color:#ffffff;letter-spacing:10px;margin-top:4px;opacity:.7;">PLANS</div>
       </td></tr>
