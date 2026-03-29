@@ -78,20 +78,23 @@ if ($method === 'POST') {
         $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
            ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
 
-        // Odešli email pokud je Brevo nakonfigurovaný
+        // Odešli email pokud je Brevo nakonfigurovaný a cURL dostupný
         $mailSent = false;
-        if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
-            $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
-            $proj->execute([$projectId]);
-            $projName  = $proj->fetch()['name'] ?? 'projekt';
-            $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
-            $roleLabel = ['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role;
-            $subject   = "Pozvánka do projektu „{$projName}" – BeSix Plans";
-            $html      = "<div style='font-family:sans-serif;max-width:520px;margin:0 auto'><h2>Byl(a) jsi pozván(a) do projektu {$projName}</h2><p>Role: {$roleLabel}</p><a href='{$inviteUrl}'>Přijmout pozvánku</a></div>";
-            try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $ex) { }
+        if (defined('BREVO_API_KEY') && BREVO_API_KEY && function_exists('curl_init')) {
+            try {
+                $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
+                $proj->execute([$projectId]);
+                $projName  = $proj->fetch()['name'] ?? 'projekt';
+                $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
+                $roleLabel = ['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role;
+                $subject   = "Pozvánka do projektu „{$projName}" – BeSix Plans";
+                $html      = "<div style='font-family:sans-serif'><h2>Pozvánka do projektu {$projName}</h2><p>Role: {$roleLabel}</p><a href='{$inviteUrl}'>Přijmout pozvánku</a></div>";
+                sendMail($email, $subject, $html);
+                $mailSent = true;
+            } catch (\Throwable $ex) { }
         }
 
-        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena']);
+        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena', 'invite_url' => 'https://plans.besix.cz/invite.php?token=' . $token]);
 
     } catch (\Throwable $e) {
         jsonError('Chyba: ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')', 500);
