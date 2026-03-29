@@ -14,10 +14,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Inject secrets into config.php
+        env:
+          DB_PASS: ${{ secrets.DB_PASS }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          sed -i "s|define('DB_PASS', '');|define('DB_PASS', '$DB_PASS');|" api/config.php
+          sed -i "s|define('GOOGLE_CLIENT_SECRET', '');|define('GOOGLE_CLIENT_SECRET', '$GOOGLE_CLIENT_SECRET');|" api/config.php
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: green.thinline.cz
-          username: plans_besix_cz
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: /
+          exclude: |
+            **/.git*
+            **/.git*/**
+            setup.sql
