@@ -96,7 +96,7 @@ if ($method === 'POST') {
                 $projName  = $proj->fetch()['name'] ?? 'projekt';
                 $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
                 $roleLabel = ['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role;
-                $subject   = "Pozvánka do projektu „{$projName}" – BeSix Plans";
+                $subject   = "Pozv\u{00E1}nka do projektu \"{$projName}\" - BeSix Plans";
                 $html      = "<div style='font-family:sans-serif'><h2>Pozvánka do projektu {$projName}</h2><p>Role: {$roleLabel}</p><a href='{$inviteUrl}'>Přijmout pozvánku</a></div>";
                 sendMail($email, $subject, $html);
                 $mailSent = true;
