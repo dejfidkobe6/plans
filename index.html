@@ -1791,6 +1791,31 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   font-size: 13px; color: var(--text-dim); margin-bottom: 32px;
   font-family: var(--font-mono);
 }
+#app-switcher {
+  display: flex; gap: 16px; margin-bottom: 40px; flex-wrap: wrap;
+}
+.app-switch-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 28px; border-radius: 10px; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s;
+  text-decoration: none; user-select: none;
+}
+.app-switch-card.active-app {
+  background: rgba(74,83,64,0.25); border-color: var(--olive-light);
+}
+.app-switch-card.active-app:hover { background: rgba(74,83,64,0.35); }
+.app-switch-card.other-app {
+  background: #fff; border-color: #e5e7eb;
+}
+.app-switch-card.other-app:hover { border-color: #9ca3af; }
+.app-switch-card-logo { height: 28px; width: auto; }
+.app-switch-card-logo.invert { filter: invert(1); }
+.app-switch-card-name {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.app-switch-card.active-app .app-switch-card-name { color: var(--olive-light); }
+.app-switch-card.other-app .app-switch-card-name { color: #111; }
 #project-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px; width: 100%; max-width: 900px;
@@ -1938,6 +1963,16 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
   </div>
   <div id="project-screen-body">
+    <div id="app-switcher">
+      <div class="app-switch-card active-app">
+        <img class="app-switch-card-logo" src="besix_logo_bila.png" alt="BeSix">
+        <span class="app-switch-card-name">Plans</span>
+      </div>
+      <a class="app-switch-card other-app" href="https://time.besix.cz" target="_blank" rel="noopener">
+        <img class="app-switch-card-logo invert" src="besix_logo_bila.png" alt="BeSix">
+        <span class="app-switch-card-name">Time</span>
+      </a>
+    </div>
     <h2>Vyberte projekt</h2>
     <div class="ps-subtitle">Vyberte existující projekt nebo vytvořte nový</div>
     <div id="project-grid"></div>
