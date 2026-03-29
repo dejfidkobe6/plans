@@ -1,13 +1,16 @@
 <?php
+ob_start();
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    ob_clean();
     header('Content-Type: application/json');
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>$errstr,'file'=>basename($errfile),'line'=>$errline]);
     exit;
 });
 set_exception_handler(function($e) {
+    ob_clean();
     header('Content-Type: application/json');
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>$e->getMessage(),'file'=>basename($e->getFile()),'line'=>$e->getLine()]);
@@ -49,64 +52,50 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     if (!$isOwnerOrAdmin) jsonError('Nemáš oprávnění pozvat členy', 403);
 
-    $body  = json_decode(file_get_contents('php://input'), true) ?? [];
-    $email = strtolower(trim($body['email'] ?? ''));
-    $role  = $body['role'] ?? 'member';
+    try {
+        $body  = json_decode(file_get_contents('php://input'), true) ?? [];
+        $email = strtolower(trim($body['email'] ?? ''));
+        $role  = $body['role'] ?? 'member';
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonError('Neplatný email');
-    if (!in_array($role, ['admin', 'member', 'viewer'])) jsonError('Neplatná role');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonError('Neplatný email');
+        if (!in_array($role, ['admin', 'member', 'viewer'])) jsonError('Neplatná role');
 
-    $db = getDB();
+        $db = getDB();
 
-    // Zkontroluj zda uživatel není již členem
-    $check = $db->prepare('
-        SELECT pm.id FROM project_members pm
-        JOIN users u ON u.id = pm.user_id
-        WHERE pm.project_id = ? AND u.email = ?
-    ');
-    $check->execute([$projectId, $email]);
-    if ($check->fetch()) jsonError('Uživatel je již členem projektu');
+        // Zkontroluj zda uživatel není již členem
+        $check = $db->prepare('SELECT pm.id FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND u.email = ?');
+        $check->execute([$projectId, $email]);
+        if ($check->fetch()) jsonError('Uživatel je již členem projektu');
 
-    // Zruš existující čekající pozvánky pro tento email
-    $db->prepare('UPDATE invitations SET status = "expired" WHERE project_id = ? AND invited_email = ? AND status = "pending"')
-       ->execute([$projectId, $email]);
+        // Zruš existující čekající pozvánky pro tento email
+        $db->prepare('UPDATE invitations SET status = "expired" WHERE project_id = ? AND invited_email = ? AND status = "pending"')
+           ->execute([$projectId, $email]);
 
-    // Vytvoř novou pozvánku
-    $token     = bin2hex(random_bytes(32));
-    $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
+        // Vytvoř novou pozvánku
+        $token     = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-    $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
-       ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
+        $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
+           ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
 
-    // Získej název projektu
-    $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
-    $proj->execute([$projectId]);
-    $projName = $proj->fetch()['name'] ?? 'projekt';
+        // Odešli email pokud je Brevo nakonfigurovaný
+        $mailSent = false;
+        if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
+            $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
+            $proj->execute([$projectId]);
+            $projName  = $proj->fetch()['name'] ?? 'projekt';
+            $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
+            $roleLabel = ['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role;
+            $subject   = "Pozvánka do projektu „{$projName}" – BeSix Plans";
+            $html      = "<div style='font-family:sans-serif;max-width:520px;margin:0 auto'><h2>Byl(a) jsi pozván(a) do projektu {$projName}</h2><p>Role: {$roleLabel}</p><a href='{$inviteUrl}'>Přijmout pozvánku</a></div>";
+            try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $ex) { }
+        }
 
-    // Odešli email
-    $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
-    $roleLabels = ['admin' => 'Administrátor', 'member' => 'Člen', 'viewer' => 'Pozorovatel'];
-    $roleLabel  = $roleLabels[$role] ?? $role;
+        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena']);
 
-    $subject = "Pozvánka do projektu „{$projName}" – BeSix Plans";
-    $html = "
-    <div style='font-family:sans-serif;max-width:520px;margin:0 auto'>
-      <img src='https://plans.besix.cz/besix_logo_bila.png' style='height:36px;margin-bottom:24px;filter:invert(1)' alt='BeSix'>
-      <h2 style='margin:0 0 8px'>Byl(a) jsi pozván(a) do projektu</h2>
-      <p style='font-size:20px;font-weight:600;margin:0 0 16px'>{$projName}</p>
-      <p style='color:#555'>Uživatel <strong>{$user['name']}</strong> tě zve jako <strong>{$roleLabel}</strong>.</p>
-      <a href='{$inviteUrl}' style='display:inline-block;margin:24px 0;padding:12px 28px;background:#4A5340;color:#fff;text-decoration:none;border-radius:6px;font-weight:600'>
-        Přijmout pozvánku
-      </a>
-      <p style='color:#999;font-size:12px'>Platnost pozvánky vyprší za 7 dní. Pokud pozvánku neočekáváš, ignoruj tento email.</p>
-    </div>";
-
-    $mailSent = false;
-    if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
-        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { }
+    } catch (\Throwable $e) {
+        jsonError('Chyba: ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')', 500);
     }
-
-    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena']);
 }
 
 // ============================================================
