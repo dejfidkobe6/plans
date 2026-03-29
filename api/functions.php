@@ -69,3 +69,49 @@ function getPlansAppId(): int {
     $id = (int)$row['id'];
     return $id;
 }
+
+// ============================================================
+// Project membership helper
+// ============================================================
+function getProjectMembership(int $projectId, int $userId): array|false {
+    $db   = getDB();
+    $stmt = $db->prepare('SELECT id, role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+    $stmt->execute([$projectId, $userId]);
+    $row = $stmt->fetch();
+    if ($row) return $row;
+
+    // Fallback: pokud je user creator projektu, auto-migruj ho do project_members
+    $check = $db->prepare('SELECT id FROM projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
+    $check->execute([$projectId, $userId]);
+    if ($check->fetch()) {
+        $db->prepare('INSERT IGNORE INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
+           ->execute([$projectId, $userId, $userId]);
+        return ['id' => 0, 'role' => 'owner'];
+    }
+    return false;
+}
+
+// ============================================================
+// Email – Brevo API
+// ============================================================
+function sendMail(string $to, string $subject, string $htmlBody): void {
+    $payload = json_encode([
+        'sender'     => ['name' => 'BeSix Plans', 'email' => MAIL_FROM],
+        'to'         => [['email' => $to]],
+        'subject'    => $subject,
+        'htmlContent'=> $htmlBody,
+    ]);
+
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'api-key: ' . BREVO_API_KEY,
+        ],
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}
