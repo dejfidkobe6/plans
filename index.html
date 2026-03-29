@@ -1684,8 +1684,38 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .zmgr-cancel-btn:hover { color: var(--text); }
 
 /* ---- Members panel ---- */
+#users-page {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 26px;
+  background: var(--bg);
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#users-page.visible { display: flex; }
+#users-page-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 2px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+#users-page-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 600; color: var(--text-bright);
+  flex: 1;
+}
+#close-users-btn {
+  background: none; border: none; color: var(--text-dim);
+  font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+}
+#close-users-btn:hover { color: var(--text-bright); }
+#users-page-body {
+  flex: 1; overflow-y: auto; padding: 24px 32px;
+  max-width: 800px; width: 100%;
+}
 #members-section { padding: 0 0 24px; }
-#members-section h2 { font-size: 16px; font-weight: 600; color: var(--text-bright); margin: 0 0 16px; }
 .members-invite-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
 .members-invite-row input { flex: 1; min-width: 180px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
 .members-invite-row select { padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
@@ -2020,6 +2050,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     Anotace
   </button>
+  <button id="users-mgmt-btn" title="Správa uživatelů">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Správa uživatelů
+  </button>
   <div id="toolbar-right">
     <!-- Tool buttons -->
     <button class="tb-btn tool-btn active" id="tool-select" data-tool="select" title="Výběr (V)">
@@ -2240,23 +2274,34 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="prof-grid"></div>
   </div>
 
-  <!-- MEMBERS -->
-  <div id="members-section">
-    <h2>Členové projektu</h2>
-    <div class="members-invite-row" id="members-invite-row">
-      <input type="email" id="invite-email" placeholder="email@firma.cz">
-      <select id="invite-role">
-        <option value="member">Člen</option>
-        <option value="admin">Administrátor</option>
-        <option value="viewer">Pozorovatel</option>
-      </select>
-      <button onclick="sendInvitation()">Pozvat</button>
-    </div>
-    <div id="members-error"></div>
-    <div id="members-list"></div>
-    <div id="pending-invitations"></div>
-  </div>
 
+</div>
+
+<!-- USERS MANAGEMENT PAGE -->
+<div id="users-page">
+  <div id="users-page-header">
+    <div id="users-page-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Správa uživatelů
+    </div>
+    <button id="close-users-btn" title="Zavřít">×</button>
+  </div>
+  <div id="users-page-body">
+    <div id="members-section">
+      <div class="members-invite-row" id="members-invite-row">
+        <input type="email" id="invite-email" placeholder="email@firma.cz">
+        <select id="invite-role">
+          <option value="member">Člen</option>
+          <option value="admin">Administrátor</option>
+          <option value="viewer">Pozorovatel</option>
+        </select>
+        <button onclick="sendInvitation()">Pozvat</button>
+      </div>
+      <div id="members-error"></div>
+      <div id="members-list"></div>
+      <div id="pending-invitations"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ALL TASKS PAGE -->
@@ -3431,6 +3476,10 @@ function setupEventListeners() {
 
   // Subdodavatele home page toggle
   document.getElementById('subddodavatele-btn').addEventListener('click', () => toggleHomePage());
+
+  // Users management page toggle
+  document.getElementById('users-mgmt-btn').addEventListener('click', () => toggleUsersPage());
+  document.getElementById('close-users-btn').addEventListener('click', () => toggleUsersPage(false));
 
   // Manage profese
   document.getElementById('manage-profese-btn').addEventListener('click', openManageProfese);
@@ -5867,10 +5916,10 @@ function toggleHomePage(forceState) {
   const hp = document.getElementById('home-page');
   const btn = document.getElementById('subddodavatele-btn');
   if (forceState === true) {
+    toggleUsersPage(false);
     hp.classList.add('visible');
     btn.classList.add('active');
     renderHomePage();
-    loadMembers();
   } else if (forceState === false) {
     hp.classList.remove('visible');
     btn.classList.remove('active');
@@ -5880,9 +5929,34 @@ function toggleHomePage(forceState) {
       hp.classList.remove('visible');
       btn.classList.remove('active');
     } else {
+      toggleUsersPage(false);
       hp.classList.add('visible');
       btn.classList.add('active');
       renderHomePage();
+    }
+  }
+}
+
+function toggleUsersPage(forceState) {
+  const up = document.getElementById('users-page');
+  const btn = document.getElementById('users-mgmt-btn');
+  if (forceState === true) {
+    toggleHomePage(false);
+    up.classList.add('visible');
+    btn.classList.add('active');
+    loadMembers();
+  } else if (forceState === false) {
+    up.classList.remove('visible');
+    btn.classList.remove('active');
+  } else {
+    const isVisible = up.classList.contains('visible');
+    if (isVisible) {
+      up.classList.remove('visible');
+      btn.classList.remove('active');
+    } else {
+      toggleHomePage(false);
+      up.classList.add('visible');
+      btn.classList.add('active');
       loadMembers();
     }
   }
