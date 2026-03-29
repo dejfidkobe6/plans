@@ -103,10 +103,10 @@ if ($method === 'POST') {
 
     $mailSent = false;
     if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
-        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { /* log silently */ }
+        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { }
     }
 
-    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena (email bude odeslán po aktivaci)']);
+    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena']);
 }
 
 // ============================================================
