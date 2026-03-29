@@ -2300,6 +2300,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn" id="tool-arrow" data-tool="arrow" title="Šipka (A)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
     </button>
+    <button class="tb-btn tool-btn" id="tool-polygon" data-tool="polygon" title="Víceuhelník – klik přidá bod, dvojklik ukončí (L)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L8 5 L19 9 L16 19 Z"/><circle cx="4" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.8" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1.8" fill="currentColor" stroke="none"/></svg>
+    </button>
     <button class="tb-btn tool-btn" id="tool-pin" data-tool="pin" title="Špendlík (P)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
     </button>
@@ -2927,7 +2930,7 @@ const LEVEL_TYPES = {
 const TOOL_NAMES = {
   select: 'Výběr', pan: 'Posun', freehand: 'Volná čára',
   rect: 'Obdélník', circle: 'Kruh', arrow: 'Šipka',
-  pin: 'Špendlík', text: 'Text'
+  pin: 'Špendlík', text: 'Text', polygon: 'Víceuhelník'
 };
 
 window.appState = {
@@ -2949,6 +2952,11 @@ let drawStartX = 0, drawStartY = 0;
 let activeObject = null;
 let tempShape = null;
 let isPanning = false;
+// Polygon tool state
+let polyPoints = [];
+let polyTempObjects = [];
+let polyPointSnap = [];
+let polyPreviewLine = null;
 let panStartX = 0, panStartY = 0;
 let lastViewportX = 0, lastViewportY = 0;
 let spacePressed = false;
@@ -3359,6 +3367,9 @@ function setupDrawingEditor() {
 // DRAWING TOOLS
 // ============================================================
 function setTool(tool) {
+  if (appState.tool === 'polygon' && tool !== 'polygon' && polyPoints.length > 0) {
+    cancelPolygon();
+  }
   appState.tool = tool;
   // Update UI
   document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -3391,6 +3402,95 @@ function setTool(tool) {
   }
 
   document.getElementById('status-tool-info').textContent = 'Nástroj: ' + (TOOL_NAMES[tool] || tool);
+  fabricCanvas.renderAll();
+}
+
+// ============================================================
+// POLYGON TOOL
+// ============================================================
+function polyAddPoint(x, y) {
+  const cw = fabricCanvas;
+  const color = getActiveProfeseColor();
+  polyPointSnap.push(polyTempObjects.length);
+
+  const dot = new fabric.Circle({
+    left: x, top: y, radius: 3.5,
+    fill: color, stroke: '#fff', strokeWidth: 1.5,
+    originX: 'center', originY: 'center',
+    selectable: false, evented: false, isPolyHelper: true
+  });
+  cw.add(dot);
+  polyTempObjects.push(dot);
+
+  if (polyPoints.length > 0) {
+    const prev = polyPoints[polyPoints.length - 1];
+    const seg = new fabric.Line([prev.x, prev.y, x, y], {
+      stroke: color, strokeWidth: 2,
+      selectable: false, evented: false, isPolyHelper: true
+    });
+    cw.add(seg);
+    polyTempObjects.push(seg);
+  }
+
+  polyPoints.push({ x, y });
+
+  if (!polyPreviewLine) {
+    polyPreviewLine = new fabric.Line([x, y, x, y], {
+      stroke: color, strokeWidth: 1.5, strokeDashArray: [6, 4],
+      selectable: false, evented: false, isPolyHelper: true, opacity: 0.75
+    });
+    cw.add(polyPreviewLine);
+  } else {
+    polyPreviewLine.set({ x1: x, y1: y });
+  }
+  cw.renderAll();
+}
+
+function polyRemoveLastPoint() {
+  if (!polyPointSnap.length) return;
+  const startIdx = polyPointSnap.pop();
+  const removed = polyTempObjects.splice(startIdx);
+  removed.forEach(o => fabricCanvas.remove(o));
+  polyPoints.pop();
+  if (polyPoints.length > 0 && polyPreviewLine) {
+    const last = polyPoints[polyPoints.length - 1];
+    polyPreviewLine.set({ x1: last.x, y1: last.y });
+  }
+}
+
+function finishPolygon() {
+  const cw = fabricCanvas;
+  polyTempObjects.forEach(o => cw.remove(o));
+  polyTempObjects = []; polyPointSnap = [];
+  if (polyPreviewLine) { cw.remove(polyPreviewLine); polyPreviewLine = null; }
+
+  const pts = polyPoints.slice();
+  polyPoints = [];
+
+  if (pts.length < 3) { cw.renderAll(); return; }
+
+  const color = getActiveProfeseColor();
+  const poly = new fabric.Polygon(pts, {
+    fill: color + '22', stroke: color,
+    strokeWidth: 2, strokeUniform: true
+  });
+  addAnnotationProperties(poly, 'polygon');
+  cw.add(poly);
+  createAnnotLabel(poly);
+  cw.setActiveObject(poly);
+  pushUndoState();
+  updateAnnotList();
+  onObjectSelected({ target: poly });
+  saveCurrentLevel();
+  setTool('select');
+  cw.renderAll();
+}
+
+function cancelPolygon() {
+  polyTempObjects.forEach(o => fabricCanvas.remove(o));
+  polyTempObjects = []; polyPointSnap = [];
+  if (polyPreviewLine) { fabricCanvas.remove(polyPreviewLine); polyPreviewLine = null; }
+  polyPoints = [];
   fabricCanvas.renderAll();
 }
 
@@ -3433,12 +3533,17 @@ function findLabel(annotId) {
 function positionLabel(label, obj) {
   if (!label || !obj) return;
   const zoom = fabricCanvas.getZoom();
-  const vpt = fabricCanvas.viewportTransform;
-  const br = obj.getBoundingRect(true);
-  const cx = (br.left - vpt[4]) / zoom;
-  const cy = (br.top  - vpt[5]) / zoom;
-  const h = 34; // approx group height at scale=1
-  label.set({ left: cx, top: cy - h / zoom, scaleX: 1 / zoom, scaleY: 1 / zoom });
+  const c = obj.getCenterPoint();
+  const lw = label.width  || 80;
+  const lh = label.height || 34;
+  label.set({
+    left: c.x - lw / (2 * zoom),
+    top:  c.y - lh / (2 * zoom),
+    scaleX: 1 / zoom,
+    scaleY: 1 / zoom,
+    originX: 'left',
+    originY: 'top'
+  });
   label.setCoords();
 }
 
@@ -3493,19 +3598,10 @@ function createAnnotLabel(obj) {
 
 function updateAllLabelScales() {
   if (!fabricCanvas) return;
-  const zoom = fabricCanvas.getZoom();
-  const vpt = fabricCanvas.viewportTransform;
   fabricCanvas.getObjects().forEach(o => {
     if (!o.annotLabelFor) return;
     const annot = fabricCanvas.getObjects().find(a => a.annotId === o.annotLabelFor);
-    if (annot) {
-      const br = annot.getBoundingRect(true);
-      const cx = (br.left - vpt[4]) / zoom;
-      const cy = (br.top  - vpt[5]) / zoom;
-      const h = (o.height || 34);
-      o.set({ left: cx, top: cy - h / zoom, scaleX: 1 / zoom, scaleY: 1 / zoom });
-      o.setCoords();
-    }
+    if (annot) positionLabel(o, annot);
   });
   fabricCanvas.renderAll();
 }
@@ -3567,6 +3663,11 @@ function setupEventListeners() {
       lastViewportY = cw.viewportTransform[5];
       cw.defaultCursor = 'grabbing';
       cw.renderAll();
+      return;
+    }
+
+    if (appState.tool === 'polygon') {
+      polyAddPoint(pointer.x, pointer.y);
       return;
     }
 
@@ -3636,6 +3737,12 @@ function setupEventListeners() {
       vpt[5] = lastViewportY + dy;
       cw.setViewportTransform(vpt);
       cw.renderAll();
+      return;
+    }
+
+    if (appState.tool === 'polygon' && polyPreviewLine) {
+      polyPreviewLine.set({ x2: pointer.x, y2: pointer.y });
+      fabricCanvas.renderAll();
       return;
     }
 
@@ -3752,6 +3859,11 @@ function setupEventListeners() {
 
   // Double-click on annotation — close 3D panel if open, focus properties
   cw.on('mouse:dblclick', (opt) => {
+    if (appState.tool === 'polygon') {
+      polyRemoveLastPoint(); // second click of dblclick added an extra point
+      finishPolygon();
+      return;
+    }
     const obj = opt.target;
     if (!obj || !obj.annotId) return;
     const panel = document.getElementById('model-3d-panel');
@@ -3764,10 +3876,12 @@ function setupEventListeners() {
     document.getElementById('right-panel-content').scrollTop = 0;
   });
 
-  // Object moving — keep label in sync
-  cw.on('object:moving', (opt) => {
-    const obj = opt.target;
-    if (obj && obj.annotId) positionLabel(findLabel(obj.annotId), obj);
+  // Object moving/scaling/rotating — keep label in sync
+  ['object:moving', 'object:scaling', 'object:rotating'].forEach(ev => {
+    cw.on(ev, (opt) => {
+      const obj = opt.target;
+      if (obj && obj.annotId) positionLabel(findLabel(obj.annotId), obj);
+    });
   });
 
   // Object modified
@@ -3996,7 +4110,7 @@ function onKeyDown(e) {
     if (e.key === 'a') { e.preventDefault(); fabricCanvas.discardActiveObject(); fabricCanvas.getObjects().filter(o => !o.isBackground).forEach(o => fabricCanvas.setActiveObject(o)); fabricCanvas.renderAll(); return; }
   }
 
-  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text' };
+  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon' };
   if (toolKeys[e.key.toLowerCase()]) { setTool(toolKeys[e.key.toLowerCase()]); return; }
 
   if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -4013,6 +4127,10 @@ function onKeyDown(e) {
     }
   }
   if (e.key === 'Escape') {
+    if (appState.tool === 'polygon' && polyPoints.length > 0) {
+      cancelPolygon();
+      return;
+    }
     fabricCanvas.discardActiveObject();
     fabricCanvas.renderAll();
   }
