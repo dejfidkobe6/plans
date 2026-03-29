@@ -3107,10 +3107,11 @@ function renderLevelTabs() {
         removeLevel(parseInt(e.target.dataset.idx));
         return;
       }
-      switchLevel(idx);
+      if (idx !== appState.activeLevel) switchLevel(idx);
     });
     tab.addEventListener('dblclick', (e) => {
       if (e.target.classList.contains('tab-close')) return;
+      e.stopPropagation();
       startRenameTab(tab, idx);
     });
     container.appendChild(tab);
