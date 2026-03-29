@@ -21,3 +21,7 @@ jobs:
           username: plans_besix_cz
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: /
+          exclude: |
+            **/.git*
+            **/.git*/**
+            setup.sql
