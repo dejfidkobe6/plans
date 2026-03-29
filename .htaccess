@@ -1,0 +1,30 @@
+Options -Indexes
+
+# PHP soubory v api/ jsou dostupné přímo
+# Vše ostatní servíruj jako index.html (SPA)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Přeskočit existující soubory a složky
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # api/ přesměrovat na PHP
+  RewriteRule ^api/(.*)$ api/$1 [L]
+
+  # Vše ostatní → index.html
+  RewriteRule ^(?!api/).*$ index.html [L]
+</IfModule>
+
+# Bezpečnostní hlavičky
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Zakázat přístup k citlivým souborům
+<FilesMatch "\.(sql|md|env|git)$">
+  Require all denied
+</FilesMatch>
