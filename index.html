@@ -6637,31 +6637,67 @@ async function bgDBLoadAll(pid, levels) {
 let saveTimer = null;
 function saveState() {
   clearTimeout(saveTimer);
-  // Okamžité uložení – žádný debounce
-  _flushSave();
+  _flushSave();    // localStorage okamžitě
+  _serverSave();   // server s 2s debounce
 }
+
+function _buildStateObj() {
+  return {
+    levels: appState.levels.map(l => ({
+      id: l.id, name: l.name, type: l.type,
+      annotations: l.annotations,
+      fabricJSON: l.fabricJSON,
+      viewportTransform: l.viewportTransform,
+      hasBackground: !!l.backgroundImage,
+      color3D: l.color3D, shape3D: l.shape3D
+    })),
+    activeLevel: appState.activeLevel,
+    tool: appState.tool,
+    showGrid: appState.showGrid,
+    zones3D: appState.zones3D
+  };
+}
+
 function _flushSave() {
   if (!currentProject) return;
   try {
-    const stateToSave = {
-      levels: appState.levels.map(l => ({
-        id: l.id, name: l.name, type: l.type,
-        annotations: l.annotations,
-        fabricJSON: l.fabricJSON,
-        viewportTransform: l.viewportTransform,
-        hasBackground: !!l.backgroundImage,
-        color3D: l.color3D, shape3D: l.shape3D
-      })),
-      activeLevel: appState.activeLevel,
-      tool: appState.tool,
-      showGrid: appState.showGrid,
-      zones3D: appState.zones3D
-    };
     const pid = String(currentProject.id);
-    localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(stateToSave));
+    localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(_buildStateObj()));
     localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
     localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
   } catch(e) { /* localStorage plný */ }
+}
+
+// ---- Server save (debounce 2 s) ----
+let _srvTimer = null;
+function _serverSave() {
+  clearTimeout(_srvTimer);
+  _srvTimer = setTimeout(_serverSaveNow, 2000);
+}
+async function _serverSaveNow() {
+  if (!currentProject) return;
+  try {
+    await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state:   _buildStateObj(),
+        profese: appState.profese,
+        counter: annotIdCounter
+      })
+    });
+  } catch(e) { /* síťová chyba – data jsou v localStorage */ }
+}
+
+// ---- Server load ----
+async function _serverLoad(projectId) {
+  try {
+    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${projectId}`);
+    if (ok && data.state && Array.isArray(data.state.levels) && data.state.levels.length > 0) {
+      return data;
+    }
+  } catch(e) {}
+  return null;
 }
 
 function loadState() {
@@ -7327,10 +7363,12 @@ async function doRegister() {
 
 // --- Logout ---
 async function doLogout() {
-  // Uložit stav před odhlášením (debounce by jinak uložil prázdná data)
+  // Uložit stav před odhlášením
   if (currentProject && fabricCanvas) {
     saveCurrentLevel();
     _flushSave();
+    clearTimeout(_srvTimer);
+    await _serverSaveNow(); // synchronní flush na server
   }
   clearTimeout(saveTimer);
   await apiFetch('api/auth.php?action=logout', { method: 'POST' });
@@ -7424,11 +7462,31 @@ async function openProject(proj) {
   appState.profese = JSON.parse(JSON.stringify(DEFAULT_PROFESE));
   annotIdCounter = 1;
   undoStack = []; redoStack = [];
-  loadState();
+
+  // Načti data ze serveru (primární) nebo z localStorage (záloha)
+  const serverData = await _serverLoad(proj.id);
+  if (serverData) {
+    const s = serverData.state;
+    appState.levels       = s.levels       || [];
+    appState.activeLevel  = s.activeLevel  || 0;
+    appState.tool         = s.tool         || 'select';
+    appState.showGrid     = s.showGrid     || false;
+    appState.zones3D      = s.zones3D      || [];
+    annotIdCounter        = serverData.counter || 1;
+    if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
+      appState.profese = serverData.profese;
+    }
+    rebuildProfeseSelects();
+    if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
+    setTool(appState.tool);
+  } else {
+    loadState(); // fallback na localStorage
+  }
+
   if (appState.levels.length === 0) {
     addLevel('1.NP', '1.NP');
   } else {
-    // Restore background images from IndexedDB before rendering
+    // Obnov obrázky pozadí z IndexedDB
     const pid = String(proj.id);
     await bgDBLoadAll(pid, appState.levels);
     renderLevelTabs();
