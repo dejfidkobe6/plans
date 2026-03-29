@@ -67,16 +67,16 @@ if ($method === 'POST') {
         $check->execute([$projectId, $email]);
         if ($check->fetch()) jsonError('Uživatel je již členem projektu');
 
-        // Zruš existující čekající pozvánky pro tento email
-        $db->prepare('UPDATE invitations SET status = "expired" WHERE project_id = ? AND invited_email = ? AND status = "pending"')
-           ->execute([$projectId, $email]);
-
-        // Vytvoř novou pozvánku
+        // Vytvoř/obnov pozvánku (ON DUPLICATE KEY = unikátní klíč project_id+invited_email)
         $token     = bin2hex(random_bytes(32));
         $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-        $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
-           ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
+        $db->prepare(
+            'INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at)
+             VALUES (?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE token=VALUES(token), expires_at=VALUES(expires_at),
+             invited_by=VALUES(invited_by), role=VALUES(role), status="pending"'
+        )->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
 
         // Odešli email pokud je Brevo nakonfigurovaný a cURL dostupný
         $mailSent = false;
