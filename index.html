@@ -1732,6 +1732,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   max-width: 800px; width: 100%;
 }
 #members-section { padding: 0 0 24px; }
+.member-profese-select {
+  padding: 5px 8px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text); font-size: 12px; cursor: pointer;
+  min-width: 140px; transition: border-color 0.15s;
+}
+.member-profese-select:focus { border-color: var(--olive); outline: none; }
 .members-invite-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
 .members-invite-row input { flex: 1; min-width: 180px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
 .members-invite-row select { padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
@@ -5981,6 +5987,17 @@ function toggleUsersPage(forceState) {
 // ============================================================
 // MEMBERS MANAGEMENT
 // ============================================================
+function getMemberProfeseMap(pid) {
+  try { return JSON.parse(localStorage.getItem(LS_MEMBER_PROFESE(pid)) || '{}'); } catch { return {}; }
+}
+function setMemberProfese(userId, profeseName) {
+  const pid = currentProject.id;
+  const map = getMemberProfeseMap(pid);
+  if (profeseName) map[userId] = profeseName;
+  else delete map[userId];
+  localStorage.setItem(LS_MEMBER_PROFESE(pid), JSON.stringify(map));
+}
+
 async function loadMembers() {
   if (!currentProject) return;
   const pid = currentProject.id;
@@ -6000,15 +6017,28 @@ async function loadMembers() {
   const membersList = document.getElementById('members-list');
   const members = mRes.ok ? mRes.data.members : [];
   const roleLabels = { owner:'Vlastník', admin:'Administrátor', member:'Člen', viewer:'Pozorovatel' };
+  const profeseList = appState.profese || [];
+  const memberProfeseMap = getMemberProfeseMap(pid);
+
   membersList.innerHTML = members.map(m => {
-    const initials = m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const canEdit  = canManage && m.role !== 'owner' && m.user_id !== currentUser.id;
+    const initials  = m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const canEdit   = canManage && m.role !== 'owner' && m.user_id !== currentUser.id;
+    const assigned  = memberProfeseMap[m.user_id] || '';
+    const profColor = profeseList.find(p => p.name === assigned)?.color || '';
+    const profeseOpts = profeseList.map(p =>
+      `<option value="${escHtml(p.name)}"${p.name === assigned ? ' selected' : ''}>${escHtml(p.name)}</option>`
+    ).join('');
     return `<div class="member-row">
       <div class="member-avatar" style="background:${escHtml(m.avatar_color||'#4A5340')}">${escHtml(initials)}</div>
       <div class="member-info">
         <div class="member-name">${escHtml(m.name)}</div>
         <div class="member-email">${escHtml(m.email)}</div>
       </div>
+      <select class="member-profese-select" onchange="setMemberProfese(${m.user_id},this.value)" title="Přiřadit k subdodavateli"
+        style="${profColor ? `border-left:3px solid ${escHtml(profColor)}` : ''}">
+        <option value="">— subdodavatel —</option>
+        ${profeseOpts}
+      </select>
       ${canEdit
         ? `<select class="member-role-select" onchange="changeMemberRole(${m.id},this.value)">
             ${['admin','member','viewer'].map(r=>`<option value="${r}"${r===m.role?' selected':''}>${roleLabels[r]}</option>`).join('')}
@@ -6079,9 +6109,10 @@ async function cancelInvitation(invId) {
 // ============================================================
 
 // --- Storage keys (pouze pro data projektu, ne pro auth) ---
-const LS_PROJECT_STATE   = (pid) => `besix_plans_state_${pid}`;
-const LS_PROJECT_COUNTER = (pid) => `besix_plans_counter_${pid}`;
-const LS_PROJECT_PROFESE = (pid) => `besix_plans_profese_${pid}`;
+const LS_PROJECT_STATE        = (pid) => `besix_plans_state_${pid}`;
+const LS_PROJECT_COUNTER      = (pid) => `besix_plans_counter_${pid}`;
+const LS_PROJECT_PROFESE      = (pid) => `besix_plans_profese_${pid}`;
+const LS_MEMBER_PROFESE       = (pid) => `besix_plans_member_profese_${pid}`;
 
 let currentUser    = null;  // {id, name, email, avatar_color}
 let currentProject = null;  // {id, name, created_at, role}
