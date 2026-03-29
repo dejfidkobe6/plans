@@ -75,8 +75,8 @@ if ($method === 'POST') {
     $token     = bin2hex(random_bytes(32));
     $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-    $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at) VALUES (?,?,?,?,?,?)')
-       ->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
+    $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
+       ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
 
     // Získej název projektu
     $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
@@ -103,10 +103,10 @@ if ($method === 'POST') {
 
     $mailSent = false;
     if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
-        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { /* log silently */ }
+        try { sendMail($email, $subject, $html); $mailSent = true; } catch (\Throwable $e) { }
     }
 
-    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena (email bude odeslán po aktivaci)']);
+    jsonOk(['message' => $mailSent ? 'Pozvánka odeslána' : 'Pozvánka vytvořena']);
 }
 
 // ============================================================
