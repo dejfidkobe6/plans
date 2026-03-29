@@ -463,6 +463,54 @@ canvas#fabric-canvas { display: block; }
 #de-reset-btn:hover { color: var(--text-bright); }
 #de-apply-btn { background: var(--olive); border-color: var(--olive); color: #fff; font-weight: 600; }
 #de-apply-btn:hover { background: var(--olive-hover); }
+#de-crop-btn {
+  margin: 0 14px 10px; padding: 7px; border-radius: 5px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--font-main); font-size: 12px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+#de-crop-btn:hover { color: var(--text-bright); background: var(--panel); }
+/* ---- Crop overlay ---- */
+#crop-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 45; display: none; cursor: crosshair; user-select: none;
+}
+#crop-overlay.active { display: block; }
+.crop-dim {
+  position: absolute; background: rgba(0,0,0,0.55); pointer-events: none;
+}
+#crop-selection {
+  position: absolute; display: none; pointer-events: none;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+}
+#crop-selection::before, #crop-selection::after,
+#crop-selection .crop-br, #crop-selection .crop-tl-r {
+  content: ''; position: absolute;
+  width: 9px; height: 9px; background: #fff; border-radius: 1px;
+}
+#crop-selection::before { top: -5px; left: -5px; }
+#crop-selection::after  { bottom: -5px; right: -5px; }
+#crop-info {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.75); color: #fff; font-size: 12px;
+  padding: 5px 14px; border-radius: 5px; pointer-events: none; white-space: nowrap;
+  font-family: var(--font-main);
+}
+#crop-actions {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 46;
+}
+#crop-cancel-btn {
+  padding: 8px 18px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); font-family: var(--font-main);
+  font-size: 13px; cursor: pointer;
+}
+#crop-confirm-btn {
+  padding: 8px 18px; border-radius: 6px; border: none;
+  background: var(--olive); color: #fff; font-family: var(--font-main);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
 
 #drop-zone {
   position: absolute;
@@ -2433,7 +2481,25 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <button id="de-reset-btn">Resetovat</button>
         <button id="de-apply-btn">Použít</button>
       </div>
+      <button id="de-crop-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M6 2v14h14M2 6h14v14"/></svg>
+        Oříznout výkres
+      </button>
     </div>
+    <!-- CROP OVERLAY -->
+    <div id="crop-overlay">
+      <div class="crop-dim" id="crop-dim-t"></div>
+      <div class="crop-dim" id="crop-dim-b"></div>
+      <div class="crop-dim" id="crop-dim-l"></div>
+      <div class="crop-dim" id="crop-dim-r"></div>
+      <div id="crop-selection"></div>
+      <div id="crop-info">Přetáhněte myší pro výběr oblasti k ořezu</div>
+      <div id="crop-actions">
+        <button id="crop-cancel-btn">Zrušit</button>
+        <button id="crop-confirm-btn">✓ Oříznout</button>
+      </div>
+    </div>
+
     <button id="drawing-edit-btn" title="Upravit výkres" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       Upravit výkres
@@ -3001,6 +3067,7 @@ function init() {
   setupTasksPage();
   setupAnotacePage();
   setupDrawingEditor();
+  setupCropOverlay();
   setupAnnotEditModal();
   setupPDFExport();
   requestAnimationFrame(autoSaveLoop);
@@ -3346,11 +3413,133 @@ function resetDrawingAdjustments() {
   }
 }
 
+// ============================================================
+// CROP TOOL
+// ============================================================
+let cropState = null;
+
+function enterCropMode() {
+  const level = appState.levels[appState.activeLevel];
+  if (!level || !level.backgroundImage) return;
+  closeDrawingEditor();
+  cropState = { startX: 0, startY: 0, endX: 0, endY: 0, dragging: false };
+  document.getElementById('crop-overlay').classList.add('active');
+  _updateCropUI(0, 0, 0, 0);
+}
+
+function exitCropMode() {
+  cropState = null;
+  document.getElementById('crop-overlay').classList.remove('active');
+}
+
+function _updateCropUI(x, y, w, h) {
+  const area = document.getElementById('canvas-area');
+  const TW = area.offsetWidth, TH = area.offsetHeight;
+  const sel = document.getElementById('crop-selection');
+  if (w > 5 && h > 5) {
+    sel.style.cssText = `display:block;left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
+  } else {
+    sel.style.display = 'none';
+  }
+  const s = (id, l, t, wd, ht) => {
+    document.getElementById(id).style.cssText = `left:${l}px;top:${t}px;width:${wd}px;height:${ht}px;`;
+  };
+  s('crop-dim-t', 0, 0, TW, y);
+  s('crop-dim-b', 0, y + h, TW, Math.max(0, TH - y - h));
+  s('crop-dim-l', 0, y, x, h);
+  s('crop-dim-r', x + w, y, Math.max(0, TW - x - w), h);
+}
+
+function _overlayToFabric(ox, oy) {
+  const canvasEl = fabricCanvas.getElement();
+  const cRect = canvasEl.getBoundingClientRect();
+  const oRect = document.getElementById('crop-overlay').getBoundingClientRect();
+  const scX = canvasEl.width  / cRect.width;
+  const scY = canvasEl.height / cRect.height;
+  const bx = (ox + oRect.left - cRect.left) * scX;
+  const by = (oy + oRect.top  - cRect.top)  * scY;
+  const vpt = fabricCanvas.viewportTransform;
+  const z = fabricCanvas.getZoom();
+  return { x: (bx - vpt[4]) / z, y: (by - vpt[5]) / z };
+}
+
+async function confirmCrop() {
+  const level = appState.levels[appState.activeLevel];
+  if (!cropState || !level) return;
+  const { startX, startY, endX, endY } = cropState;
+  const selX = Math.min(startX, endX), selY = Math.min(startY, endY);
+  const selW = Math.abs(endX - startX),  selH = Math.abs(endY - startY);
+  if (selW < 10 || selH < 10) { showToast('Vyberte oblast k ořezu', 'warn'); return; }
+
+  const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+  if (!bgObj) { exitCropMode(); return; }
+
+  const p1 = _overlayToFabric(selX, selY);
+  const p2 = _overlayToFabric(selX + selW, selY + selH);
+
+  const imgX = (p1.x - bgObj.left) / bgObj.scaleX;
+  const imgY = (p1.y - bgObj.top)  / bgObj.scaleY;
+  const imgW = (p2.x - p1.x) / bgObj.scaleX;
+  const imgH = (p2.y - p1.y) / bgObj.scaleY;
+
+  const cX = Math.max(0, Math.round(imgX));
+  const cY = Math.max(0, Math.round(imgY));
+  const cW = Math.min(bgObj.width  - cX, Math.round(imgW));
+  const cH = Math.min(bgObj.height - cY, Math.round(imgH));
+
+  if (cW < 1 || cH < 1) { showToast('Oblast je mimo výkres', 'warn'); return; }
+
+  const srcUrl = level.backgroundImageOriginal || level.backgroundImage;
+  const croppedUrl = await new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = cW; c.height = cH;
+      c.getContext('2d').drawImage(img, cX, cY, cW, cH, 0, 0, cW, cH);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.src = srcUrl;
+  });
+
+  level.backgroundImage = croppedUrl;
+  level.backgroundImageOriginal = croppedUrl;
+  level.drawingAdjust = { brightness: 0, contrast: 0, grayscale: false };
+  exitCropMode();
+  loadBackgroundImage(croppedUrl, true);
+  saveCurrentLevel();
+  showToast('Výkres oříznut', 'success');
+}
+
+function setupCropOverlay() {
+  const overlay = document.getElementById('crop-overlay');
+  overlay.addEventListener('mousedown', e => {
+    if (!cropState) return;
+    e.preventDefault();
+    const r = overlay.getBoundingClientRect();
+    cropState.startX = cropState.endX = e.clientX - r.left;
+    cropState.startY = cropState.endY = e.clientY - r.top;
+    cropState.dragging = true;
+  });
+  overlay.addEventListener('mousemove', e => {
+    if (!cropState || !cropState.dragging) return;
+    const r = overlay.getBoundingClientRect();
+    cropState.endX = e.clientX - r.left;
+    cropState.endY = e.clientY - r.top;
+    const x = Math.min(cropState.startX, cropState.endX);
+    const y = Math.min(cropState.startY, cropState.endY);
+    _updateCropUI(x, y, Math.abs(cropState.endX - cropState.startX), Math.abs(cropState.endY - cropState.startY));
+  });
+  overlay.addEventListener('mouseup', () => { if (cropState) cropState.dragging = false; });
+  document.getElementById('crop-cancel-btn').addEventListener('click', exitCropMode);
+  document.getElementById('crop-confirm-btn').addEventListener('click', confirmCrop);
+}
+
 function setupDrawingEditor() {
   document.getElementById('drawing-edit-btn').addEventListener('click', openDrawingEditor);
   document.getElementById('drawing-edit-close').addEventListener('click', closeDrawingEditor);
   document.getElementById('de-apply-btn').addEventListener('click', applyDrawingAdjustments);
   document.getElementById('de-reset-btn').addEventListener('click', resetDrawingAdjustments);
+  document.getElementById('de-crop-btn').addEventListener('click', enterCropMode);
   document.getElementById('de-grayscale-btn').addEventListener('click', () => {
     drawingEditorGrayscale = !drawingEditorGrayscale;
     const btn = document.getElementById('de-grayscale-btn');
@@ -4128,6 +4317,7 @@ function onKeyDown(e) {
     }
   }
   if (e.key === 'Escape') {
+    if (cropState) { exitCropMode(); return; }
     if (appState.tool === 'polygon' && polyPoints.length > 0) {
       cancelPolygon();
       return;
