@@ -1,22 +1,35 @@
 <?php
 // ============================================================
-// BESIX Platform – sdílená konfigurace (stejné hodnoty jako board.besix.cz)
+// BESIX Platform – plans.besix.cz
+// Stejná DB jako board.besix.cz → sdílení uživatelů
 // ============================================================
 
-define('DB_HOST', 'localhost');
-define('DB_NAME', '');          // ← doplň stejné jako board
-define('DB_USER', '');          // ← doplň stejné jako board
-define('DB_PASS', '');          // ← doplň stejné jako board
-define('DB_CHARSET', 'utf8mb4');
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'besixcz');
+define('DB_USER', 'besixcz001');
+define('DB_PASS', '');           // ← doplň stejné heslo jako board
+
+define('MAIL_FROM',  'Noreply@besix.cz');
+define('APP_URL',    'https://plans.besix.cz');
+
+define('GOOGLE_CLIENT_ID',     '257797351627-ha61f9rgcgn49ljmm8gudv4adtr9cif9.apps.googleusercontent.com');
+define('GOOGLE_CLIENT_SECRET', '');  // ← doplň stejné jako board
+define('GOOGLE_REDIRECT_URI',  'https://plans.besix.cz/api/auth.php?action=google_callback');
 
 define('PLANS_APP_KEY', 'plans');
 
-// Cookie – musí být shodné s board.besix.cz!
-define('SESSION_COOKIE',  'BESIX_SESS');
-define('COOKIE_DOMAIN',   '.besix.cz');
-define('SESSION_LIFETIME', 60 * 60 * 24 * 30); // 30 dní
+// PHP session – sdílená přes celou doménu .besix.cz
+// DŮLEŽITÉ: stejné nastavení musí být i v board.besix.cz/api/config.php!
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.cookie_secure',   1);
+ini_set('session.cookie_domain',   '.besix.cz');  // ← klíč pro sdílení session
+session_name('BESIX_SESS');
+if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Google OAuth – stejné klienty jako board (nebo vlastní)
-define('GOOGLE_CLIENT_ID',     '');  // ← doplň
-define('GOOGLE_CLIENT_SECRET', '');  // ← doplň
-define('GOOGLE_REDIRECT_URI',  'https://plans.besix.cz/api/auth.php?action=google_callback');
+header('Access-Control-Allow-Origin: ' . APP_URL);
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+header('Content-Type: application/json; charset=UTF-8');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
