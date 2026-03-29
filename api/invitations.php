@@ -75,8 +75,8 @@ if ($method === 'POST') {
     $token     = bin2hex(random_bytes(32));
     $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-    $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at) VALUES (?,?,?,?,?,?)')
-       ->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
+    $db->prepare('INSERT INTO invitations (project_id, invited_email, invited_by, token, role, status, expires_at) VALUES (?,?,?,?,?,?,?)')
+       ->execute([$projectId, $email, $userId, $token, $role, 'pending', $expiresAt]);
 
     // Získej název projektu
     $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
