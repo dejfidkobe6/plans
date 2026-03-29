@@ -2390,10 +2390,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn" id="model-3d-btn" title="3D Model">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
     </button>
-    <div class="tb-separator"></div>
-    <button class="tb-btn" id="manage-profese-btn" title="Spravovat profese">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    </button>
     <button class="tb-btn" id="all-tasks-btn" title="Všechny úkoly dodavatelů">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </button>
@@ -4235,8 +4231,7 @@ function setupEventListeners() {
   document.getElementById('users-mgmt-btn').addEventListener('click', () => toggleUsersPage());
   document.getElementById('close-users-btn').addEventListener('click', () => toggleUsersPage(false));
 
-  // Manage profese
-  document.getElementById('manage-profese-btn').addEventListener('click', openManageProfese);
+  // Manage profese (otevírá se z domovské stránky subdodavatelů)
   document.getElementById('close-manage-profese-btn').addEventListener('click', closeManageProfese);
   document.getElementById('manage-profese-overlay').addEventListener('click', (e) => {
     if (e.target === document.getElementById('manage-profese-overlay')) closeManageProfese();
@@ -4299,6 +4294,7 @@ function onKeyDown(e) {
     if (e.key === 'c') { e.preventDefault(); copySelected(); return; }
     if (e.key === 'v') { e.preventDefault(); pasteSelected(); return; }
     if (e.key === 'a') { e.preventDefault(); fabricCanvas.discardActiveObject(); fabricCanvas.getObjects().filter(o => !o.isBackground).forEach(o => fabricCanvas.setActiveObject(o)); fabricCanvas.renderAll(); return; }
+    if (e.key === 's') { e.preventDefault(); if (currentProject) { saveCurrentLevel(); _flushSave(); showToast('Projekt uložen', 'success'); } return; }
   }
 
   const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon' };
@@ -6641,31 +6637,31 @@ async function bgDBLoadAll(pid, levels) {
 let saveTimer = null;
 function saveState() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      // Don't save backgroundImage (too large) directly, strip it from state
-      const stateToSave = {
-        levels: appState.levels.map(l => ({
-          id: l.id, name: l.name, type: l.type,
-          annotations: l.annotations,
-          fabricJSON: l.fabricJSON,
-          viewportTransform: l.viewportTransform,
-          hasBackground: !!l.backgroundImage,
-          color3D: l.color3D, shape3D: l.shape3D
-        })),
-        activeLevel: appState.activeLevel,
-        tool: appState.tool,
-        showGrid: appState.showGrid,
-        zones3D: appState.zones3D
-      };
-      const pid = currentProject ? currentProject.id : '_default';
-      localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(stateToSave));
-      localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
-      localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
-    } catch(e) {
-      // localStorage full or error - silently fail
-    }
-  }, 500);
+  // Okamžité uložení – žádný debounce
+  _flushSave();
+}
+function _flushSave() {
+  if (!currentProject) return;
+  try {
+    const stateToSave = {
+      levels: appState.levels.map(l => ({
+        id: l.id, name: l.name, type: l.type,
+        annotations: l.annotations,
+        fabricJSON: l.fabricJSON,
+        viewportTransform: l.viewportTransform,
+        hasBackground: !!l.backgroundImage,
+        color3D: l.color3D, shape3D: l.shape3D
+      })),
+      activeLevel: appState.activeLevel,
+      tool: appState.tool,
+      showGrid: appState.showGrid,
+      zones3D: appState.zones3D
+    };
+    const pid = String(currentProject.id);
+    localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(stateToSave));
+    localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
+    localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
+  } catch(e) { /* localStorage plný */ }
 }
 
 function loadState() {
@@ -7331,6 +7327,12 @@ async function doRegister() {
 
 // --- Logout ---
 async function doLogout() {
+  // Uložit stav před odhlášením (debounce by jinak uložil prázdná data)
+  if (currentProject && fabricCanvas) {
+    saveCurrentLevel();
+    _flushSave();
+  }
+  clearTimeout(saveTimer);
   await apiFetch('api/auth.php?action=logout', { method: 'POST' });
   currentUser = null;
   currentProject = null;
