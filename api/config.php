@@ -12,8 +12,8 @@ define('DB_PASS', '');           // ← doplň stejné heslo jako board
 define('MAIL_FROM',  'Noreply@besix.cz');
 define('APP_URL',    'https://plans.besix.cz');
 
-define('GOOGLE_CLIENT_ID',     '257797351627-ha61f9rgcgn49ljmm8gudv4adtr9cif9.apps.googleusercontent.com');
-define('GOOGLE_CLIENT_SECRET', '');  // ← doplň stejné jako board
+define('GOOGLE_CLIENT_ID',     '');  // injected from GitHub Secrets
+define('GOOGLE_CLIENT_SECRET', '');  // injected from GitHub Secrets
 define('GOOGLE_REDIRECT_URI',  'https://plans.besix.cz/api/auth.php?action=google_callback');
 
 define('PLANS_APP_KEY', 'plans');
