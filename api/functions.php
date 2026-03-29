@@ -107,6 +107,8 @@ function sendMail(string $to, string $subject, string $htmlBody): void {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
             'api-key: ' . BREVO_API_KEY,
