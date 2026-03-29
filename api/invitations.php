@@ -87,17 +87,75 @@ if ($method === 'POST') {
              invited_by=VALUES(invited_by), role=VALUES(role), status="pending"'
         )->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
 
-        // Odešli email pokud je Brevo nakonfigurovaný a cURL dostupný
+        // Odešli email pokud je Brevo nakonfigurovaný
         $mailSent = false;
-        if (defined('BREVO_API_KEY') && BREVO_API_KEY && function_exists('curl_init')) {
+        if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
             try {
                 $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
                 $proj->execute([$projectId]);
-                $projName  = $proj->fetch()['name'] ?? 'projekt';
-                $inviteUrl = 'https://plans.besix.cz/invite.php?token=' . $token;
-                $roleLabel = ['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role;
-                $subject   = "Pozv\u{00E1}nka do projektu \"{$projName}\" - BeSix Plans";
-                $html      = "<div style='font-family:sans-serif'><h2>Pozvánka do projektu {$projName}</h2><p>Role: {$roleLabel}</p><a href='{$inviteUrl}'>Přijmout pozvánku</a></div>";
+                $projName  = htmlspecialchars($proj->fetch()['name'] ?? 'projekt', ENT_QUOTES, 'UTF-8');
+                $inviteUrl = htmlspecialchars('https://plans.besix.cz/invite.php?token=' . $token, ENT_QUOTES, 'UTF-8');
+                $roleLabel = htmlspecialchars(['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role, ENT_QUOTES, 'UTF-8');
+                $subject   = "Pozvanka do projektu {$projName} - BeSix Plans";
+                $html      = <<<HTML
+<!DOCTYPE html>
+<html lang="cs">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#111111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111111;">
+  <tr><td align="center" style="padding:48px 16px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;background-color:#1a1a1a;border-radius:12px;overflow:hidden;">
+
+      <!-- Logo hlavička -->
+      <tr><td align="center" style="padding:40px 32px 28px;">
+        <img src="https://plans.besix.cz/logo.png" alt="BeSix" width="72" height="72"
+             style="display:block;margin:0 auto 14px;" onerror="this.style.display='none'">
+        <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:1px;line-height:1;">BeSix</div>
+        <div style="font-size:10px;font-weight:700;color:#ffffff;letter-spacing:10px;margin-top:4px;opacity:.7;">PLANS</div>
+      </td></tr>
+
+      <!-- Oddělovač -->
+      <tr><td style="padding:0 32px;"><div style="height:1px;background:#282828;"></div></td></tr>
+
+      <!-- Tělo -->
+      <tr><td style="padding:32px 32px 8px;">
+        <p style="margin:0 0 6px;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;">Pozvánka do projektu</p>
+        <h2 style="margin:0 0 28px;color:#ffffff;font-size:22px;font-weight:700;">{$projName}</h2>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          <tr><td style="padding:14px 16px;background:#222222;border-radius:8px;border-left:3px solid #6b7c3a;">
+            <div style="font-size:10px;color:#666666;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px;">Vaše role</div>
+            <div style="font-size:16px;color:#ffffff;font-weight:600;">{$roleLabel}</div>
+          </td></tr>
+        </table>
+
+        <p style="margin:0 0 28px;color:#777777;font-size:13px;line-height:1.7;">
+          Klikněte na tlačítko níže pro přijetí pozvánky a&nbsp;přístup do projektu.
+        </p>
+
+        <!-- Tlačítko -->
+        <a href="{$inviteUrl}"
+           style="display:block;text-align:center;background-color:#6b7c3a;color:#ffffff;text-decoration:none;
+                  padding:15px 24px;border-radius:7px;font-size:15px;font-weight:700;letter-spacing:.4px;">
+          Přijmout pozvánku
+        </a>
+      </td></tr>
+
+      <!-- Patička -->
+      <tr><td style="padding:24px 32px 36px;">
+        <div style="height:1px;background:#282828;margin-bottom:20px;"></div>
+        <p style="margin:0;color:#444444;font-size:11px;text-align:center;line-height:1.8;">
+          Pokud tuto pozvánku neočekáváte, ignorujte tento email.<br>
+          Odkaz je platný 7&nbsp;dní.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
+HTML;
                 sendMail($email, $subject, $html);
                 $mailSent = true;
             } catch (\Throwable $ex) { }
