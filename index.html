@@ -3058,6 +3058,7 @@ function switchLevel(idx) {
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
+      if (level.backgroundImage) loadBackgroundImage(level.backgroundImage, false);
       if (level.viewportTransform) {
         fabricCanvas.setViewportTransform(level.viewportTransform);
       }
@@ -6382,8 +6383,15 @@ function exportTasksCSV() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  // Strip background image object from fabricJSON — saved separately to IndexedDB
+  json.objects = (json.objects || []).filter(o => !o.isBackground);
+  appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
+  // Save background images to IndexedDB
+  const pid = currentProject ? String(currentProject.id) : '_default';
+  const lvl = appState.levels[appState.activeLevel];
+  bgDBSave(pid, lvl.id, lvl.backgroundImage || null, lvl.backgroundImageOriginal || null);
 
   // Extract annotations for sidebar
   const annotObjects = getAnnotObjects();
@@ -6394,6 +6402,49 @@ function saveCurrentLevel() {
   }));
 
   saveState();
+}
+
+// ============================================================
+// IndexedDB – persistování obrázků na pozadí (mimo localStorage)
+// ============================================================
+const BG_DB_NAME = 'besix_plans_bg';
+let _bgDB = null;
+function bgDBOpen() {
+  if (_bgDB) return Promise.resolve(_bgDB);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(BG_DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('bg');
+    req.onsuccess  = e => { _bgDB = e.target.result; resolve(_bgDB); };
+    req.onerror    = () => reject(req.error);
+  });
+}
+function bgDBSave(pid, levelId, dataUrl, originalUrl) {
+  bgDBOpen().then(db => {
+    const tx = db.transaction('bg', 'readwrite');
+    const store = tx.objectStore('bg');
+    const key = pid + '_' + levelId;
+    if (dataUrl) store.put({ dataUrl, originalUrl: originalUrl || null }, key);
+    else store.delete(key);
+  }).catch(() => {});
+}
+async function bgDBLoad(pid, levelId) {
+  try {
+    const db = await bgDBOpen();
+    return await new Promise(resolve => {
+      const req = db.transaction('bg', 'readonly').objectStore('bg').get(pid + '_' + levelId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror   = () => resolve(null);
+    });
+  } catch { return null; }
+}
+async function bgDBLoadAll(pid, levels) {
+  for (const lvl of levels) {
+    const rec = await bgDBLoad(pid, lvl.id);
+    if (rec) {
+      lvl.backgroundImage = rec.dataUrl || null;
+      lvl.backgroundImageOriginal = rec.originalUrl || null;
+    }
+  }
 }
 
 let saveTimer = null;
@@ -7166,7 +7217,7 @@ async function doCreateProject() {
 }
 
 // --- Open Project ---
-function openProject(proj) {
+async function openProject(proj) {
   currentProject = proj;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
@@ -7184,6 +7235,9 @@ function openProject(proj) {
   if (appState.levels.length === 0) {
     addLevel('1.NP', '1.NP');
   } else {
+    // Restore background images from IndexedDB before rendering
+    const pid = String(proj.id);
+    await bgDBLoadAll(pid, appState.levels);
     renderLevelTabs();
     switchLevel(appState.activeLevel);
   }
