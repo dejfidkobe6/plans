@@ -69,3 +69,41 @@ function getPlansAppId(): int {
     $id = (int)$row['id'];
     return $id;
 }
+
+// ============================================================
+// Project membership helper
+// ============================================================
+function getProjectMembership(int $projectId, int $userId): array|false {
+    $stmt = getDB()->prepare('
+        SELECT id, role FROM project_members
+        WHERE project_id = ? AND user_id = ?
+        LIMIT 1
+    ');
+    $stmt->execute([$projectId, $userId]);
+    return $stmt->fetch();
+}
+
+// ============================================================
+// Email – Brevo API
+// ============================================================
+function sendMail(string $to, string $subject, string $htmlBody): void {
+    $payload = json_encode([
+        'sender'     => ['name' => 'BeSix Plans', 'email' => MAIL_FROM],
+        'to'         => [['email' => $to]],
+        'subject'    => $subject,
+        'htmlContent'=> $htmlBody,
+    ]);
+
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'api-key: ' . BREVO_API_KEY,
+        ],
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}

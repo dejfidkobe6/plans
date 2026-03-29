@@ -12,7 +12,8 @@ define('DB_USER', 'besixcz001');
 define('MAIL_FROM',  'Noreply@besix.cz');
 define('APP_URL',    'https://plans.besix.cz');
 
-// Secrets jsou v samostatném souboru generovaném CI (není v gitu)
+// Secrets: DB_PASS, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BREVO_API_KEY
+// generováno CI z GitHub Secrets (není v gitu)
 require_once __DIR__ . '/secrets.php';
 define('GOOGLE_REDIRECT_URI',  'https://plans.besix.cz/api/auth.php?action=google_callback');
 

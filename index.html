@@ -1081,7 +1081,7 @@ option { background: var(--card); color: var(--text); }
 }
 #home-tasks-resizer:hover::after { opacity: 1; }
 
-/* ---- subdodavatele section ---- */
+/* ---- subdodavatele / members section ---- */
 #home-subdod-section {
   flex: 1; overflow-y: auto;
   padding: 18px 24px;
@@ -1683,6 +1683,33 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 .zmgr-cancel-btn:hover { color: var(--text); }
 
+/* ---- Members panel ---- */
+#members-section { padding: 0 0 24px; }
+#members-section h2 { font-size: 16px; font-weight: 600; color: var(--text-bright); margin: 0 0 16px; }
+.members-invite-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.members-invite-row input { flex: 1; min-width: 180px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
+.members-invite-row select { padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 13px; }
+.members-invite-row button { padding: 8px 16px; background: var(--olive); border: none; border-radius: 5px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.members-invite-row button:hover { background: var(--olive-hover); }
+.member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.member-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.member-info { flex: 1; min-width: 0; }
+.member-name { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.member-email { font-size: 11px; color: var(--text-dim); }
+.member-role-select { padding: 4px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; }
+.member-remove-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 4px; }
+.member-remove-btn:hover { background: rgba(239,68,68,0.15); color: #EF4444; }
+.member-role-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.role-owner { background: rgba(245,158,11,0.2); color: #F59E0B; }
+.role-admin { background: rgba(139,92,246,0.2); color: #8B5CF6; }
+.role-member { background: rgba(59,130,246,0.2); color: #3B82F6; }
+.role-viewer { background: rgba(107,114,128,0.2); color: #9CA3AF; }
+.pending-inv-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-dim); }
+.pending-inv-row span { flex: 1; }
+.pending-inv-cancel { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 3px; }
+.pending-inv-cancel:hover { color: #EF4444; }
+#members-error { font-size: 12px; color: #EF4444; margin-bottom: 8px; min-height: 16px; }
+
 /* ============================================================
    AUTH SCREEN
    ============================================================ */
@@ -2211,6 +2238,23 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <input type="text" id="home-search" placeholder="Hledat profesi nebo firmu...">
     </div>
     <div id="prof-grid"></div>
+  </div>
+
+  <!-- MEMBERS -->
+  <div id="members-section">
+    <h2>Členové projektu</h2>
+    <div class="members-invite-row" id="members-invite-row">
+      <input type="email" id="invite-email" placeholder="email@firma.cz">
+      <select id="invite-role">
+        <option value="member">Člen</option>
+        <option value="admin">Administrátor</option>
+        <option value="viewer">Pozorovatel</option>
+      </select>
+      <button onclick="sendInvitation()">Pozvat</button>
+    </div>
+    <div id="members-error"></div>
+    <div id="members-list"></div>
+    <div id="pending-invitations"></div>
   </div>
 
 </div>
@@ -5826,6 +5870,7 @@ function toggleHomePage(forceState) {
     hp.classList.add('visible');
     btn.classList.add('active');
     renderHomePage();
+    loadMembers();
   } else if (forceState === false) {
     hp.classList.remove('visible');
     btn.classList.remove('active');
@@ -5838,8 +5883,105 @@ function toggleHomePage(forceState) {
       hp.classList.add('visible');
       btn.classList.add('active');
       renderHomePage();
+      loadMembers();
     }
   }
+}
+
+// ============================================================
+// MEMBERS MANAGEMENT
+// ============================================================
+async function loadMembers() {
+  if (!currentProject) return;
+  const pid = currentProject.id;
+  const errEl = document.getElementById('members-error');
+  errEl.textContent = '';
+
+  // Skryj invite row pro viewer
+  const canManage = ['owner','admin'].includes(currentProject.role);
+  document.getElementById('members-invite-row').style.display = canManage ? '' : 'none';
+
+  const [mRes, iRes] = await Promise.all([
+    apiFetch(`api/members.php?project_id=${pid}`),
+    apiFetch(`api/invitations.php?project_id=${pid}`),
+  ]);
+
+  // Render členů
+  const membersList = document.getElementById('members-list');
+  const members = mRes.ok ? mRes.data.members : [];
+  const roleLabels = { owner:'Vlastník', admin:'Administrátor', member:'Člen', viewer:'Pozorovatel' };
+  membersList.innerHTML = members.map(m => {
+    const initials = m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const canEdit  = canManage && m.role !== 'owner' && m.user_id !== currentUser.id;
+    return `<div class="member-row">
+      <div class="member-avatar" style="background:${escHtml(m.avatar_color||'#4A5340')}">${escHtml(initials)}</div>
+      <div class="member-info">
+        <div class="member-name">${escHtml(m.name)}</div>
+        <div class="member-email">${escHtml(m.email)}</div>
+      </div>
+      ${canEdit
+        ? `<select class="member-role-select" onchange="changeMemberRole(${m.id},this.value)">
+            ${['admin','member','viewer'].map(r=>`<option value="${r}"${r===m.role?' selected':''}>${roleLabels[r]}</option>`).join('')}
+           </select>
+           <button class="member-remove-btn" onclick="removeMember(${m.id})" title="Odebrat">×</button>`
+        : `<span class="member-role-badge role-${m.role}">${roleLabels[m.role]||m.role}</span>`
+      }
+    </div>`;
+  }).join('');
+
+  // Render čekajících pozvánek
+  const pendingEl = document.getElementById('pending-invitations');
+  const invitations = iRes.ok ? iRes.data.invitations : [];
+  if (invitations.length > 0) {
+    pendingEl.innerHTML = `<div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;font-weight:600;">ČEKAJÍCÍ POZVÁNKY</div>` +
+      invitations.map(inv => `
+        <div class="pending-inv-row">
+          <span>${escHtml(inv.invited_email)} – <em>${roleLabels[inv.role]||inv.role}</em></span>
+          ${canManage ? `<button class="pending-inv-cancel" onclick="cancelInvitation(${inv.id})" title="Zrušit pozvánku">✕</button>` : ''}
+        </div>`).join('');
+  } else {
+    pendingEl.innerHTML = '';
+  }
+}
+
+async function sendInvitation() {
+  const email = document.getElementById('invite-email').value.trim();
+  const role  = document.getElementById('invite-role').value;
+  const errEl = document.getElementById('members-error');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Zadej email'; return; }
+
+  const { ok, data } = await apiFetch(`api/invitations.php?project_id=${currentProject.id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role }),
+  });
+  if (!ok) { errEl.textContent = data.error || 'Chyba'; return; }
+  document.getElementById('invite-email').value = '';
+  showToast('Pozvánka odeslána na ' + email, 'success');
+  loadMembers();
+}
+
+async function changeMemberRole(memberId, newRole) {
+  const { ok, data } = await apiFetch(`api/members.php?project_id=${currentProject.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ member_id: memberId, role: newRole }),
+  });
+  if (!ok) { showToast(data.error || 'Chyba změny role', 'error'); loadMembers(); }
+}
+
+async function removeMember(memberId) {
+  if (!confirm('Odebrat tohoto člena z projektu?')) return;
+  const { ok, data } = await apiFetch(`api/members.php?project_id=${currentProject.id}&member_id=${memberId}`, { method: 'DELETE' });
+  if (!ok) { showToast(data.error || 'Chyba', 'error'); return; }
+  loadMembers();
+}
+
+async function cancelInvitation(invId) {
+  const { ok, data } = await apiFetch(`api/invitations.php?project_id=${currentProject.id}&id=${invId}`, { method: 'DELETE' });
+  if (!ok) { showToast(data.error || 'Chyba', 'error'); return; }
+  loadMembers();
 }
 
 // ============================================================
