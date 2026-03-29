@@ -14,15 +14,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Inject secrets into config.php
+      - name: Generate secrets.php
         env:
           DB_PASS: ${{ secrets.DB_PASS }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
-          sed -i "s|define('DB_PASS', '');|define('DB_PASS', '$DB_PASS');|" api/config.php
-          sed -i "s|define('GOOGLE_CLIENT_ID', '');|define('GOOGLE_CLIENT_ID', '$GOOGLE_CLIENT_ID');|" api/config.php
-          sed -i "s|define('GOOGLE_CLIENT_SECRET', '');|define('GOOGLE_CLIENT_SECRET', '$GOOGLE_CLIENT_SECRET');|" api/config.php
+          php -r "
+          file_put_contents('api/secrets.php',
+            '<?php' . PHP_EOL .
+            'define(\'DB_PASS\', ' . var_export(getenv('DB_PASS'), true) . ');' . PHP_EOL .
+            'define(\'GOOGLE_CLIENT_ID\', ' . var_export(getenv('GOOGLE_CLIENT_ID'), true) . ');' . PHP_EOL .
+            'define(\'GOOGLE_CLIENT_SECRET\', ' . var_export(getenv('GOOGLE_CLIENT_SECRET'), true) . ');' . PHP_EOL
+          );"
 
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
