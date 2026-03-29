@@ -20,12 +20,12 @@ function getDB(): PDO {
 // ============================================================
 // JSON responses
 // ============================================================
-function jsonOk(array $data = []): never {
+function jsonOk(array $data = []): void {
     echo json_encode(['ok' => true] + $data);
     exit;
 }
 
-function jsonError(string $msg, int $code = 400): never {
+function jsonError(string $msg, int $code = 400): void {
     http_response_code($code);
     echo json_encode(['ok' => false, 'error' => $msg]);
     exit;
