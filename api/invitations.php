@@ -2,6 +2,15 @@
 ob_start();
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
+register_shutdown_function(function() {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_USER_ERROR])) {
+        ob_clean();
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode(['ok'=>false,'error'=>$err['message'],'fatal'=>true,'file'=>basename($err['file']),'line'=>$err['line']]);
+    }
+});
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     ob_clean();
     header('Content-Type: application/json');
