@@ -6893,11 +6893,12 @@ function uid() {
 // --- API helper ---
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, { credentials: 'include', ...options });
+  const resClone = res.clone();
   let json;
   try {
     json = await res.json();
   } catch {
-    const text = await res.text().catch(() => '');
+    const text = await resClone.text().catch(() => '');
     const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
     json = { ok: false, error: 'Chyba serveru (HTTP ' + res.status + '): ' + (snippet || 'prázdná odpověď') };
   }

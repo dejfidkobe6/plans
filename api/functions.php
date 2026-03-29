@@ -92,28 +92,38 @@ function getProjectMembership(int $projectId, int $userId): array|false {
 }
 
 // ============================================================
-// Email – Brevo API
+// Email – Brevo API (file_get_contents, no cURL dependency)
 // ============================================================
-function sendMail(string $to, string $subject, string $htmlBody): void {
-    $payload = json_encode([
-        'sender'     => ['name' => 'BeSix Plans', 'email' => MAIL_FROM],
-        'to'         => [['email' => $to]],
-        'subject'    => $subject,
-        'htmlContent'=> $htmlBody,
-    ]);
+function sendMail(string $to, string $subject, string $htmlBody): bool {
+    $from = defined('MAIL_FROM') ? MAIL_FROM : 'noreply@besix.cz';
 
-    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_TIMEOUT        => 8,
-        CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'api-key: ' . BREVO_API_KEY,
-        ],
-    ]);
-    curl_exec($ch);
-    curl_close($ch);
+    if (defined('BREVO_API_KEY') && BREVO_API_KEY !== '') {
+        $payload = json_encode([
+            'sender'      => ['name' => 'BeSix Plans', 'email' => $from],
+            'to'          => [['email' => $to]],
+            'subject'     => $subject,
+            'htmlContent' => $htmlBody,
+        ]);
+        $ctx = stream_context_create(['http' => [
+            'method'        => 'POST',
+            'header'        => implode("\r\n", [
+                'Content-Type: application/json',
+                'api-key: ' . BREVO_API_KEY,
+            ]),
+            'content'       => $payload,
+            'ignore_errors' => true,
+        ]]);
+        $result = @file_get_contents('https://api.brevo.com/v3/smtp/email', false, $ctx);
+        if ($result !== false) {
+            $json = json_decode($result, true);
+            if (isset($json['messageId'])) return true;
+        }
+        error_log('Brevo API error: ' . ($result ?: 'no response'));
+        return false;
+    }
+
+    // Fallback: PHP mail()
+    $headers  = "From: BeSix Plans <{$from}>\r\n";
+    $headers .= "Content-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+    return (bool)@mail($to, $subject, $htmlBody, $headers);
 }
