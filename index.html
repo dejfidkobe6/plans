@@ -40,20 +40,21 @@
   display: none;
   position: fixed;
   z-index: 9000;
-  background: #1e1e1e;
+  background: #1a1a1a;
   border: 1px solid #333;
+  border-left: 3px solid #666;
   border-radius: 6px;
-  padding: 10px 14px;
-  min-width: 180px;
-  max-width: 280px;
+  padding: 10px 14px 10px 12px;
+  min-width: 200px;
+  max-width: 320px;
   pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
   font-family: 'Barlow Condensed', sans-serif;
 }
 #annot-tooltip .tt-prof {
   font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 5px;
+  font-weight: 700;
+  margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -61,13 +62,15 @@
   font-size: 13px;
   color: #e0e0e0;
   line-height: 1.4;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 #annot-tooltip .tt-badges {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 #annot-tooltip .tt-badge {
   font-size: 10px;
@@ -76,6 +79,28 @@
   background: #2a2a2a;
   color: #aaa;
   border: 1px solid #444;
+}
+#annot-tooltip .tt-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  font-size: 11px;
+  color: #ccc;
+  border-top: 1px solid #2e2e2e;
+  padding-top: 7px;
+  margin-top: 2px;
+}
+#annot-tooltip .tt-rows .tt-label {
+  color: #666;
+  white-space: nowrap;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 1px;
+}
+#annot-tooltip .tt-rows .tt-val {
+  color: #ccc;
+  word-break: break-word;
 }
 html, body { height: 100%; overflow: hidden; }
 body {
@@ -3078,6 +3103,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="tt-prof"></div>
   <div class="tt-popisek"></div>
   <div class="tt-badges"></div>
+  <div class="tt-rows" id="tt-rows"></div>
 </div>
 
 <!-- MODAL -->
@@ -4793,10 +4819,11 @@ function setupEventListeners() {
     const obj = opt.target;
     if (!obj || !obj.annotId) return;
     const color = getProfColor(obj.profese || '');
-    tooltip.style.borderLeft = '3px solid ' + color;
+    tooltip.style.borderLeftColor = color;
     tooltip.querySelector('.tt-prof').style.color = color;
-    tooltip.querySelector('.tt-prof').textContent = obj.profese || '';
+    tooltip.querySelector('.tt-prof').textContent = obj.profese || '(bez profesí)';
     tooltip.querySelector('.tt-popisek').textContent = obj.popisek || '(bez popisu)';
+    // Badges: priorita + status
     const badgesEl = tooltip.querySelector('.tt-badges');
     badgesEl.innerHTML = '';
     const prioBadge = document.createElement('span');
@@ -4807,6 +4834,26 @@ function setupEventListeners() {
     statBadge.className = 'tt-badge';
     statBadge.textContent = obj.status || 'Otevřeno';
     badgesEl.appendChild(statBadge);
+    // Detail rows
+    const rowsEl = document.getElementById('tt-rows');
+    rowsEl.innerHTML = '';
+    function addRow(label, val) {
+      if (!val) return;
+      const lEl = document.createElement('span'); lEl.className = 'tt-label'; lEl.textContent = label;
+      const vEl = document.createElement('span'); vEl.className = 'tt-val'; vEl.textContent = val;
+      rowsEl.appendChild(lEl); rowsEl.appendChild(vEl);
+    }
+    addRow('ID', obj.annotId);
+    addRow('Přiřazeno', obj.assignee || obj.prirazen || obj.prirazen_komu);
+    const fmtDate = d => { if (!d) return null; const p = d.split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
+    const dateFrom = fmtDate(obj.dateFrom);
+    const dateTo   = fmtDate(obj.deadline);
+    if (dateFrom && dateTo) addRow('Termín', dateFrom + ' – ' + dateTo);
+    else if (dateFrom)      addRow('Termín od', dateFrom);
+    else if (dateTo)        addRow('Termín do', dateTo);
+    if (obj.createdAt) addRow('Vytvořeno', fmtDate(typeof obj.createdAt === 'string' && obj.createdAt.includes('T') ? obj.createdAt.split('T')[0] : obj.createdAt));
+    if (rowsEl.children.length === 0) rowsEl.style.display = 'none';
+    else rowsEl.style.display = 'grid';
     tooltip.style.display = 'block';
   });
   cw.on('mouse:out', (opt) => {
