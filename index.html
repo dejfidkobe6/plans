@@ -3968,6 +3968,19 @@ function setupEventListeners() {
       return;
     }
 
+    if (e.button === 1) {
+      // Middle mouse button – pan
+      e.preventDefault();
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      lastViewportX = cw.viewportTransform[4];
+      lastViewportY = cw.viewportTransform[5];
+      cw.defaultCursor = 'grabbing';
+      cw.renderAll();
+      return;
+    }
+
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
       panStartX = e.clientX;
@@ -4218,8 +4231,13 @@ function setupEventListeners() {
     setTool('select');
   });
 
-  // Wheel zoom
+  // Middle mouse button: prevent browser autoscroll icon
   const wrapper = document.getElementById('canvas-wrapper');
+  wrapper.addEventListener('mousedown', (e) => {
+    if (e.button === 1) e.preventDefault();
+  });
+
+  // Wheel zoom
   wrapper.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY;
