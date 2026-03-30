@@ -180,17 +180,91 @@ body {
   width: 80px;
   padding: 0;
 }
+/* LEVEL BAR – dedicated always-visible row for floor tabs */
+#level-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  height: 40px;
+  flex-shrink: 0;
+  z-index: 99;
+  overflow: hidden;
+}
+
 #add-level-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 44px;
+  width: 40px;
   cursor: pointer;
   color: var(--text-dim);
   font-size: 18px;
   transition: color 0.15s, background 0.15s;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   flex-shrink: 0;
 }
 #add-level-btn:hover { background: rgba(255,255,255,0.05); color: var(--olive-light); }
+
+/* TOPBAR ACTIONS GROUP */
+#topbar-actions {
+  display: flex;
+  align-items: stretch;
+}
+
+/* MOBILE MENU BUTTON – hidden on desktop */
+#mobile-menu-btn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 44px; height: 100%;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+#mobile-menu-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-bright); }
+#mobile-menu-btn.active { color: var(--olive-light); background: rgba(74,83,64,0.2); }
+
+/* MOBILE DROPDOWN */
+#mobile-dropdown {
+  display: none;
+  flex-direction: column;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  z-index: 200;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#mobile-dropdown.open { display: flex; }
+#mobile-dropdown-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.mob-action-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.mob-action-btn:hover { background: var(--panel); color: var(--text-bright); }
+#mobile-dropdown-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  flex-wrap: wrap;
+}
 
 /* TOOLBAR BUTTONS */
 #toolbar-right {
@@ -2229,6 +2303,38 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 #topbar-switch-project-btn:hover { border-color: var(--olive); color: var(--olive-light); }
 #topbar-logout-btn:hover { border-color: #EF4444; color: #EF4444; }
+
+/* ============================================================
+   RESPONSIVE – mobile (≤ 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Show hamburger, hide desktop action buttons & toolbar-right */
+  #mobile-menu-btn { display: flex; }
+  #topbar-actions { display: none; }
+  #toolbar-right { display: none; }
+
+  /* Compact user info – hide name/project text, keep buttons */
+  #topbar-user-name,
+  #topbar-project-name,
+  .topbar-sep-dot { display: none; }
+  #topbar-user-info { gap: 4px; padding: 0 6px; }
+
+  /* Logo – hide text label, keep icon */
+  #logo .logo-plans { display: none; }
+  #logo { padding: 0 10px; }
+
+  /* Level bar – slightly smaller on mobile */
+  #level-bar { height: 38px; }
+  .level-tab { padding: 0 10px; font-size: 12px; }
+}
+
+/* Medium screens – hide text labels on action buttons */
+@media (max-width: 1100px) {
+  #subddodavatele-btn span,
+  #anotace-btn span,
+  #users-mgmt-btn span,
+  #pdf-export-btn span { display: none; }
+}
 </style>
 </head>
 <body>
@@ -2333,8 +2439,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <img src="besix_logo_bila.png" alt="BeSix">
     <div class="logo-plans" id="logo-project-name">PLANS</div>
   </div>
-  <div id="level-tabs"></div>
-  <div id="add-level-btn" title="Přidat podlaží">+</div>
+  <div id="topbar-actions">
   <button id="subddodavatele-btn" title="Subdodavatelé projektu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Subdodavatelé
@@ -2351,6 +2456,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
     Export
   </button>
+  </div>
   <div id="toolbar-right">
     <!-- Tool buttons -->
     <button class="tb-btn tool-btn active" id="tool-select" data-tool="select" title="Výběr (V)">
@@ -2418,12 +2524,60 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </button>
   </div>
+  <button id="mobile-menu-btn" onclick="toggleMobileMenu()" title="Menu" aria-label="Menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <div id="topbar-user-info">
     <span id="topbar-user-name"></span>
     <span class="topbar-sep-dot">·</span>
     <span id="topbar-project-name"></span>
     <button id="topbar-switch-project-btn" onclick="showProjectScreen()" title="Přepnout projekt">Projekt</button>
     <button id="topbar-logout-btn" onclick="doLogout()" title="Odhlásit se">Odhlásit</button>
+  </div>
+</div>
+
+<!-- LEVEL BAR – always visible -->
+<div id="level-bar">
+  <div id="level-tabs"></div>
+  <div id="add-level-btn" title="Přidat podlaží">+</div>
+</div>
+
+<!-- MOBILE DROPDOWN MENU -->
+<div id="mobile-dropdown">
+  <div id="mobile-dropdown-actions">
+    <button class="mob-action-btn" onclick="document.getElementById('subddodavatele-btn').click();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Subdodavatelé
+    </button>
+    <button class="mob-action-btn" onclick="document.getElementById('anotace-btn').click();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+      Anotace
+    </button>
+    <button class="mob-action-btn" onclick="document.getElementById('users-mgmt-btn').click();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>
+      Uživatelé
+    </button>
+    <button class="mob-action-btn" onclick="document.getElementById('pdf-export-btn').click();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/></svg>
+      Export
+    </button>
+  </div>
+  <div id="mobile-dropdown-tools">
+    <button class="tb-btn tool-btn mob-tool" data-tool="select" title="Výběr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 2-4 7L5 3z"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="pan" title="Posun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0m0 0v2M10 10V5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0v9l-1-1a2 2 0 0 0-3 0v0l5 6a4 4 0 0 0 3 1h3a4 4 0 0 0 4-4v-5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v1"/></svg></button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn tool-btn mob-tool" data-tool="freehand" title="Čára"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c3-3 6-3 9-1s6 2 9-1"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="rect" title="Obdélník"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="circle" title="Kruh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="arrow" title="Šipka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="pin" title="Špendlík"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="text" title="Text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>
+    <div class="tb-separator"></div>
+    <button class="tb-btn mob-tool" onclick="document.getElementById('zoom-in-btn').click()" title="Přiblížit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+    <button class="tb-btn mob-tool" onclick="document.getElementById('zoom-out-btn').click()" title="Oddálit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+    <button class="tb-btn mob-tool" onclick="document.getElementById('fit-btn').click();toggleMobileMenu()" title="Zobrazit vše"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+    <button class="tb-btn mob-tool" onclick="document.getElementById('undo-btn').click()" title="Zpět"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>
+    <button class="tb-btn mob-tool" onclick="document.getElementById('redo-btn').click()" title="Znovu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg></button>
   </div>
 </div>
 
@@ -3075,6 +3229,7 @@ let animFrameId = null;
 let filterProfese = '', filterStatus = '';
 let contextMenuTarget = null;
 let pendingModalResolve = null;
+let _isProjectLoading = false; // prevents saves during async canvas/image load
 
 // ============================================================
 // INIT
@@ -4334,9 +4489,12 @@ function setupEventListeners() {
     }
   });
 
-  // Toolbar buttons
+  // Toolbar buttons (desktop + mobile dropdown)
   document.querySelectorAll('.tool-btn').forEach(btn => {
-    btn.addEventListener('click', () => setTool(btn.dataset.tool));
+    btn.addEventListener('click', () => {
+      setTool(btn.dataset.tool);
+      if (btn.classList.contains('mob-tool')) closeMobileMenu();
+    });
   });
 
   document.getElementById('zoom-in-btn').addEventListener('click', () => zoomBy(1.25));
@@ -4976,6 +5134,27 @@ function resolveModal(result) {
 // TOAST NOTIFICATIONS
 // ============================================================
 let toastContainer = null;
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobile-dropdown');
+  const btn  = document.getElementById('mobile-menu-btn');
+  const open = menu.classList.toggle('open');
+  btn.classList.toggle('active', open);
+}
+function closeMobileMenu() {
+  const menu = document.getElementById('mobile-dropdown');
+  const btn  = document.getElementById('mobile-menu-btn');
+  if (menu) { menu.classList.remove('open'); btn && btn.classList.remove('active'); }
+}
+// Close mobile menu when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('mobile-dropdown');
+  const btn  = document.getElementById('mobile-menu-btn');
+  if (menu && menu.classList.contains('open') && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+    menu.classList.remove('open');
+    btn.classList.remove('active');
+  }
+});
+
 function showToast(message, type = 'info') {
   if (!toastContainer) {
     toastContainer = document.createElement('div');
