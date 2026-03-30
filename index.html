@@ -783,6 +783,9 @@ canvas#fabric-canvas { display: block; }
   font-size: 11px;
   font-family: var(--font-mono);
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--text-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2324,6 +2327,65 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Level bar – slightly smaller on mobile */
   #level-bar { height: 38px; }
   .level-tab { padding: 0 10px; font-size: 12px; }
+
+  /* Right panel – floating overlay, hidden by default */
+  #right-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    z-index: 1200;
+    width: 280px !important;
+    min-width: 280px !important;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+  }
+  #right-panel.mob-open {
+    transform: translateX(0);
+  }
+  #right-panel-toggle-mob {
+    display: flex !important;
+  }
+  /* Semi-transparent backdrop when panel is open */
+  #right-panel-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 1199;
+    background: rgba(0,0,0,0.45);
+  }
+  #right-panel-backdrop.visible { display: block; }
+}
+
+/* Mobile toggle button – hidden on desktop */
+#right-panel-toggle-mob {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 16px;
+  border-radius: 4px; transition: background 0.15s, color 0.15s;
+}
+#right-panel-toggle-mob:hover { background: var(--card); color: var(--text-bright); }
+
+/* Floating open button – visible on mobile when panel is closed */
+#mob-props-open-btn {
+  display: none;
+  position: fixed;
+  bottom: 70px; right: 12px;
+  z-index: 1100;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 18px;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  transition: background 0.15s, color 0.15s;
+}
+#mob-props-open-btn:hover { background: var(--card); color: var(--text-bright); }
+@media (max-width: 768px) {
+  #mob-props-open-btn { display: flex; }
 }
 
 /* Medium screens – hide text labels on action buttons */
@@ -2706,8 +2768,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="panel-resize-handle" id="right-resize-handle" title="Táhněte pro změnu šířky"></div>
 
   <!-- RIGHT PANEL -->
+  <div id="right-panel-backdrop"></div>
   <div id="right-panel">
-    <div id="right-panel-header">Vlastnosti</div>
+    <div id="right-panel-header">
+      Vlastnosti
+      <button id="right-panel-toggle-mob" title="Zavřít vlastnosti">✕</button>
+    </div>
     <div id="right-panel-content">
       <div class="no-sel-state" id="no-sel-state">
         <div class="ns-icon">✏️</div>
@@ -4991,6 +5057,7 @@ function onObjectSelected(opt) {
 
   document.getElementById('no-sel-state').style.display = 'none';
   document.getElementById('prop-form').style.display = 'block';
+  if (window.innerWidth <= 768) document.dispatchEvent(new CustomEvent('annotation-selected'));
 
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
@@ -8068,6 +8135,36 @@ function _beaconSave() {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
 window.addEventListener('pagehide', _beaconSave);
+
+// ============================================================
+// MOBILE RIGHT PANEL TOGGLE
+// ============================================================
+(function initMobRightPanel() {
+  const panel    = document.getElementById('right-panel');
+  const backdrop = document.getElementById('right-panel-backdrop');
+  const closeBtn = document.getElementById('right-panel-toggle-mob');
+  const openBtn  = document.getElementById('mob-props-open-btn');
+
+  function open()  { panel.classList.add('mob-open');    backdrop.classList.add('visible');    if (openBtn) openBtn.style.display = 'none'; }
+  function close() { panel.classList.remove('mob-open'); backdrop.classList.remove('visible'); if (openBtn) openBtn.style.display = ''; }
+
+  if (closeBtn)  closeBtn.addEventListener('click', close);
+  if (backdrop)  backdrop.addEventListener('click', close);
+  if (openBtn)   openBtn.addEventListener('click', open);
+
+  // Auto-open panel when an annotation is selected on mobile
+  const origOnObjectSelected = window.onObjectSelected;
+  document.addEventListener('annotation-selected', () => {
+    if (window.innerWidth <= 768) open();
+  });
+})();
 </script>
+
+<button id="mob-props-open-btn" title="Vlastnosti anotace">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+</button>
 </body>
 </html>
