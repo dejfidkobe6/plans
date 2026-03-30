@@ -1,5 +1,17 @@
 Options -Indexes
 
+# Increase limits for large floor plan file uploads
+LimitRequestBody 0
+
+<IfModule mod_php8.c>
+  php_value upload_max_filesize 50M
+  php_value post_max_size       52M
+</IfModule>
+<IfModule mod_php7.c>
+  php_value upload_max_filesize 50M
+  php_value post_max_size       52M
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /

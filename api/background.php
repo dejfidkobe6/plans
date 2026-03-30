@@ -1,7 +1,8 @@
 <?php
 ob_start();
 ini_set('display_errors', 0);
-ini_set('post_max_size', '50M');
+ini_set('post_max_size',       '52M');
+ini_set('upload_max_filesize', '50M');
 error_reporting(E_ALL);
 register_shutdown_function(function() {
     $err = error_get_last();
@@ -22,15 +23,22 @@ set_exception_handler(function($e) {
 
 require_once __DIR__ . '/functions.php';
 
-// Vytvoř tabulku pokud neexistuje
-getDB()->exec('CREATE TABLE IF NOT EXISTS plan_backgrounds (
-    project_id    INT          NOT NULL,
-    level_id      VARCHAR(64)  NOT NULL,
-    image_data    LONGTEXT,
-    original_data LONGTEXT,
-    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+// Vytvoř/oprav tabulku (bez velkých LONGTEXT sloupců – ukládáme jen cesty k souborům)
+$db = getDB();
+$db->exec('CREATE TABLE IF NOT EXISTS plan_backgrounds (
+    project_id   INT          NOT NULL,
+    level_id     VARCHAR(64)  NOT NULL,
+    image_url    VARCHAR(500),
+    original_url VARCHAR(500),
+    updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (project_id, level_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+// Migrace starého schématu (image_data → image_url)
+try { $db->exec('ALTER TABLE plan_backgrounds ADD COLUMN image_url    VARCHAR(500) DEFAULT NULL'); } catch (\PDOException $e) {}
+try { $db->exec('ALTER TABLE plan_backgrounds ADD COLUMN original_url VARCHAR(500) DEFAULT NULL'); } catch (\PDOException $e) {}
+try { $db->exec('ALTER TABLE plan_backgrounds DROP COLUMN image_data');    } catch (\PDOException $e) {}
+try { $db->exec('ALTER TABLE plan_backgrounds DROP COLUMN original_data'); } catch (\PDOException $e) {}
 
 $user      = requireAuth();
 $userId    = (int)$user['id'];
@@ -45,44 +53,93 @@ $membership = getProjectMembership($projectId, $userId);
 if (!$membership) jsonError('Nemáš přístup', 403);
 
 // ============================================================
-// GET – načti obrázek pozadí
+// GET – vrátí URL obrázku z DB
 // ============================================================
 if ($method === 'GET') {
-    $stmt = getDB()->prepare(
-        'SELECT image_data, original_data FROM plan_backgrounds WHERE project_id = ? AND level_id = ? LIMIT 1'
-    );
+    $stmt = $db->prepare('SELECT image_url, original_url FROM plan_backgrounds WHERE project_id = ? AND level_id = ? LIMIT 1');
     $stmt->execute([$projectId, $levelId]);
     $row = $stmt->fetch();
-    if (!$row || !$row['image_data']) {
-        jsonOk(['dataUrl' => null, 'originalUrl' => null]);
-    }
-    jsonOk(['dataUrl' => $row['image_data'], 'originalUrl' => $row['original_data']]);
+    jsonOk([
+        'url'      => $row['image_url']    ?? null,
+        'origUrl'  => $row['original_url'] ?? null,
+    ]);
 }
 
 // ============================================================
-// POST – ulož nebo smaž obrázek pozadí
-// Body: { dataUrl, originalUrl }  – null dataUrl = smazat
+// POST – nahrání souboru (multipart/form-data)
+// Pole: image (povinné), original (volitelné)
 // ============================================================
 if ($method === 'POST') {
-    $body        = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dataUrl     = $body['dataUrl']     ?? null;
-    $originalUrl = $body['originalUrl'] ?? null;
+    if (empty($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+        jsonError('Soubor nebyl nahrán nebo nastala chyba (' . ($_FILES['image']['error'] ?? 'no file') . ')');
+    }
 
-    $db = getDB();
-    if (!$dataUrl) {
+    // Sanitizuj level_id pro název souboru
+    $safe    = preg_replace('/[^a-zA-Z0-9_-]/', '_', $levelId);
+    $ext     = _guessExtFromMime($_FILES['image']['type'] ?? '');
+    $extOrig = _guessExtFromMime($_FILES['original']['type'] ?? '');
+
+    $uploadDir = __DIR__ . '/../uploads/bg/' . $projectId . '/';
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        jsonError('Nelze vytvořit upload adresář');
+    }
+
+    $filename = $safe . '.' . $ext;
+    if (!move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $filename)) {
+        jsonError('Nepodařilo se uložit soubor');
+    }
+    $imageUrl = '/uploads/bg/' . $projectId . '/' . $filename;
+
+    $originalUrl = $imageUrl; // default: same as image
+    if (isset($_FILES['original']) && $_FILES['original']['error'] === UPLOAD_ERR_OK) {
+        $origFilename = $safe . '_orig.' . $extOrig;
+        if (move_uploaded_file($_FILES['original']['tmp_name'], $uploadDir . $origFilename)) {
+            $originalUrl = '/uploads/bg/' . $projectId . '/' . $origFilename;
+        }
+    }
+
+    $db->prepare('
+        INSERT INTO plan_backgrounds (project_id, level_id, image_url, original_url)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            image_url    = VALUES(image_url),
+            original_url = VALUES(original_url),
+            updated_at   = NOW()
+    ')->execute([$projectId, $levelId, $imageUrl, $originalUrl]);
+
+    jsonOk(['url' => $imageUrl, 'origUrl' => $originalUrl]);
+}
+
+// ============================================================
+// DELETE – smaž soubor a záznam v DB
+// ============================================================
+if ($method === 'DELETE') {
+    $stmt = $db->prepare('SELECT image_url, original_url FROM plan_backgrounds WHERE project_id = ? AND level_id = ? LIMIT 1');
+    $stmt->execute([$projectId, $levelId]);
+    $row = $stmt->fetch();
+
+    if ($row) {
+        foreach ([$row['image_url'], $row['original_url']] as $url) {
+            if ($url) {
+                $path = __DIR__ . '/..' . $url;
+                if (file_exists($path)) @unlink($path);
+            }
+        }
         $db->prepare('DELETE FROM plan_backgrounds WHERE project_id = ? AND level_id = ?')
            ->execute([$projectId, $levelId]);
-    } else {
-        $db->prepare('
-            INSERT INTO plan_backgrounds (project_id, level_id, image_data, original_data)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                image_data    = VALUES(image_data),
-                original_data = VALUES(original_data),
-                updated_at    = NOW()
-        ')->execute([$projectId, $levelId, $dataUrl, $originalUrl]);
     }
     jsonOk();
 }
 
 jsonError('Metoda není povolena', 405);
+
+// ============================================================
+function _guessExtFromMime(string $mime): string {
+    return match($mime) {
+        'image/jpeg'    => 'jpg',
+        'image/png'     => 'png',
+        'image/webp'    => 'webp',
+        'image/gif'     => 'gif',
+        default         => 'jpg',
+    };
+}
