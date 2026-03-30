@@ -6575,10 +6575,13 @@ function saveCurrentLevel() {
   json.objects = (json.objects || []).filter(o => !o.isBackground);
   appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
-  // Save background images to IndexedDB
+  // Save background images to IndexedDB + server
   const pid = currentProject ? String(currentProject.id) : '_default';
   const lvl = appState.levels[appState.activeLevel];
   bgDBSave(pid, lvl.id, lvl.backgroundImage || null, lvl.backgroundImageOriginal || null);
+  if (currentProject && lvl.backgroundImage) {
+    _serverSaveBg(currentProject.id, lvl.id, lvl.backgroundImage, lvl.backgroundImageOriginal || null);
+  }
 
   // Extract annotations for sidebar
   const annotObjects = getAnnotObjects();
@@ -6630,8 +6633,26 @@ async function bgDBLoadAll(pid, levels) {
     if (rec) {
       lvl.backgroundImage = rec.dataUrl || null;
       lvl.backgroundImageOriginal = rec.originalUrl || null;
+    } else if (currentProject) {
+      // Fallback: načti z serveru pokud není v IndexedDB
+      try {
+        const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&level_id=${encodeURIComponent(lvl.id)}`);
+        if (ok && data.dataUrl) {
+          lvl.backgroundImage = data.dataUrl;
+          lvl.backgroundImageOriginal = data.originalUrl || null;
+          bgDBSave(pid, lvl.id, lvl.backgroundImage, lvl.backgroundImageOriginal);
+        }
+      } catch {}
     }
   }
+}
+
+function _serverSaveBg(projectId, levelId, dataUrl, originalUrl) {
+  apiFetch(`api/background.php?project_id=${projectId}&level_id=${encodeURIComponent(levelId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataUrl, originalUrl: originalUrl || null })
+  }).catch(() => {});
 }
 
 let saveTimer = null;
@@ -6677,7 +6698,7 @@ function _serverSave() {
 async function _serverSaveNow() {
   if (!currentProject) return;
   try {
-    await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
+    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -6686,6 +6707,10 @@ async function _serverSaveNow() {
         counter: annotIdCounter
       })
     });
+    if (!ok) {
+      console.error('Server save failed:', data?.error);
+      showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
+    }
   } catch(e) { /* síťová chyba – data jsou v localStorage */ }
 }
 
@@ -7329,6 +7354,8 @@ async function doLogin() {
   if (!ok) { errEl.textContent = data.error || 'Chyba přihlášení.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
+  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
 
@@ -7358,6 +7385,8 @@ async function doRegister() {
   if (!ok) { errEl.textContent = data.error || 'Chyba registrace.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
+  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
 
@@ -7526,7 +7555,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (ok && data.user) {
     currentUser = data.user;
     document.getElementById('auth-screen').classList.add('hidden');
-    showProjectScreen();
+    const _params = new URLSearchParams(window.location.search);
+    const _inviteOk = _params.get('invite_ok');
+    const _inviteToken = _params.get('invite');
+    if (_inviteToken) {
+      // Nepřihlášený uživatel klikl na pozvánku a nyní je přihlášen
+      window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken);
+      return;
+    }
+    if (_inviteOk) {
+      // Pozvánka byla přijata – načti projekty a otevři ten správný
+      await showProjectScreen();
+      const projId = parseInt(_inviteOk);
+      const { ok: pok, data: pd } = await apiFetch('api/projects.php');
+      if (pok && pd.projects) {
+        const proj = pd.projects.find(p => p.id === projId);
+        if (proj) { openProject(proj); return; }
+      }
+      showToast('Byl(a) jsi přidán(a) do projektu!', 'success');
+    } else {
+      showProjectScreen();
+    }
   }
   // auth screen je viditelný dokud se uživatel nepřihlásí
 });

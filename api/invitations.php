@@ -94,7 +94,7 @@ if ($method === 'POST') {
                 $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
                 $proj->execute([$projectId]);
                 $projName  = htmlspecialchars($proj->fetch()['name'] ?? 'projekt', ENT_QUOTES, 'UTF-8');
-                $inviteUrl = htmlspecialchars('https://plans.besix.cz/invite.php?token=' . $token, ENT_QUOTES, 'UTF-8');
+                $inviteUrl = htmlspecialchars('https://plans.besix.cz/api/invite.php?token=' . $token, ENT_QUOTES, 'UTF-8');
                 $roleLabel = htmlspecialchars(['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role, ENT_QUOTES, 'UTF-8');
                 $subject   = "Pozvanka do projektu {$projName} - BeSix Plans";
                 $html      = <<<HTML
@@ -161,7 +161,7 @@ HTML;
             } catch (\Throwable $ex) { }
         }
 
-        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena', 'invite_url' => 'https://plans.besix.cz/invite.php?token=' . $token]);
+        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena', 'invite_url' => 'https://plans.besix.cz/api/invite.php?token=' . $token]);
 
     } catch (\Throwable $e) {
         jsonError('Chyba: ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')', 500);
