@@ -3968,19 +3968,6 @@ function setupEventListeners() {
       return;
     }
 
-    if (e.button === 1) {
-      // Middle mouse button – pan
-      e.preventDefault();
-      isPanning = true;
-      panStartX = e.clientX;
-      panStartY = e.clientY;
-      lastViewportX = cw.viewportTransform[4];
-      lastViewportY = cw.viewportTransform[5];
-      cw.defaultCursor = 'grabbing';
-      cw.renderAll();
-      return;
-    }
-
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
       panStartX = e.clientX;
@@ -4231,10 +4218,34 @@ function setupEventListeners() {
     setTool('select');
   });
 
-  // Middle mouse button: prevent browser autoscroll icon
+  // Middle mouse button pan (native events – Fabric.js doesn't fire mouse:down for button 1)
+  let _midPanning = false, _midStartX = 0, _midStartY = 0, _midVptX = 0, _midVptY = 0;
   const wrapper = document.getElementById('canvas-wrapper');
   wrapper.addEventListener('mousedown', (e) => {
-    if (e.button === 1) e.preventDefault();
+    if (e.button !== 1) return;
+    e.preventDefault();
+    _midPanning = true;
+    _midStartX = e.clientX;
+    _midStartY = e.clientY;
+    _midVptX = cw.viewportTransform[4];
+    _midVptY = cw.viewportTransform[5];
+    cw.defaultCursor = 'grabbing';
+    cw.renderAll();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!_midPanning) return;
+    const vpt = cw.viewportTransform.slice();
+    vpt[4] = _midVptX + (e.clientX - _midStartX);
+    vpt[5] = _midVptY + (e.clientY - _midStartY);
+    cw.setViewportTransform(vpt);
+    cw.renderAll();
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button !== 1 || !_midPanning) return;
+    _midPanning = false;
+    cw.defaultCursor = appState.tool === 'pan' ? 'grab' : 'default';
+    cw.renderAll();
+    saveCurrentLevel();
   });
 
   // Wheel zoom
