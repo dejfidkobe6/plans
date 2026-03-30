@@ -2995,6 +2995,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="status-item" id="status-level-info">Podlaží: -</div>
   <div class="status-sep">|</div>
   <div class="status-item" id="status-tool-info">Nástroj: Výběr</div>
+  <div class="status-sep">|</div>
+  <div class="status-item" id="status-save-info" style="color:var(--text-dim)">💾 –</div>
 </div>
 
 <!-- CONTEXT MENU -->
@@ -3284,9 +3286,10 @@ function addLevel(name, type) {
     viewportTransform: null
   };
   appState.levels.push(level);
-  appState.activeLevel = appState.levels.length - 1;
+  // NENASTAVUJ appState.activeLevel zde – switchLevel to udělá sám
+  // a předtím správně uloží canvas do starého podlaží
   renderLevelTabs();
-  switchLevel(appState.activeLevel);
+  switchLevel(appState.levels.length - 1);
   saveState();
   return level;
 }
@@ -7136,11 +7139,15 @@ async function _serverSaveNow() {
         counter: annotIdCounter
       })
     });
+    const saveEl = document.getElementById('status-save-info');
     if (!ok) {
       console.error('Server save failed:', data?.error);
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
+      if (saveEl) { saveEl.textContent = '💾 Chyba'; saveEl.style.color = '#e74c3c'; }
     } else {
-      console.log('[canvas] saved', data?.saved, 'bytes,', new Date().toLocaleTimeString());
+      const t = new Date().toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      console.log('[canvas] saved', data?.saved, 'bytes at', t);
+      if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
     }
   } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
 }
