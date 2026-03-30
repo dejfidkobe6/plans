@@ -3323,7 +3323,11 @@ function switchLevel(idx) {
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
-      if (level.backgroundImage) loadBackgroundImage(level.backgroundImage, false);
+      if (level.backgroundImage) {
+        loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
+      } else {
+        _isProjectLoading = false; // no background – loading done
+      }
       if (level.viewportTransform) {
         fabricCanvas.setViewportTransform(level.viewportTransform);
       }
@@ -3332,8 +3336,9 @@ function switchLevel(idx) {
       updateAnnotList();
     });
   } else if (level.backgroundImage) {
-    loadBackgroundImage(level.backgroundImage, false);
+    loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
   } else {
+    _isProjectLoading = false; // empty canvas – loading done
     if (level.viewportTransform) {
       fabricCanvas.setViewportTransform(level.viewportTransform);
     }
@@ -3520,6 +3525,7 @@ function loadBackgroundImage(dataUrl, fit) {
     fabricCanvas.insertAt(img, 0);
     fabricCanvas.renderAll();
     showDropZone(false);
+    _isProjectLoading = false; // loading complete – saves are now allowed
     saveCurrentLevel();
   });
 }
@@ -7114,11 +7120,12 @@ function _flushSave() {
 // ---- Server save (debounce 2 s) ----
 let _srvTimer = null;
 function _serverSave() {
+  if (_isProjectLoading) return; // don't schedule during async canvas load
   clearTimeout(_srvTimer);
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
 async function _serverSaveNow() {
-  if (!currentProject) return;
+  if (!currentProject || _isProjectLoading) return;
   try {
     const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
       method: 'POST',
@@ -7965,7 +7972,10 @@ async function openProject(proj) {
       }
     });
     renderLevelTabs();
+    _isProjectLoading = true;
     switchLevel(appState.activeLevel);
+    // Safety fallback: clear loading flag after 8s even if async callbacks don't fire
+    setTimeout(() => { _isProjectLoading = false; }, 8000);
   }
 }
 
@@ -8028,7 +8038,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Uložení při zavření / přepnutí záložky (sendBeacon = funguje i při zavírání stránky)
 function _beaconSave() {
-  if (!currentProject) return;
+  if (!currentProject || _isProjectLoading) return;
   saveCurrentLevel();
   clearTimeout(_srvTimer);
   const body = JSON.stringify({
