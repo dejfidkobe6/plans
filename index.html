@@ -171,8 +171,17 @@ body {
   min-width: 0;
   user-select: none;
 }
-.level-tab.drag-over { border-left: 2px solid var(--accent, var(--olive)); }
-.level-tab.dragging { opacity: 0.4; }
+.level-tab.tab-drag-placeholder { border: 2px dashed var(--olive); background: rgba(74,83,64,0.12); opacity: 0.5; }
+.level-tab.tab-drag-ghost { opacity: 0.35; pointer-events: none; }
+#level-tab-dragging {
+  position: fixed; z-index: 9999; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--olive);
+  border-radius: 4px; padding: 0 14px; height: 38px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--text-bright);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  white-space: nowrap; opacity: 0.92;
+}
 .level-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .level-tab.active { color: var(--text-bright); }
 .level-tab.active::after {
@@ -3327,7 +3336,6 @@ function renderLevelTabs() {
     const tab = document.createElement('div');
     tab.className = 'level-tab ' + typeInfo.cssClass + (idx === appState.activeLevel ? ' active' : '');
     tab.dataset.idx = idx;
-    tab.draggable = true;
     tab.innerHTML = `
       <span class="tab-icon">${typeInfo.icon}</span>
       <span class="tab-name">${escHtml(level.name)}</span>
@@ -3346,33 +3354,79 @@ function renderLevelTabs() {
       e.stopPropagation();
       startRenameTab(tab, idx);
     });
-    // Drag-to-reorder
-    tab.addEventListener('dragstart', (e) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(idx));
-      tab.classList.add('dragging');
+    tab.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('tab-close')) return;
+      if (e.button !== 0) return;
+      startTabDrag(e, idx, tab, container);
     });
-    tab.addEventListener('dragend', () => {
-      tab.classList.remove('dragging');
-      container.querySelectorAll('.level-tab').forEach(t => t.classList.remove('drag-over'));
-    });
-    tab.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      container.querySelectorAll('.level-tab').forEach(t => t.classList.remove('drag-over'));
-      tab.classList.add('drag-over');
-    });
-    tab.addEventListener('dragleave', () => tab.classList.remove('drag-over'));
-    tab.addEventListener('drop', (e) => {
-      e.preventDefault();
-      tab.classList.remove('drag-over');
-      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-      const toIdx = idx;
-      if (fromIdx === toIdx) return;
+    container.appendChild(tab);
+  });
+}
+
+function startTabDrag(e, fromIdx, dragTab, container) {
+  const THRESHOLD = 6; // px before drag activates
+  let dragging = false;
+  let ghost = null;
+  let placeholder = null;
+  let currentToIdx = fromIdx;
+
+  const onMove = (mv) => {
+    const dx = Math.abs(mv.clientX - e.clientX);
+    if (!dragging) {
+      if (dx < THRESHOLD) return;
+      dragging = true;
+      // Create floating ghost
+      ghost = document.createElement('div');
+      ghost.id = 'level-tab-dragging';
+      ghost.innerHTML = dragTab.innerHTML;
+      document.body.appendChild(ghost);
+      dragTab.classList.add('tab-drag-ghost');
+      // Placeholder keeps the space
+      placeholder = document.createElement('div');
+      placeholder.className = 'level-tab tab-drag-placeholder';
+      placeholder.style.width = dragTab.offsetWidth + 'px';
+      placeholder.style.minWidth = dragTab.offsetWidth + 'px';
+      container.insertBefore(placeholder, dragTab);
+      dragTab.style.display = 'none';
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+    }
+    // Move ghost
+    const tabH = dragTab.offsetHeight || 38;
+    ghost.style.left = mv.clientX + 10 + 'px';
+    ghost.style.top  = (container.getBoundingClientRect().top + (container.offsetHeight - tabH) / 2) + 'px';
+    // Find target position
+    const tabs = [...container.querySelectorAll('.level-tab:not(.tab-drag-ghost):not(.tab-drag-placeholder)')];
+    let toIdx = appState.levels.length - 1;
+    for (let i = 0; i < tabs.length; i++) {
+      const r = tabs[i].getBoundingClientRect();
+      if (mv.clientX < r.left + r.width / 2) { toIdx = parseInt(tabs[i].dataset.idx); break; }
+    }
+    if (toIdx !== currentToIdx) {
+      currentToIdx = toIdx;
+      // Move placeholder
+      const targetTab = container.querySelector(`.level-tab[data-idx="${toIdx}"]`);
+      if (targetTab) container.insertBefore(placeholder, targetTab);
+      else container.appendChild(placeholder);
+    }
+  };
+
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (!dragging) return;
+    ghost.remove();
+    placeholder.remove();
+    dragTab.style.display = '';
+    dragTab.classList.remove('tab-drag-ghost');
+    // Apply reorder
+    const toIdx = currentToIdx;
+    if (toIdx !== fromIdx) {
       saveCurrentLevel();
       const moved = appState.levels.splice(fromIdx, 1)[0];
       appState.levels.splice(toIdx, 0, moved);
-      // Keep activeLevel pointing to same level
       if (appState.activeLevel === fromIdx) {
         appState.activeLevel = toIdx;
       } else if (fromIdx < toIdx) {
@@ -3382,9 +3436,13 @@ function renderLevelTabs() {
       }
       renderLevelTabs();
       saveState();
-    });
-    container.appendChild(tab);
-  });
+    } else {
+      renderLevelTabs();
+    }
+  };
+
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
 }
 
 function startRenameTab(tabEl, idx) {
