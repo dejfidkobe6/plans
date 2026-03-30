@@ -463,14 +463,16 @@ canvas#fabric-canvas { display: block; }
 #de-reset-btn:hover { color: var(--text-bright); }
 #de-apply-btn { background: var(--olive); border-color: var(--olive); color: #fff; font-weight: 600; }
 #de-apply-btn:hover { background: var(--olive-hover); }
-#de-crop-btn {
-  margin: 0 14px 10px; padding: 7px; border-radius: 5px;
+#de-crop-btn, #de-replace-btn, #de-remove-btn {
+  margin: 0 14px 8px; padding: 7px; border-radius: 5px; width: calc(100% - 28px);
   background: var(--card); border: 1px solid var(--border);
   color: var(--text-dim); font-family: var(--font-main); font-size: 12px;
   cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
   transition: background 0.15s, color 0.15s;
 }
-#de-crop-btn:hover { color: var(--text-bright); background: var(--panel); }
+#de-crop-btn:hover, #de-replace-btn:hover { color: var(--text-bright); background: var(--panel); }
+#de-remove-btn { color: #c0392b; border-color: #c0392b44; margin-bottom: 14px; }
+#de-remove-btn:hover { background: #c0392b22; color: #e74c3c; }
 /* ---- Crop overlay ---- */
 #crop-overlay {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -2481,6 +2483,15 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M6 2v14h14M2 6h14v14"/></svg>
         Oříznout výkres
       </button>
+      <button id="de-replace-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Vyměnit výkres
+      </button>
+      <button id="de-remove-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        Odstranit výkres
+      </button>
+      <input type="file" id="de-replace-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
     </div>
     <!-- CROP OVERLAY -->
     <div id="crop-overlay">
@@ -3450,10 +3461,9 @@ function _overlayToFabric(ox, oy) {
   const canvasEl = fabricCanvas.getElement();
   const cRect = canvasEl.getBoundingClientRect();
   const oRect = document.getElementById('crop-overlay').getBoundingClientRect();
-  const scX = canvasEl.width  / cRect.width;
-  const scY = canvasEl.height / cRect.height;
-  const bx = (ox + oRect.left - cRect.left) * scX;
-  const by = (oy + oRect.top  - cRect.top)  * scY;
+  // Convert overlay CSS coords → canvas element CSS coords (no retina factor – fabric uses CSS pixels)
+  const bx = ox + oRect.left - cRect.left;
+  const by = oy + oRect.top  - cRect.top;
   const vpt = fabricCanvas.viewportTransform;
   const z = fabricCanvas.getZoom();
   return { x: (bx - vpt[4]) / z, y: (by - vpt[5]) / z };
@@ -3537,6 +3547,47 @@ function setupDrawingEditor() {
   document.getElementById('de-apply-btn').addEventListener('click', applyDrawingAdjustments);
   document.getElementById('de-reset-btn').addEventListener('click', resetDrawingAdjustments);
   document.getElementById('de-crop-btn').addEventListener('click', enterCropMode);
+  document.getElementById('de-replace-btn').addEventListener('click', () => {
+    document.getElementById('de-replace-input').click();
+  });
+  document.getElementById('de-replace-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    closeDrawingEditor();
+    const idx = appState.activeLevel;
+    if (file.type === 'application/pdf') {
+      await loadPDF(file, idx);
+    } else {
+      await loadImage(file, idx);
+    }
+    appState.levels[idx].backgroundImageOriginal = appState.levels[idx].backgroundImage;
+    appState.levels[idx].drawingAdjust = { brightness: 0, contrast: 0, grayscale: false };
+    saveCurrentLevel();
+    showToast('Výkres vyměněn', 'success');
+  });
+  document.getElementById('de-remove-btn').addEventListener('click', async () => {
+    const confirmed = await showModal('Odstranit výkres', 'Opravdu chceš odstranit výkres z tohoto podlaží?');
+    if (!confirmed) return;
+    const level = appState.levels[appState.activeLevel];
+    if (!level) return;
+    level.backgroundImage = null;
+    level.backgroundImageOriginal = null;
+    level.drawingAdjust = { brightness: 0, contrast: 0, grayscale: false };
+    const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+    if (bgObj) fabricCanvas.remove(bgObj);
+    fabricCanvas.renderAll();
+    closeDrawingEditor();
+    showDropZone(true);
+    // Smaž z serveru
+    if (currentProject) {
+      _serverSaveBg(currentProject.id, level.id, null, null);
+      const pid = String(currentProject.id);
+      bgDBSave(pid, level.id, null, null);
+    }
+    saveCurrentLevel();
+    showToast('Výkres odstraněn', 'success');
+  });
   document.getElementById('de-grayscale-btn').addEventListener('click', () => {
     drawingEditorGrayscale = !drawingEditorGrayscale;
     const btn = document.getElementById('de-grayscale-btn');
