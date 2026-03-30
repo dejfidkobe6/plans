@@ -469,6 +469,30 @@ option { background: var(--card); }
 }
 
 /* CANVAS AREA */
+/* PANEL RESIZE HANDLES */
+.panel-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+  z-index: 15;
+  transition: background 0.15s;
+}
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -2px; right: -2px; /* wider hit area */
+}
+.panel-resize-handle:hover,
+.panel-resize-handle.resizing {
+  background: var(--accent);
+}
+@media (max-width: 768px) {
+  .panel-resize-handle { display: none; }
+}
+
 #canvas-area {
   flex: 1;
   position: relative;
@@ -2612,6 +2636,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="prof-badges"></div>
   </div>
   <div id="sidebar-toggle">‹</div>
+  <div class="panel-resize-handle" id="left-resize-handle" title="Táhněte pro změnu šířky"></div>
 
   <!-- CANVAS AREA -->
   <div id="canvas-area">
@@ -2700,6 +2725,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       Upravit výkres
     </button>
   </div>
+
+  <div class="panel-resize-handle" id="right-resize-handle" title="Táhněte pro změnu šířky"></div>
 
   <!-- RIGHT PANEL -->
   <div id="right-panel">
@@ -4534,9 +4561,58 @@ function setupEventListeners() {
     const toggle = document.getElementById('sidebar-toggle');
     sidebar.classList.toggle('collapsed');
     toggle.textContent = sidebar.classList.contains('collapsed') ? '›' : '‹';
-    toggle.style.left = sidebar.classList.contains('collapsed') ? '0' : '240px';
+    toggle.style.left = sidebar.classList.contains('collapsed') ? '0' : (sidebar.offsetWidth || 240) + 'px';
     setTimeout(() => fabricCanvas && resizeCanvas(), 200);
   });
+
+  // ---- Panel resize handles ----
+  (function initPanelResize() {
+    const MIN_W = 160, MAX_W = 520;
+
+    function startResize(e, panel, side) {
+      e.preventDefault();
+      const handle = document.getElementById(side === 'left' ? 'left-resize-handle' : 'right-resize-handle');
+      const startX = e.clientX;
+      const startW = panel.offsetWidth;
+      handle.classList.add('resizing');
+      panel.style.transition = 'none';
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(ev) {
+        const dx = side === 'left' ? ev.clientX - startX : startX - ev.clientX;
+        const newW = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
+        panel.style.width = newW + 'px';
+        panel.style.minWidth = newW + 'px';
+        if (side === 'left') {
+          // Keep sidebar toggle button aligned to the right edge
+          const toggle = document.getElementById('sidebar-toggle');
+          if (toggle && !panel.classList.contains('collapsed')) toggle.style.left = newW + 'px';
+        }
+      }
+
+      function onUp() {
+        handle.classList.remove('resizing');
+        panel.style.transition = '';
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        if (fabricCanvas) resizeCanvas();
+      }
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }
+
+    const leftHandle  = document.getElementById('left-resize-handle');
+    const rightHandle = document.getElementById('right-resize-handle');
+    const leftPanel   = document.getElementById('left-sidebar');
+    const rightPanel  = document.getElementById('right-panel');
+
+    if (leftHandle && leftPanel)   leftHandle.addEventListener('mousedown',  e => startResize(e, leftPanel,  'left'));
+    if (rightHandle && rightPanel) rightHandle.addEventListener('mousedown', e => startResize(e, rightPanel, 'right'));
+  })();
 
   // Drop zone
   document.getElementById('dz-pick-btn').addEventListener('click', () => document.getElementById('file-input').click());
