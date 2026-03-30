@@ -2793,8 +2793,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
           </div>
         </div>
         <div class="field-group">
-          <label class="field-label">Termín splnění</label>
-          <input type="date" class="field-input" id="prop-deadline" style="color-scheme:dark;" title="Termín splnění">
+          <label class="field-label">Termín od / do</label>
+          <div style="display:flex;gap:4px;">
+            <input type="date" class="field-input" id="prop-date-from" style="color-scheme:dark;flex:1;" title="Termín od">
+            <input type="date" class="field-input" id="prop-deadline"  style="color-scheme:dark;flex:1;" title="Termín do">
+          </div>
         </div>
         <div class="field-group">
           <label class="field-label">ID anotace</label>
@@ -3125,8 +3128,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <input type="text" id="ae-prirazeno" placeholder="Jméno / tým...">
       </div>
       <div class="ae-field">
-        <label>Termín</label>
-        <input type="date" id="ae-deadline" style="color-scheme:dark;">
+        <label>Termín od / do</label>
+        <div style="display:flex;gap:4px;">
+          <input type="date" id="ae-date-from" style="color-scheme:dark;flex:1;" placeholder="od">
+          <input type="date" id="ae-deadline"  style="color-scheme:dark;flex:1;" placeholder="do">
+        </div>
       </div>
     </div>
     <div id="annot-edit-footer">
@@ -3358,7 +3364,7 @@ function switchLevel(idx) {
   // If idx === appState.activeLevel (e.g. during openProject after server load), the
   // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
   if (fabricCanvas && appState.activeLevel !== idx && appState.levels[appState.activeLevel]) {
-    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
     _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
     appState.levels[appState.activeLevel].fabricJSON = _j;
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
@@ -4044,12 +4050,23 @@ function getLabelFirma(obj) {
 }
 
 function labelLineTop(obj) {
-  // First line: full company name (or profession if no company)
   return getLabelFirma(obj);
 }
 function labelLineBot(obj) {
-  // Second line: description truncated
   return (obj.popisek || '').substring(0, 32) || obj.annotId;
+}
+function labelLineDates(obj) {
+  const fmt = d => {
+    if (!d) return null;
+    const parts = d.split('-');
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  };
+  const from = fmt(obj.dateFrom);
+  const to   = fmt(obj.deadline);
+  if (from && to)  return `${from} – ${to}`;
+  if (from)        return `od ${from}`;
+  if (to)          return `do ${to}`;
+  return null;
 }
 
 function findLabel(annotId) {
@@ -4074,46 +4091,64 @@ function positionLabel(label, obj) {
 }
 
 function createAnnotLabel(obj) {
-  const zoom  = fabricCanvas.getZoom();
-  const color = getAnnotColor(obj);
-  const top1  = labelLineTop(obj);
-  const top2  = labelLineBot(obj);
+  const zoom   = fabricCanvas.getZoom();
+  const color  = getAnnotColor(obj);
+  const line1  = labelLineTop(obj);
+  const line2  = labelLineBot(obj);
+  const line3  = labelLineDates(obj);   // null when no dates set
 
-  // Measure text width to size background rect
-  const W = Math.max(Math.max(top1.length, top2.length) * 6.3 + 18, 80);
-  const H = 34;
+  const FONT1 = 20, FONT2 = 18, FONT3 = 16;
+  const PAD_L = 10, PAD_T = 6, GAP = 2;
+  // approximate monospace char width at given size
+  const cw1 = FONT1 * 0.62, cw2 = FONT2 * 0.62, cw3 = FONT3 * 0.62;
+  const W = Math.max(
+    line1.length * cw1,
+    line2.length * cw2,
+    line3 ? line3.length * cw3 : 0
+  ) + PAD_L * 2 + 4;  // +4 for stripe
+
+  const lineH1 = FONT1 + GAP;
+  const lineH2 = FONT2 + GAP;
+  const lineH3 = line3 ? FONT3 + GAP : 0;
+  const H = PAD_T * 2 + lineH1 + lineH2 + lineH3;
 
   const bg = new fabric.Rect({
     left: 0, top: 0, width: W, height: H,
-    fill: 'rgba(18,18,18,0.88)',
-    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.07)', strokeWidth: 0.5
+    fill: 'rgba(18,18,18,0.90)',
+    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5
   });
   const stripe = new fabric.Rect({
-    left: 0, top: 0, width: 3, height: H,
-    fill: color, rx: 0, ry: 0
+    left: 0, top: 0, width: 4, height: H,
+    fill: color
   });
-  const txtTop = new fabric.Text(top1, {
-    left: 7, top: 4,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: 10,
-    fontWeight: '700', fill: color,
-    textTransform: 'uppercase'
+  const txtTop = new fabric.Text(line1, {
+    left: PAD_L + 4, top: PAD_T,
+    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT1,
+    fontWeight: '700', fill: color
   });
-  const txtBot = new fabric.Text(top2, {
-    left: 7, top: 18,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: 9,
-    fill: '#cccccc'
+  const txtBot = new fabric.Text(line2, {
+    left: PAD_L + 4, top: PAD_T + lineH1,
+    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT2,
+    fill: '#dddddd'
   });
 
-  const group = new fabric.Group([bg, stripe, txtTop, txtBot], {
+  const items = [bg, stripe, txtTop, txtBot];
+
+  if (line3) {
+    items.push(new fabric.Text(line3, {
+      left: PAD_L + 4, top: PAD_T + lineH1 + lineH2,
+      fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT3,
+      fill: '#aaaaaa'
+    }));
+  }
+
+  const group = new fabric.Group(items, {
     left: obj.left || 0,
-    top: (obj.top || 0) - H - 4,
-    selectable: false,
-    evented: false,
-    hasControls: false,
-    hasBorders: false,
+    top: (obj.top || 0) - H - 6,
+    selectable: false, evented: false,
+    hasControls: false, hasBorders: false,
     annotLabelFor: obj.annotId,
-    scaleX: 1 / zoom,
-    scaleY: 1 / zoom,
+    scaleX: 1 / zoom, scaleY: 1 / zoom,
     originX: 'left', originY: 'top'
   });
 
@@ -4660,6 +4695,7 @@ function setupEventListeners() {
   document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
   document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
   document.getElementById('prop-deadline').addEventListener('change', () => updateActiveAnnotProp('deadline', document.getElementById('prop-deadline').value));
+  document.getElementById('prop-date-from').addEventListener('change', () => updateActiveAnnotProp('dateFrom', document.getElementById('prop-date-from').value));
 
   document.querySelectorAll('.prio-btn').forEach(btn => {
     btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
@@ -4919,7 +4955,8 @@ function onObjectSelected(opt) {
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
   document.getElementById('prop-prirazeno').value = obj.prirazeno || '';
-  document.getElementById('prop-deadline').value = obj.deadline || '';
+  document.getElementById('prop-deadline').value  = obj.deadline  || '';
+  document.getElementById('prop-date-from').value = obj.dateFrom || '';
   document.getElementById('prop-annot-id').textContent = obj.annotId || '-';
 
   // Priorita buttons
@@ -5145,7 +5182,7 @@ function drawGrid() {
 // UNDO / REDO
 // ============================================================
 function pushUndoState() {
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   undoStack.push(JSON.stringify(json));
   if (undoStack.length > 50) undoStack.shift();
   redoStack = [];
@@ -5153,7 +5190,7 @@ function pushUndoState() {
 
 function undo() {
   if (undoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
@@ -5165,7 +5202,7 @@ function undo() {
 
 function redo() {
   if (redoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
@@ -5184,7 +5221,7 @@ function copySelected() {
   obj.clone((cloned) => {
     appState.clipboard = cloned;
     showToast('Zkopírováno', 'info');
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
 }
 
 function pasteSelected() {
@@ -5197,7 +5234,7 @@ function pasteSelected() {
     pushUndoState();
     updateAnnotList();
     saveCurrentLevel();
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
 }
 
 // ============================================================
@@ -6651,7 +6688,8 @@ function openAnnotEditModal(annotId, levelIdx) {
   document.getElementById('ae-priorita').value  = ann.priorita  || 'Střední';
   document.getElementById('ae-status').value    = ann.status    || 'Otevřeno';
   document.getElementById('ae-prirazeno').value = ann.prirazeno || '';
-  document.getElementById('ae-deadline').value  = ann.deadline  || '';
+  document.getElementById('ae-deadline').value   = ann.deadline  || '';
+  document.getElementById('ae-date-from').value  = ann.dateFrom  || '';
   document.getElementById('annot-edit-title').textContent = 'Upravit anotaci ' + annotId;
   document.getElementById('annot-edit-overlay').classList.add('visible');
   document.getElementById('ae-popisek').focus();
@@ -6676,13 +6714,15 @@ function saveAnnotEdit() {
   ann.status    = document.getElementById('ae-status').value;
   ann.prirazeno = document.getElementById('ae-prirazeno').value;
   ann.deadline  = document.getElementById('ae-deadline').value;
+  ann.dateFrom  = document.getElementById('ae-date-from').value;
 
   // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
   if (levelIdx === appState.activeLevel) {
     const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
     if (obj) {
       obj.set({ profese: ann.profese, popisek: ann.popisek, priorita: ann.priorita,
-                 status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline });
+                 status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline,
+                 dateFrom: ann.dateFrom });
       applyAnnotColorToCanvas(obj);
       updateLabelFor(annotId);
       fabricCanvas.renderAll();
@@ -7054,7 +7094,7 @@ function exportTasksCSV() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   // Strip background image object from fabricJSON — saved separately to IndexedDB
   json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
   appState.levels[appState.activeLevel].fabricJSON = json;
@@ -7076,7 +7116,8 @@ function saveCurrentLevel() {
   appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
     annotId: o.annotId, profese: o.profese, popisek: o.popisek,
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-    createdAt: o.createdAt || null, deadline: o.deadline || null
+    createdAt: o.createdAt || null, deadline: o.deadline || null,
+    dateFrom: o.dateFrom || null
   }));
 
   saveState();
