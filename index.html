@@ -4067,7 +4067,10 @@ function labelLineTop(obj) {
   return getLabelFirma(obj);
 }
 function labelLineBot(obj) {
-  return (obj.popisek || '').substring(0, 32) || obj.annotId;
+  // Allow multi-line but cap each line at 40 chars, max 4 lines
+  const raw = (obj.popisek || obj.annotId || '');
+  const lines = raw.split('\n').slice(0, 4).map(l => l.substring(0, 40));
+  return lines.join('\n');
 }
 function labelLineDates(obj) {
   const fmt = d => {
@@ -4105,56 +4108,52 @@ function positionLabel(label, obj) {
 }
 
 function createAnnotLabel(obj) {
-  const zoom   = fabricCanvas.getZoom();
-  const color  = getAnnotColor(obj);
-  const line1  = labelLineTop(obj);
-  const line2  = labelLineBot(obj);
-  const line3  = labelLineDates(obj);   // null when no dates set
+  const zoom  = fabricCanvas.getZoom();
+  const color = getAnnotColor(obj);
 
   const FONT1 = 20, FONT2 = 18, FONT3 = 16;
-  const PAD_L = 10, PAD_T = 6, GAP = 2;
-  // approximate monospace char width at given size
-  const cw1 = FONT1 * 0.62, cw2 = FONT2 * 0.62, cw3 = FONT3 * 0.62;
-  const W = Math.max(
-    line1.length * cw1,
-    line2.length * cw2,
-    line3 ? line3.length * cw3 : 0
-  ) + PAD_L * 2 + 4;  // +4 for stripe
+  const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
+  const fontOpts = 'IBM Plex Mono, monospace';
 
-  const lineH1 = FONT1 + GAP;
-  const lineH2 = FONT2 + GAP;
-  const lineH3 = line3 ? FONT3 + GAP : 0;
-  const H = PAD_T * 2 + lineH1 + lineH2 + lineH3;
+  // ── 1. Create text nodes first so fabric measures real width/height ──
+  const txtTop = new fabric.Text(labelLineTop(obj), {
+    fontFamily: fontOpts, fontSize: FONT1, fontWeight: '700', fill: color,
+    left: 0, top: 0
+  });
+  const txtBot = new fabric.Text(labelLineBot(obj), {
+    fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd',
+    left: 0, top: 0
+  });
+  const line3 = labelLineDates(obj);
+  const txtDates = line3 ? new fabric.Text(line3, {
+    fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa',
+    left: 0, top: 0
+  }) : null;
 
+  // ── 2. Measure actual rendered size (fabric computes on instantiation) ──
+  const contentW = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0);
+  const W = contentW + PAD_L * 2 + STRIPE;
+
+  let curY = PAD_T;
+  txtTop.set({ left: STRIPE + PAD_L, top: curY });
+  curY += txtTop.height + GAP;
+  txtBot.set({ left: STRIPE + PAD_L, top: curY });
+  curY += txtBot.height + GAP;
+  if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
+  const H = curY - GAP + PAD_T;
+
+  // ── 3. Build background and stripe with correct dimensions ──
   const bg = new fabric.Rect({
     left: 0, top: 0, width: W, height: H,
-    fill: 'rgba(18,18,18,0.90)',
+    fill: 'rgba(18,18,18,0.92)',
     rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5
   });
   const stripe = new fabric.Rect({
-    left: 0, top: 0, width: 4, height: H,
-    fill: color
-  });
-  const txtTop = new fabric.Text(line1, {
-    left: PAD_L + 4, top: PAD_T,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT1,
-    fontWeight: '700', fill: color
-  });
-  const txtBot = new fabric.Text(line2, {
-    left: PAD_L + 4, top: PAD_T + lineH1,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT2,
-    fill: '#dddddd'
+    left: 0, top: 0, width: STRIPE, height: H, fill: color
   });
 
   const items = [bg, stripe, txtTop, txtBot];
-
-  if (line3) {
-    items.push(new fabric.Text(line3, {
-      left: PAD_L + 4, top: PAD_T + lineH1 + lineH2,
-      fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT3,
-      fill: '#aaaaaa'
-    }));
-  }
+  if (txtDates) items.push(txtDates);
 
   const group = new fabric.Group(items, {
     left: obj.left || 0,
