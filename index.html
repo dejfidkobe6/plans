@@ -4111,7 +4111,7 @@ function createAnnotLabel(obj) {
   const zoom  = fabricCanvas.getZoom();
   const color = getAnnotColor(obj);
 
-  const FONT1 = 20, FONT2 = 18, FONT3 = 16;
+  const FONT1 = 12, FONT2 = 11, FONT3 = 10;
   const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
   const fontOpts = 'IBM Plex Mono, monospace';
 
@@ -4954,7 +4954,7 @@ function updateActiveAnnotProp(prop, value) {
   obj.set(prop, value);
 
   // Update annotation label
-  if (prop === 'profese' || prop === 'popisek') {
+  if (prop === 'profese' || prop === 'popisek' || prop === 'deadline' || prop === 'dateFrom') {
     updateLabelFor(obj.annotId);
   }
 
