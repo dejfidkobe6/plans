@@ -42,20 +42,27 @@ if (!$projectId) jsonError('Chybí project_id');
 $membership = getProjectMembership($projectId, $userId);
 if (!$membership) jsonError('Nemáš přístup k tomuto projektu', 403);
 
-// Pomocné funkce pro (de)kompresi – JSON se komprimuje 5-10×, čímž obchází max_allowed_packet
+// ============================================================
+// Komprese / dekomprese (gzip+base64, 5-10× menší data)
+// ============================================================
 function _compress(string $json): string {
-    return base64_encode(gzencode($json, 6));
+    // Pokud gzip není dostupný nebo selže, ulož plain JSON
+    if (function_exists('gzencode')) {
+        $gz = @gzencode($json, 6);
+        if ($gz !== false) return base64_encode($gz);
+    }
+    return $json; // fallback – nekomprimovaný JSON
 }
+
 function _decompress(string $val): string {
-    // Detekce: base64(gzip) začíná "H4s"
-    if (str_starts_with($val, 'H4s')) {
+    if (strlen($val) >= 4 && str_starts_with($val, 'H4s')) {
         $decoded = base64_decode($val, true);
         if ($decoded !== false) {
-            $inflated = gzdecode($decoded);
+            $inflated = @gzdecode($decoded);
             if ($inflated !== false) return $inflated;
         }
     }
-    return $val; // starý nekomprimovaný formát
+    return $val; // plain JSON nebo starý nekomprimovaný formát
 }
 
 // ============================================================
@@ -72,9 +79,17 @@ if ($method === 'GET') {
         jsonOk(['state' => null, 'profese' => null, 'counter' => 1]);
     }
 
+    $state   = json_decode(_decompress($row['state_json']), true);
+    $profese = $row['profese_json'] ? json_decode(_decompress($row['profese_json']), true) : null;
+
+    if ($state === null) {
+        // Dekomprese nebo parsování selhalo – vrať prázdný stav
+        jsonOk(['state' => null, 'profese' => null, 'counter' => 1]);
+    }
+
     jsonOk([
-        'state'   => json_decode(_decompress($row['state_json']),  true),
-        'profese' => $row['profese_json'] ? json_decode(_decompress($row['profese_json']), true) : null,
+        'state'   => $state,
+        'profese' => $profese,
         'counter' => (int)($row['annot_counter'] ?? 1),
     ]);
 }
@@ -84,7 +99,12 @@ if ($method === 'GET') {
 // Body: { state: {...levels...}, profese: [...], counter: N }
 // ============================================================
 if ($method === 'POST') {
-    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $rawInput = file_get_contents('php://input');
+    if (!$rawInput) jsonError('Prázdné tělo požadavku', 400);
+
+    $body = json_decode($rawInput, true);
+    if ($body === null) jsonError('Neplatný JSON: ' . json_last_error_msg(), 400);
+
     $state   = $body['state']   ?? null;
     $profese = $body['profese'] ?? null;
     $counter = (int)($body['counter'] ?? 1);
@@ -99,21 +119,45 @@ if ($method === 'POST') {
         unset($lvl);
     }
 
-    // Komprimuj JSON před uložením (obchází MySQL max_allowed_packet)
-    $stateCompressed   = _compress(json_encode($state,   JSON_UNESCAPED_UNICODE));
-    $proteseCompressed = $profese !== null ? _compress(json_encode($profese, JSON_UNESCAPED_UNICODE)) : null;
+    // Serializuj JSON – JSON_PARTIAL_OUTPUT_ON_ERROR jako pojistka pro bad UTF-8
+    $stateJson = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    if ($stateJson === false || $stateJson === 'null') {
+        jsonError('Chyba serializace stavu: ' . json_last_error_msg(), 500);
+    }
 
-    getDB()->prepare('
-        INSERT INTO plan_canvas_data (project_id, state_json, profese_json, annot_counter)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            state_json    = VALUES(state_json),
-            profese_json  = VALUES(profese_json),
-            annot_counter = VALUES(annot_counter),
-            updated_at    = NOW()
-    ')->execute([$projectId, $stateCompressed, $proteseCompressed, $counter]);
+    $profeseJson = null;
+    if ($profese !== null) {
+        $profeseJson = json_encode($profese, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        if ($profeseJson === false) $profeseJson = null;
+    }
 
-    jsonOk();
+    $stateCompressed   = _compress($stateJson);
+    $proteseCompressed = $profeseJson !== null ? _compress($profeseJson) : null;
+
+    // Ověř, že komprimovaná data nejsou prázdná
+    if (empty($stateCompressed)) {
+        jsonError('Komprese selhala – prázdný výsledek', 500);
+    }
+
+    // INSERT nebo UPDATE – explicitní syntax (kompatibilní s MySQL 8.0+)
+    $db = getDB();
+    $existing = $db->prepare('SELECT project_id FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
+    $existing->execute([$projectId]);
+
+    if ($existing->fetch()) {
+        $db->prepare('
+            UPDATE plan_canvas_data
+            SET state_json = ?, profese_json = ?, annot_counter = ?, updated_at = NOW()
+            WHERE project_id = ?
+        ')->execute([$stateCompressed, $proteseCompressed, $counter, $projectId]);
+    } else {
+        $db->prepare('
+            INSERT INTO plan_canvas_data (project_id, state_json, profese_json, annot_counter)
+            VALUES (?, ?, ?, ?)
+        ')->execute([$projectId, $stateCompressed, $proteseCompressed, $counter]);
+    }
+
+    jsonOk(['saved' => strlen($stateCompressed)]);
 }
 
 jsonError('Metoda není povolena', 405);
