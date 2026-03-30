@@ -346,25 +346,20 @@ body {
   flex-shrink: 0;
 }
 #sidebar-header span { text-transform: uppercase; }
+/* Collapse button now lives INSIDE the sidebar header */
 #sidebar-toggle {
-  position: absolute;
-  left: 240px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px; height: 40px;
-  background: var(--panel);
+  background: none;
   border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 4px 4px 0;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 12px;
+  width: 20px; height: 20px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  color: var(--text-dim);
-  font-size: 10px;
-  z-index: 10;
-  transition: left 0.2s, color 0.15s;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
 }
 #sidebar-toggle:hover { color: var(--text-bright); background: var(--card); }
-#left-sidebar.collapsed ~ #sidebar-toggle { left: 0; }
 
 /* FILTERS */
 #filter-row {
@@ -468,26 +463,47 @@ option { background: var(--card); }
   font-size: 11px;
 }
 
-/* CANVAS AREA */
 /* PANEL RESIZE HANDLES */
 .panel-resize-handle {
-  width: 4px;
+  width: 6px;
   flex-shrink: 0;
-  background: transparent;
+  background: var(--border);
   cursor: col-resize;
   position: relative;
-  z-index: 15;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s;
-}
-.panel-resize-handle::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0;
-  left: -2px; right: -2px; /* wider hit area */
+  user-select: none;
 }
 .panel-resize-handle:hover,
 .panel-resize-handle.resizing {
   background: var(--accent);
+}
+/* Grip dots in the center */
+.resize-grip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+.resize-grip::before,
+.resize-grip::after {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  box-shadow: 0 5px 0 var(--text-dim), 0 10px 0 var(--text-dim);
+}
+.panel-resize-handle:hover .resize-grip::before,
+.panel-resize-handle:hover .resize-grip::after,
+.panel-resize-handle.resizing .resize-grip::before,
+.panel-resize-handle.resizing .resize-grip::after {
+  background: #fff;
+  box-shadow: 0 5px 0 #fff, 0 10px 0 #fff;
 }
 @media (max-width: 768px) {
   .panel-resize-handle { display: none; }
@@ -2611,7 +2627,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div id="left-sidebar">
     <div id="sidebar-header">
       <span>Anotace</span>
-      <span id="annot-total-count" style="color: var(--text-bright); font-size: 12px;">0</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span id="annot-total-count" style="color: var(--text-bright); font-size: 12px;">0</span>
+        <button id="sidebar-toggle" title="Sbalit/rozbalit panel">‹</button>
+      </div>
     </div>
     <div id="filter-row">
       <select id="filter-profese" class="filter-select">
@@ -2635,8 +2654,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="annot-list"></div>
     <div id="prof-badges"></div>
   </div>
-  <div id="sidebar-toggle">‹</div>
-  <div class="panel-resize-handle" id="left-resize-handle" title="Táhněte pro změnu šířky"></div>
+  <div class="panel-resize-handle" id="left-resize-handle" title="Táhněte pro změnu šířky"><span class="resize-grip"></span></div>
 
   <!-- CANVAS AREA -->
   <div id="canvas-area">
@@ -4555,13 +4573,14 @@ function setupEventListeners() {
     addLevel(next, next);
   });
 
-  // Sidebar toggle
+  // Sidebar toggle (button is now inside the panel header)
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
     const sidebar = document.getElementById('left-sidebar');
-    const toggle = document.getElementById('sidebar-toggle');
-    sidebar.classList.toggle('collapsed');
-    toggle.textContent = sidebar.classList.contains('collapsed') ? '›' : '‹';
-    toggle.style.left = sidebar.classList.contains('collapsed') ? '0' : (sidebar.offsetWidth || 240) + 'px';
+    const handle  = document.getElementById('left-resize-handle');
+    const toggle  = document.getElementById('sidebar-toggle');
+    const collapsed = sidebar.classList.toggle('collapsed');
+    toggle.textContent = collapsed ? '›' : '‹';
+    if (handle) handle.style.display = collapsed ? 'none' : '';
     setTimeout(() => fabricCanvas && resizeCanvas(), 200);
   });
 
@@ -4584,11 +4603,6 @@ function setupEventListeners() {
         const newW = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
         panel.style.width = newW + 'px';
         panel.style.minWidth = newW + 'px';
-        if (side === 'left') {
-          // Keep sidebar toggle button aligned to the right edge
-          const toggle = document.getElementById('sidebar-toggle');
-          if (toggle && !panel.classList.contains('collapsed')) toggle.style.left = newW + 'px';
-        }
       }
 
       function onUp() {
@@ -7216,29 +7230,45 @@ function _serverSave() {
   clearTimeout(_srvTimer);
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
+let _saving = false;
 async function _serverSaveNow() {
-  if (!currentProject || _isProjectLoading) return;
+  if (!currentProject || _isProjectLoading || _saving) return;
+  _saving = true;
   try {
-    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    let bodyStr;
+    try {
+      bodyStr = JSON.stringify({
         state:   _buildStateObj(),
         profese: appState.profese,
         counter: annotIdCounter
-      })
+      });
+    } catch(jsonErr) {
+      console.error('[canvas] JSON.stringify failed:', jsonErr);
+      showToast('Chyba serializace: ' + jsonErr.message, 'error');
+      return;
+    }
+    console.log('[canvas] save payload:', bodyStr.length, 'bytes');
+
+    // Use URL-encoded form body to avoid potential mod_security/WAF blocks
+    // on application/json content type
+    const formBody = 'data=' + encodeURIComponent(bodyStr);
+    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody
     });
     const saveEl = document.getElementById('status-save-info');
     if (!ok) {
-      console.error('Server save failed:', data?.error);
+      console.error('[canvas] save failed:', data?.error, '| payload was', bodyStr.length, 'bytes');
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
       if (saveEl) { saveEl.textContent = '💾 Chyba'; saveEl.style.color = '#e74c3c'; }
     } else {
       const t = new Date().toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-      console.log('[canvas] saved', data?.saved, 'bytes at', t);
+      console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
     }
-  } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
+  } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
+  finally { _saving = false; }
 }
 
 // ---- Server load ----
@@ -8139,13 +8169,17 @@ function _beaconSave() {
   if (!currentProject || _isProjectLoading) return;
   saveCurrentLevel();
   clearTimeout(_srvTimer);
-  const body = JSON.stringify({
-    state:   _buildStateObj(),
-    profese: appState.profese,
-    counter: annotIdCounter
-  });
-  const blob = new Blob([body], { type: 'application/json' });
-  navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
+  try {
+    const json = JSON.stringify({
+      state:   _buildStateObj(),
+      profese: appState.profese,
+      counter: annotIdCounter
+    });
+    // Send as URL-encoded form to avoid WAF/mod_security blocks on application/json
+    const formBody = 'data=' + encodeURIComponent(json);
+    const blob = new Blob([formBody], { type: 'application/x-www-form-urlencoded' });
+    navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
+  } catch(e) { console.error('[beacon] save error:', e); }
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
 window.addEventListener('pagehide', _beaconSave);
