@@ -2666,8 +2666,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       </select>
       <select id="filter-status" class="filter-select">
         <option value="">Všechny stavy</option>
-        <option value="Otevřeno">Otevřeno</option>
-        <option value="V řešení">V řešení</option>
+        <option value="Nový úkol">Nový úkol</option>
+        <option value="Probíhá">Probíhá</option>
         <option value="Hotovo">Hotovo</option>
         <option value="Urgence">Urgence</option>
       </select>
@@ -2811,8 +2811,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div class="field-group">
           <label class="field-label">Status</label>
           <div class="status-select-row">
-            <button class="status-btn" data-status="Otevřeno">Otevřeno</button>
-            <button class="status-btn" data-status="V řešení">V řešení</button>
+            <button class="status-btn" data-status="Nový úkol">Nový úkol</button>
+            <button class="status-btn" data-status="Probíhá">Probíhá</button>
             <button class="status-btn" data-status="Hotovo">Hotovo</button>
             <button class="status-btn" data-status="Urgence">🔴 Urgence</button>
           </div>
@@ -2923,8 +2923,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div class="tfilter-group">
       <select id="afilter-status" class="tfilter-select">
         <option value="">Všechny stavy</option>
-        <option value="Otevřeno">Otevřeno</option>
-        <option value="V řešení">V řešení</option>
+        <option value="Nový úkol">Nový úkol</option>
+        <option value="Probíhá">Probíhá</option>
         <option value="Hotovo">Hotovo</option>
         <option value="Urgence">Urgence</option>
       </select>
@@ -3072,8 +3072,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div class="ae-field">
           <label>Status</label>
           <select id="ae-status">
-            <option>Otevřeno</option>
-            <option>V řešení</option>
+            <option>Nový úkol</option>
+            <option>Probíhá</option>
             <option>Hotovo</option>
             <option>Urgence</option>
           </select>
@@ -3165,8 +3165,8 @@ function applyStatusButtons(value) {
   document.querySelectorAll('.status-btn').forEach(btn => {
     btn.className = 'status-btn';
     if (btn.dataset.status === value) {
-      if (value === 'Otevřeno')  btn.classList.add('active-otevreno');
-      else if (value === 'V řešení') btn.classList.add('active-vreseni');
+      if (value === 'Nový úkol')  btn.classList.add('active-otevreno');
+      else if (value === 'Probíhá') btn.classList.add('active-vreseni');
       else if (value === 'Hotovo')   btn.classList.add('active-hotovo');
       else if (value === 'Urgence')  btn.classList.add('active-urgence');
     }
@@ -4246,7 +4246,7 @@ function addAnnotationProperties(obj, type) {
     popisek: '',
     priorita: 'Střední',
     prirazeno: '',
-    status: 'Otevřeno',
+    status: 'Nový úkol',
     createdAt: new Date().toISOString()
   });
   return obj;
@@ -4847,7 +4847,7 @@ function setupEventListeners() {
     badgesEl.appendChild(prioBadge);
     const statBadge = document.createElement('span');
     statBadge.className = 'tt-badge';
-    statBadge.textContent = obj.status || 'Otevřeno';
+    statBadge.textContent = obj.status || 'Nový úkol';
     badgesEl.appendChild(statBadge);
     // Detail rows
     const rowsEl = document.getElementById('tt-rows');
@@ -5078,7 +5078,7 @@ function onObjectSelected(opt) {
   });
 
   // Status buttons
-  applyStatusButtons(obj.status || 'Otevřeno');
+  applyStatusButtons(obj.status || 'Nový úkol');
 
   // Highlight in list
   updateAnnotList();
@@ -5144,7 +5144,7 @@ function updateAnnotList() {
     filtered.forEach(obj => {
       const color = getProfColor(obj.profese);
       const isSelected = activeObj && (activeObj === obj || (activeObj._objects && activeObj._objects.includes(obj)));
-      const statusClass = obj.status === 'Otevřeno' ? 'status-otevreno' : obj.status === 'V řešení' ? 'status-vreseni' : 'status-hotovo';
+      const statusClass = obj.status === 'Nový úkol' ? 'status-otevreno' : obj.status === 'Probíhá' ? 'status-vreseni' : 'status-hotovo';
       const item = document.createElement('div');
       item.className = 'annot-item' + (isSelected ? ' selected' : '');
       item.innerHTML = `
@@ -5153,7 +5153,7 @@ function updateAnnotList() {
           <div class="annot-label">${escHtml(obj.popisek || getAnnotTypeName(obj.annotType || obj.type))}</div>
           <div class="annot-meta">
             <span>${escHtml(obj.profese || '—')}</span>
-            <span><span class="status-dot ${statusClass}"></span>${escHtml(obj.status || 'Otevřeno')}</span>
+            <span><span class="status-dot ${statusClass}"></span>${escHtml(obj.status || 'Nový úkol')}</span>
           </div>
         </div>
         <div class="annot-id-tag">${obj.annotId || ''}</div>
@@ -5997,12 +5997,12 @@ function renderHomeTasksStrip() {
 
   // Stats
   const byStatus = {};
-  filtered.forEach(r => { byStatus[r.status||'Otevřeno'] = (byStatus[r.status||'Otevřeno']||0)+1; });
+  filtered.forEach(r => { byStatus[r.status||'Nový úkol'] = (byStatus[r.status||'Nový úkol']||0)+1; });
   if (statsEl) {
     statsEl.innerHTML = `
       <span class="ht-stat"><b>${filtered.length}</b>/${all.length}</span>
-      ${byStatus['Otevřeno']  ? `<span class="ht-stat" style="border-color:#EF4444"><b style="color:#EF4444">${byStatus['Otevřeno']}</b> otevřeno</span>` : ''}
-      ${byStatus['V řešení']  ? `<span class="ht-stat" style="border-color:#F59E0B"><b style="color:#F59E0B">${byStatus['V řešení']}</b> v řešení</span>` : ''}
+      ${byStatus['Nový úkol']  ? `<span class="ht-stat" style="border-color:#EF4444"><b style="color:#EF4444">${byStatus['Nový úkol']}</b> nový úkol</span>` : ''}
+      ${byStatus['Probíhá']  ? `<span class="ht-stat" style="border-color:#F59E0B"><b style="color:#F59E0B">${byStatus['Probíhá']}</b> probíhá</span>` : ''}
       ${byStatus['Hotovo']    ? `<span class="ht-stat" style="border-color:#10B981"><b style="color:#10B981">${byStatus['Hotovo']}</b> hotovo</span>` : ''}
     `;
   }
@@ -6012,11 +6012,11 @@ function renderHomeTasksStrip() {
     return;
   }
 
-  const STATUS_COLORS = { 'Otevřeno':'#EF4444', 'V řešení':'#F59E0B', 'Hotovo':'#10B981' };
+  const STATUS_COLORS = { 'Nový úkol':'#EF4444', 'Probíhá':'#F59E0B', 'Hotovo':'#10B981' };
 
   list.innerHTML = filtered.map(r => {
     const color   = getProfColor(r.profese||'');
-    const statusC = STATUS_COLORS[r.status||'Otevřeno'] || '#6B7280';
+    const statusC = STATUS_COLORS[r.status||'Nový úkol'] || '#6B7280';
     const profObj = (appState.profese||[]).find(p => p.name === r.profese);
     const firma   = profObj ? (profObj.firma || '') : '';
 
@@ -6039,7 +6039,7 @@ function renderHomeTasksStrip() {
       <div class="ht-card-meta">
         <span class="ht-card-level">${escHtml(r.levelName)}</span>
         <span class="ht-status-dot" style="background:${statusC}"></span>
-        <span style="font-size:10px;color:${statusC}">${escHtml(r.status||'Otevřeno')}</span>
+        <span style="font-size:10px;color:${statusC}">${escHtml(r.status||'Nový úkol')}</span>
         ${dlText ? `<span class="ht-card-deadline ${dlClass}" style="margin-left:auto">📅 ${dlText}</span>` : ''}
       </div>
     </div>`;
@@ -6398,7 +6398,7 @@ function filterAnnotations(rows, f) {
 }
 
 const PRIO_ORDER = { 'Vysoká': 0, 'Střední': 1, 'Nízká': 2 };
-const STATUS_ORDER = { 'Otevřeno': 0, 'V řešení': 1, 'Hotovo': 2 };
+const STATUS_ORDER = { 'Nový úkol': 0, 'Probíhá': 1, 'Hotovo': 2 };
 
 function sortAnnotations(rows, col, dir) {
   return [...rows].sort((a, b) => {
@@ -6512,8 +6512,8 @@ function renderAnotacePage() {
   filtered.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
   statsRow.innerHTML = `
     <div class="tstat-pill"><span class="tstat-num">${filtered.length}</span>&nbsp;/ ${all.length} celkem</div>
-    ${byStatus['Otevřeno'] ? `<div class="tstat-pill" style="border-color:#EF4444"><span class="tstat-num" style="color:#EF4444">${byStatus['Otevřeno']}</span>&nbsp;Otevřeno</div>` : ''}
-    ${byStatus['V řešení'] ? `<div class="tstat-pill" style="border-color:#F59E0B"><span class="tstat-num" style="color:#F59E0B">${byStatus['V řešení']}</span>&nbsp;V řešení</div>` : ''}
+    ${byStatus['Nový úkol'] ? `<div class="tstat-pill" style="border-color:#EF4444"><span class="tstat-num" style="color:#EF4444">${byStatus['Nový úkol']}</span>&nbsp;Nový úkol</div>` : ''}
+    ${byStatus['Probíhá'] ? `<div class="tstat-pill" style="border-color:#F59E0B"><span class="tstat-num" style="color:#F59E0B">${byStatus['Probíhá']}</span>&nbsp;Probíhá</div>` : ''}
     ${byStatus['Hotovo']   ? `<div class="tstat-pill" style="border-color:#10B981"><span class="tstat-num" style="color:#10B981">${byStatus['Hotovo']}</span>&nbsp;Hotovo</div>` : ''}
   `;
 
@@ -6533,7 +6533,7 @@ function renderAnotacePage() {
     const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
     const createdStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
     const deadlineStr = r.deadline || '—';
-    const statusOpts = ['Otevřeno','V řešení','Hotovo','Urgence'].map(s =>
+    const statusOpts = ['Nový úkol','Probíhá','Hotovo','Urgence'].map(s =>
       `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
     ).join('');
     return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
@@ -6620,7 +6620,7 @@ function openAnnotEditModal(annotId, levelIdx) {
 
   document.getElementById('ae-popisek').value   = ann.popisek   || '';
   document.getElementById('ae-priorita').value  = ann.priorita  || 'Střední';
-  document.getElementById('ae-status').value    = ann.status    || 'Otevřeno';
+  document.getElementById('ae-status').value    = ann.status    || 'Nový úkol';
   document.getElementById('ae-prirazeno').value = ann.prirazeno || '';
   document.getElementById('ae-deadline').value   = ann.deadline  || '';
   document.getElementById('ae-date-from').value  = ann.dateFrom  || '';
@@ -6781,8 +6781,8 @@ async function renderLevelToImage(levelIdx) {
 function renderAnnotListToPDF(pdf, anns, x, y, w, maxH) {
   const STATUS_COLORS = {
     'Urgence':  [239, 68,  68],
-    'Otevřeno': [245, 158, 11],
-    'V řešení': [59,  130, 246],
+    'Nový úkol': [245, 158, 11],
+    'Probíhá': [59,  130, 246],
     'Hotovo':   [16,  185, 129],
   };
 
