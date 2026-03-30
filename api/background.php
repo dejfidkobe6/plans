@@ -22,6 +22,16 @@ set_exception_handler(function($e) {
 
 require_once __DIR__ . '/functions.php';
 
+// Vytvoř tabulku pokud neexistuje
+getDB()->exec('CREATE TABLE IF NOT EXISTS plan_backgrounds (
+    project_id    INT          NOT NULL,
+    level_id      VARCHAR(64)  NOT NULL,
+    image_data    LONGTEXT,
+    original_data LONGTEXT,
+    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id, level_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
 $user      = requireAuth();
 $userId    = (int)$user['id'];
 $method    = $_SERVER['REQUEST_METHOD'];
