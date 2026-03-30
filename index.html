@@ -3285,25 +3285,21 @@ function switchLevel(idx) {
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
       if (level.backgroundImage) {
-        loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
+        loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
       } else {
         _isProjectLoading = false; // no background – loading done
-      }
-      if (level.viewportTransform) {
-        fabricCanvas.setViewportTransform(level.viewportTransform);
+        fitToWindow();
       }
       rebuildAllLabels();
       fabricCanvas.renderAll();
       updateAnnotList();
     });
   } else if (level.backgroundImage) {
-    loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
+    loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
   } else {
     _isProjectLoading = false; // empty canvas – loading done
-    if (level.viewportTransform) {
-      fabricCanvas.setViewportTransform(level.viewportTransform);
-    }
     fabricCanvas.renderAll();
+    fitToWindow();
   }
 
   renderLevelTabs();
@@ -3544,7 +3540,7 @@ async function loadImage(file, levelIdx) {
   });
 }
 
-function loadBackgroundImage(dataUrl, fit) {
+function loadBackgroundImage(dataUrl, fit, onDone) {
   fabric.Image.fromURL(dataUrl, (img) => {
     const level = appState.levels[appState.activeLevel];
     const cw = fabricCanvas.getWidth();
@@ -3575,6 +3571,7 @@ function loadBackgroundImage(dataUrl, fit) {
     showDropZone(false);
     _isProjectLoading = false; // loading complete – saves are now allowed
     saveCurrentLevel();
+    if (onDone) onDone();
   });
 }
 
