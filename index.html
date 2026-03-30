@@ -6952,7 +6952,7 @@ async function _serverSaveNow() {
       console.error('Server save failed:', data?.error);
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
     }
-  } catch(e) { /* síťová chyba – data jsou v localStorage */ }
+  } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
 }
 
 // ---- Server load ----
@@ -7662,6 +7662,12 @@ async function doLogout() {
 // --- Project Screen ---
 async function showProjectScreen() {
   if (!currentUser) return;
+  // Flush pending save before leaving canvas
+  if (currentProject && fabricCanvas) {
+    saveCurrentLevel();
+    clearTimeout(_srvTimer);
+    await _serverSaveNow();
+  }
   document.getElementById('ps-user-label').textContent = currentUser.name + ' (' + currentUser.email + ')';
   await renderProjectGrid();
   document.getElementById('project-screen').classList.remove('hidden');
@@ -7723,6 +7729,13 @@ async function doCreateProject() {
 
 // --- Open Project ---
 async function openProject(proj) {
+  // Flush pending save for current project BEFORE switching
+  if (currentProject && fabricCanvas) {
+    saveCurrentLevel();
+    clearTimeout(_srvTimer);
+    await _serverSaveNow();
+  }
+
   currentProject = proj;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
