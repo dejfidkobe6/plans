@@ -99,10 +99,17 @@ if ($method === 'GET') {
 // Body: { state: {...levels...}, profese: [...], counter: N }
 // ============================================================
 if ($method === 'POST') {
-    $rawInput = file_get_contents('php://input');
-    if (!$rawInput) jsonError('Prázdné tělo požadavku', 400);
+    // Accept both application/x-www-form-urlencoded (field: data=<json>)
+    // and legacy application/json (raw body).
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (strpos($contentType, 'application/x-www-form-urlencoded') !== false) {
+        $rawJson = $_POST['data'] ?? '';
+    } else {
+        $rawJson = file_get_contents('php://input');
+    }
+    if (!$rawJson) jsonError('Prázdné tělo požadavku', 400);
 
-    $body = json_decode($rawInput, true);
+    $body = json_decode($rawJson, true);
     if ($body === null) jsonError('Neplatný JSON: ' . json_last_error_msg(), 400);
 
     $state   = $body['state']   ?? null;

@@ -7216,29 +7216,45 @@ function _serverSave() {
   clearTimeout(_srvTimer);
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
+let _saving = false;
 async function _serverSaveNow() {
-  if (!currentProject || _isProjectLoading) return;
+  if (!currentProject || _isProjectLoading || _saving) return;
+  _saving = true;
   try {
-    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    let bodyStr;
+    try {
+      bodyStr = JSON.stringify({
         state:   _buildStateObj(),
         profese: appState.profese,
         counter: annotIdCounter
-      })
+      });
+    } catch(jsonErr) {
+      console.error('[canvas] JSON.stringify failed:', jsonErr);
+      showToast('Chyba serializace: ' + jsonErr.message, 'error');
+      return;
+    }
+    console.log('[canvas] save payload:', bodyStr.length, 'bytes');
+
+    // Use URL-encoded form body to avoid potential mod_security/WAF blocks
+    // on application/json content type
+    const formBody = 'data=' + encodeURIComponent(bodyStr);
+    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody
     });
     const saveEl = document.getElementById('status-save-info');
     if (!ok) {
-      console.error('Server save failed:', data?.error);
+      console.error('[canvas] save failed:', data?.error, '| payload was', bodyStr.length, 'bytes');
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
       if (saveEl) { saveEl.textContent = '💾 Chyba'; saveEl.style.color = '#e74c3c'; }
     } else {
       const t = new Date().toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-      console.log('[canvas] saved', data?.saved, 'bytes at', t);
+      console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
     }
-  } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
+  } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
+  finally { _saving = false; }
 }
 
 // ---- Server load ----
@@ -8139,13 +8155,17 @@ function _beaconSave() {
   if (!currentProject || _isProjectLoading) return;
   saveCurrentLevel();
   clearTimeout(_srvTimer);
-  const body = JSON.stringify({
-    state:   _buildStateObj(),
-    profese: appState.profese,
-    counter: annotIdCounter
-  });
-  const blob = new Blob([body], { type: 'application/json' });
-  navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
+  try {
+    const json = JSON.stringify({
+      state:   _buildStateObj(),
+      profese: appState.profese,
+      counter: annotIdCounter
+    });
+    // Send as URL-encoded form to avoid WAF/mod_security blocks on application/json
+    const formBody = 'data=' + encodeURIComponent(json);
+    const blob = new Blob([formBody], { type: 'application/x-www-form-urlencoded' });
+    navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
+  } catch(e) { console.error('[beacon] save error:', e); }
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
 window.addEventListener('pagehide', _beaconSave);
