@@ -3385,11 +3385,17 @@ function addLevel(name, type) {
   return level;
 }
 
-function removeLevel(idx) {
+async function removeLevel(idx) {
   if (appState.levels.length <= 1) {
     showToast('Nelze smazat poslední podlaží', 'warn');
     return;
   }
+  const levelName = appState.levels[idx]?.name || 'toto podlaží';
+  const confirmed = await showModal(
+    'Smazat podlaží',
+    `Opravdu chcete smazat podlaží „${levelName}"? Tato akce je nevratná – smažou se i všechny anotace na tomto podlaží.`
+  );
+  if (!confirmed) return;
   appState.levels.splice(idx, 1);
   if (appState.activeLevel >= appState.levels.length) {
     appState.activeLevel = appState.levels.length - 1;
