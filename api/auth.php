@@ -9,7 +9,7 @@ $action = $_GET['action'] ?? '';
 if ($action === 'me' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $user = $_SESSION['user'] ?? null;
     if (!$user) jsonError('Nepřihlášen', 401);
-    jsonOk(['user' => $user]);
+    jsonOk(['user' => $user, 'pending_invite' => $_SESSION['pending_invite'] ?? null]);
 }
 
 // ============================================================
@@ -31,7 +31,7 @@ if ($action === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!password_verify($password, $user['password_hash'])) jsonError('Nesprávný email nebo heslo');
 
     loginSession($user);
-    jsonOk(['user' => $_SESSION['user']]);
+    jsonOk(['user' => $_SESSION['user'], 'pending_invite' => $_SESSION['pending_invite'] ?? null]);
 }
 
 // ============================================================
@@ -61,7 +61,7 @@ if ($action === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $user = ['id' => (int)$db->lastInsertId(), 'name' => $name, 'email' => $email, 'avatar_color' => $avatar_color];
     loginSession($user);
-    jsonOk(['user' => $_SESSION['user']]);
+    jsonOk(['user' => $_SESSION['user'], 'pending_invite' => $_SESSION['pending_invite'] ?? null]);
 }
 
 // ============================================================

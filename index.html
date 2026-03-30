@@ -7520,7 +7520,9 @@ async function doLogin() {
   if (!ok) { errEl.textContent = data.error || 'Chyba přihlášení.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
-  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenUrl = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenSess = data.pending_invite;
+  const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
@@ -7551,7 +7553,9 @@ async function doRegister() {
   if (!ok) { errEl.textContent = data.error || 'Chyba registrace.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
-  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenUrl = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenSess = data.pending_invite;
+  const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
@@ -7730,7 +7734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('auth-screen').classList.add('hidden');
     const _params = new URLSearchParams(window.location.search);
     const _inviteOk = _params.get('invite_ok');
-    const _inviteToken = _params.get('invite');
+    const _inviteToken = _params.get('invite') || data.pending_invite || null;
     if (_inviteToken) {
       // Nepřihlášený uživatel klikl na pozvánku a nyní je přihlášen
       window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken);
