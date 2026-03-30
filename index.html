@@ -3968,6 +3968,19 @@ function setupEventListeners() {
       return;
     }
 
+    if (e.button === 1) {
+      // Middle mouse button – pan
+      e.preventDefault();
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      lastViewportX = cw.viewportTransform[4];
+      lastViewportY = cw.viewportTransform[5];
+      cw.defaultCursor = 'grabbing';
+      cw.renderAll();
+      return;
+    }
+
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
       panStartX = e.clientX;
@@ -4218,8 +4231,13 @@ function setupEventListeners() {
     setTool('select');
   });
 
-  // Wheel zoom
+  // Middle mouse button: prevent browser autoscroll icon
   const wrapper = document.getElementById('canvas-wrapper');
+  wrapper.addEventListener('mousedown', (e) => {
+    if (e.button === 1) e.preventDefault();
+  });
+
+  // Wheel zoom
   wrapper.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY;
@@ -7520,7 +7538,9 @@ async function doLogin() {
   if (!ok) { errEl.textContent = data.error || 'Chyba přihlášení.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
-  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenUrl = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenSess = data.pending_invite;
+  const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
@@ -7551,7 +7571,9 @@ async function doRegister() {
   if (!ok) { errEl.textContent = data.error || 'Chyba registrace.'; return; }
   currentUser = data.user;
   document.getElementById('auth-screen').classList.add('hidden');
-  const _inviteToken = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenUrl = new URLSearchParams(window.location.search).get('invite');
+  const _inviteTokenSess = data.pending_invite;
+  const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
 }
@@ -7730,7 +7752,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('auth-screen').classList.add('hidden');
     const _params = new URLSearchParams(window.location.search);
     const _inviteOk = _params.get('invite_ok');
-    const _inviteToken = _params.get('invite');
+    const _inviteToken = _params.get('invite') || data.pending_invite || null;
     if (_inviteToken) {
       // Nepřihlášený uživatel klikl na pozvánku a nyní je přihlášen
       window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken);
