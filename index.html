@@ -7139,6 +7139,8 @@ async function _serverSaveNow() {
     if (!ok) {
       console.error('Server save failed:', data?.error);
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
+    } else {
+      console.log('[canvas] saved', data?.saved, 'bytes,', new Date().toLocaleTimeString());
     }
   } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
 }
