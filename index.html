@@ -7094,17 +7094,28 @@ function saveState() {
 
 function _buildStateObj() {
   return {
-    levels: appState.levels.map(l => ({
-      id: l.id, name: l.name, type: l.type,
-      annotations: l.annotations,
-      fabricJSON: l.fabricJSON,
-      viewportTransform: l.viewportTransform,
-      bgLeft: l.bgLeft, bgTop: l.bgTop,
-      bgServerUrl: l.bgServerUrl || null,
-      bgOrigServerUrl: l.bgOrigServerUrl || null,
-      hasBackground: !!l.backgroundImage || !!l.bgServerUrl,
-      color3D: l.color3D, shape3D: l.shape3D
-    })),
+    levels: appState.levels.map(l => {
+      // Always strip background image objects before sending to server —
+      // inactive levels keep their raw fabricJSON from DB which may still
+      // contain the fabric.Image background (huge base64 src).
+      const fj = l.fabricJSON ? {
+        ...l.fabricJSON,
+        objects: (l.fabricJSON.objects || []).filter(
+          o => o.name !== '__background__' && !o.isBackground
+        )
+      } : null;
+      return {
+        id: l.id, name: l.name, type: l.type,
+        annotations: l.annotations,
+        fabricJSON: fj,
+        viewportTransform: l.viewportTransform,
+        bgLeft: l.bgLeft, bgTop: l.bgTop,
+        bgServerUrl: l.bgServerUrl || null,
+        bgOrigServerUrl: l.bgOrigServerUrl || null,
+        hasBackground: !!l.backgroundImage || !!l.bgServerUrl,
+        color3D: l.color3D, shape3D: l.shape3D
+      };
+    }),
     activeLevel: appState.activeLevel,
     tool: appState.tool,
     showGrid: appState.showGrid,
