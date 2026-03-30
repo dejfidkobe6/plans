@@ -2521,6 +2521,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn" id="tool-polygon" data-tool="polygon" title="Víceuhelník – klik přidá bod, dvojklik ukončí (L)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L8 5 L19 9 L16 19 Z"/><circle cx="4" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.8" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1.8" fill="currentColor" stroke="none"/></svg>
     </button>
+    <button class="tb-btn tool-btn" id="tool-partition" data-tool="partition" title="Příčka – tažením nakreslit zeď/příčku">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+    </button>
     <button class="tb-btn tool-btn" id="tool-pin" data-tool="pin" title="Špendlík (P)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
     </button>
@@ -2610,6 +2613,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn mob-tool" data-tool="rect" title="Obdélník"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="circle" title="Kruh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="arrow" title="Šipka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+    <button class="tb-btn tool-btn mob-tool" data-tool="partition" title="Příčka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="pin" title="Špendlík"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="text" title="Text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>
     <div class="tb-separator"></div>
@@ -2793,8 +2797,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
           </div>
         </div>
         <div class="field-group">
-          <label class="field-label">Termín splnění</label>
-          <input type="date" class="field-input" id="prop-deadline" style="color-scheme:dark;" title="Termín splnění">
+          <label class="field-label">Termín od / do</label>
+          <div style="display:flex;gap:4px;">
+            <input type="date" class="field-input" id="prop-date-from" style="color-scheme:dark;flex:1;" title="Termín od">
+            <input type="date" class="field-input" id="prop-deadline"  style="color-scheme:dark;flex:1;" title="Termín do">
+          </div>
         </div>
         <div class="field-group">
           <label class="field-label">ID anotace</label>
@@ -3125,8 +3132,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <input type="text" id="ae-prirazeno" placeholder="Jméno / tým...">
       </div>
       <div class="ae-field">
-        <label>Termín</label>
-        <input type="date" id="ae-deadline" style="color-scheme:dark;">
+        <label>Termín od / do</label>
+        <div style="display:flex;gap:4px;">
+          <input type="date" id="ae-date-from" style="color-scheme:dark;flex:1;" placeholder="od">
+          <input type="date" id="ae-deadline"  style="color-scheme:dark;flex:1;" placeholder="do">
+        </div>
       </div>
     </div>
     <div id="annot-edit-footer">
@@ -3218,12 +3228,21 @@ function getAnnotColor(obj) {
 
 function applyAnnotColorToCanvas(obj) {
   const color = getAnnotColor(obj);
-  if (obj.type === 'rect' || obj.type === 'ellipse') {
+  if (obj.type === 'rect') {
+    // příčka uses more opaque fill, regular rect uses semi-transparent
+    const fillAlpha = obj.annotType === 'partition' ? '66' : '22';
+    obj.set({ stroke: color, fill: color + fillAlpha });
+  } else if (obj.type === 'ellipse' || obj.type === 'polygon') {
     obj.set({ stroke: color, fill: color + '22' });
   } else if (obj.type === 'path' || obj.type === 'polyline') {
-    obj.set({ stroke: color });
+    obj.set({ stroke: color, fill: 'transparent' });
   } else if (obj.type === 'i-text' || obj.type === 'text') {
     obj.set({ fill: color });
+  } else if (obj.type === 'group') {
+    // pin: update all sub-objects (circle head + triangle tail)
+    (obj.getObjects ? obj.getObjects() : []).forEach(o => {
+      if (o.type === 'circle' || o.type === 'triangle') o.set({ fill: color });
+    });
   }
 }
 
@@ -3238,7 +3257,8 @@ const LEVEL_TYPES = {
 const TOOL_NAMES = {
   select: 'Výběr', pan: 'Posun', freehand: 'Volná čára',
   rect: 'Obdélník', circle: 'Kruh', arrow: 'Šipka',
-  pin: 'Špendlík', text: 'Text', polygon: 'Víceuhelník'
+  pin: 'Špendlík', text: 'Text', polygon: 'Víceuhelník',
+  partition: 'Příčka'
 };
 
 window.appState = {
@@ -3358,7 +3378,7 @@ function switchLevel(idx) {
   // If idx === appState.activeLevel (e.g. during openProject after server load), the
   // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
   if (fabricCanvas && appState.activeLevel !== idx && appState.levels[appState.activeLevel]) {
-    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
     _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
     appState.levels[appState.activeLevel].fabricJSON = _j;
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
@@ -4044,12 +4064,26 @@ function getLabelFirma(obj) {
 }
 
 function labelLineTop(obj) {
-  // First line: full company name (or profession if no company)
   return getLabelFirma(obj);
 }
 function labelLineBot(obj) {
-  // Second line: description truncated
-  return (obj.popisek || '').substring(0, 32) || obj.annotId;
+  // Allow multi-line but cap each line at 40 chars, max 4 lines
+  const raw = (obj.popisek || obj.annotId || '');
+  const lines = raw.split('\n').slice(0, 4).map(l => l.substring(0, 40));
+  return lines.join('\n');
+}
+function labelLineDates(obj) {
+  const fmt = d => {
+    if (!d) return null;
+    const parts = d.split('-');
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  };
+  const from = fmt(obj.dateFrom);
+  const to   = fmt(obj.deadline);
+  if (from && to)  return `${from} – ${to}`;
+  if (from)        return `od ${from}`;
+  if (to)          return `do ${to}`;
+  return null;
 }
 
 function findLabel(annotId) {
@@ -4076,44 +4110,58 @@ function positionLabel(label, obj) {
 function createAnnotLabel(obj) {
   const zoom  = fabricCanvas.getZoom();
   const color = getAnnotColor(obj);
-  const top1  = labelLineTop(obj);
-  const top2  = labelLineBot(obj);
 
-  // Measure text width to size background rect
-  const W = Math.max(Math.max(top1.length, top2.length) * 6.3 + 18, 80);
-  const H = 34;
+  const FONT1 = 20, FONT2 = 18, FONT3 = 16;
+  const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
+  const fontOpts = 'IBM Plex Mono, monospace';
 
+  // ── 1. Create text nodes first so fabric measures real width/height ──
+  const txtTop = new fabric.Text(labelLineTop(obj), {
+    fontFamily: fontOpts, fontSize: FONT1, fontWeight: '700', fill: color,
+    left: 0, top: 0
+  });
+  const txtBot = new fabric.Text(labelLineBot(obj), {
+    fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd',
+    left: 0, top: 0
+  });
+  const line3 = labelLineDates(obj);
+  const txtDates = line3 ? new fabric.Text(line3, {
+    fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa',
+    left: 0, top: 0
+  }) : null;
+
+  // ── 2. Measure actual rendered size (fabric computes on instantiation) ──
+  const contentW = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0);
+  const W = contentW + PAD_L * 2 + STRIPE;
+
+  let curY = PAD_T;
+  txtTop.set({ left: STRIPE + PAD_L, top: curY });
+  curY += txtTop.height + GAP;
+  txtBot.set({ left: STRIPE + PAD_L, top: curY });
+  curY += txtBot.height + GAP;
+  if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
+  const H = curY - GAP + PAD_T;
+
+  // ── 3. Build background and stripe with correct dimensions ──
   const bg = new fabric.Rect({
     left: 0, top: 0, width: W, height: H,
-    fill: 'rgba(18,18,18,0.88)',
-    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.07)', strokeWidth: 0.5
+    fill: 'rgba(18,18,18,0.92)',
+    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5
   });
   const stripe = new fabric.Rect({
-    left: 0, top: 0, width: 3, height: H,
-    fill: color, rx: 0, ry: 0
-  });
-  const txtTop = new fabric.Text(top1, {
-    left: 7, top: 4,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: 10,
-    fontWeight: '700', fill: color,
-    textTransform: 'uppercase'
-  });
-  const txtBot = new fabric.Text(top2, {
-    left: 7, top: 18,
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: 9,
-    fill: '#cccccc'
+    left: 0, top: 0, width: STRIPE, height: H, fill: color
   });
 
-  const group = new fabric.Group([bg, stripe, txtTop, txtBot], {
+  const items = [bg, stripe, txtTop, txtBot];
+  if (txtDates) items.push(txtDates);
+
+  const group = new fabric.Group(items, {
     left: obj.left || 0,
-    top: (obj.top || 0) - H - 4,
-    selectable: false,
-    evented: false,
-    hasControls: false,
-    hasBorders: false,
+    top: (obj.top || 0) - H - 6,
+    selectable: false, evented: false,
+    hasControls: false, hasBorders: false,
     annotLabelFor: obj.annotId,
-    scaleX: 1 / zoom,
-    scaleY: 1 / zoom,
+    scaleX: 1 / zoom, scaleY: 1 / zoom,
     originX: 'left', originY: 'top'
   });
 
@@ -4212,6 +4260,18 @@ function setupEventListeners() {
     } else if (appState.tool === 'text') {
       isDrawing = false;
       placeTextAt(pointer.x, pointer.y);
+    } else if (appState.tool === 'partition') {
+      tempShape = new fabric.Rect({
+        left: pointer.x, top: pointer.y,
+        width: 1, height: 1,
+        fill: color + '66',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true,
+        selectable: false, evented: false,
+        originX: 'left', originY: 'top'
+      });
+      cw.add(tempShape);
     } else if (appState.tool === 'rect') {
       tempShape = new fabric.Rect({
         left: pointer.x, top: pointer.y,
@@ -4277,7 +4337,7 @@ function setupEventListeners() {
     const dx = pointer.x - drawStartX;
     const dy = pointer.y - drawStartY;
 
-    if (appState.tool === 'rect') {
+    if (appState.tool === 'rect' || appState.tool === 'partition') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       tempShape.set({ left, top, width: Math.abs(dx), height: Math.abs(dy) });
@@ -4323,7 +4383,26 @@ function setupEventListeners() {
 
     const color = getActiveProfeseColor();
 
-    if (appState.tool === 'rect') {
+    if (appState.tool === 'partition') {
+      const left = dx < 0 ? pointer.x : drawStartX;
+      const top = dy < 0 ? pointer.y : drawStartY;
+      const wall = new fabric.Rect({
+        left, top,
+        width: Math.abs(dx), height: Math.abs(dy),
+        fill: color + '66',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true
+      });
+      addAnnotationProperties(wall, 'partition');
+      cw.add(wall);
+      createAnnotLabel(wall);
+      cw.setActiveObject(wall);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: wall });
+      setTool('select');
+    } else if (appState.tool === 'rect') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       const rect = new fabric.Rect({
@@ -4660,6 +4739,7 @@ function setupEventListeners() {
   document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
   document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
   document.getElementById('prop-deadline').addEventListener('change', () => updateActiveAnnotProp('deadline', document.getElementById('prop-deadline').value));
+  document.getElementById('prop-date-from').addEventListener('change', () => updateActiveAnnotProp('dateFrom', document.getElementById('prop-date-from').value));
 
   document.querySelectorAll('.prio-btn').forEach(btn => {
     btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
@@ -4919,7 +4999,8 @@ function onObjectSelected(opt) {
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
   document.getElementById('prop-prirazeno').value = obj.prirazeno || '';
-  document.getElementById('prop-deadline').value = obj.deadline || '';
+  document.getElementById('prop-deadline').value  = obj.deadline  || '';
+  document.getElementById('prop-date-from').value = obj.dateFrom || '';
   document.getElementById('prop-annot-id').textContent = obj.annotId || '-';
 
   // Priorita buttons
@@ -5145,7 +5226,7 @@ function drawGrid() {
 // UNDO / REDO
 // ============================================================
 function pushUndoState() {
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   undoStack.push(JSON.stringify(json));
   if (undoStack.length > 50) undoStack.shift();
   redoStack = [];
@@ -5153,7 +5234,7 @@ function pushUndoState() {
 
 function undo() {
   if (undoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
@@ -5165,7 +5246,7 @@ function undo() {
 
 function redo() {
   if (redoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
@@ -5184,7 +5265,7 @@ function copySelected() {
   obj.clone((cloned) => {
     appState.clipboard = cloned;
     showToast('Zkopírováno', 'info');
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
 }
 
 function pasteSelected() {
@@ -5197,7 +5278,7 @@ function pasteSelected() {
     pushUndoState();
     updateAnnotList();
     saveCurrentLevel();
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
 }
 
 // ============================================================
@@ -6651,7 +6732,8 @@ function openAnnotEditModal(annotId, levelIdx) {
   document.getElementById('ae-priorita').value  = ann.priorita  || 'Střední';
   document.getElementById('ae-status').value    = ann.status    || 'Otevřeno';
   document.getElementById('ae-prirazeno').value = ann.prirazeno || '';
-  document.getElementById('ae-deadline').value  = ann.deadline  || '';
+  document.getElementById('ae-deadline').value   = ann.deadline  || '';
+  document.getElementById('ae-date-from').value  = ann.dateFrom  || '';
   document.getElementById('annot-edit-title').textContent = 'Upravit anotaci ' + annotId;
   document.getElementById('annot-edit-overlay').classList.add('visible');
   document.getElementById('ae-popisek').focus();
@@ -6676,13 +6758,15 @@ function saveAnnotEdit() {
   ann.status    = document.getElementById('ae-status').value;
   ann.prirazeno = document.getElementById('ae-prirazeno').value;
   ann.deadline  = document.getElementById('ae-deadline').value;
+  ann.dateFrom  = document.getElementById('ae-date-from').value;
 
   // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
   if (levelIdx === appState.activeLevel) {
     const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
     if (obj) {
       obj.set({ profese: ann.profese, popisek: ann.popisek, priorita: ann.priorita,
-                 status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline });
+                 status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline,
+                 dateFrom: ann.dateFrom });
       applyAnnotColorToCanvas(obj);
       updateLabelFor(annotId);
       fabricCanvas.renderAll();
@@ -7054,7 +7138,7 @@ function exportTasksCSV() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
   // Strip background image object from fabricJSON — saved separately to IndexedDB
   json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
   appState.levels[appState.activeLevel].fabricJSON = json;
@@ -7076,7 +7160,8 @@ function saveCurrentLevel() {
   appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
     annotId: o.annotId, profese: o.profese, popisek: o.popisek,
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-    createdAt: o.createdAt || null, deadline: o.deadline || null
+    createdAt: o.createdAt || null, deadline: o.deadline || null,
+    dateFrom: o.dateFrom || null
   }));
 
   saveState();
