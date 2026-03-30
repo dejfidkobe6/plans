@@ -169,6 +169,18 @@ body {
   color: var(--text-dim);
   transition: color 0.15s, background 0.15s;
   min-width: 0;
+  user-select: none;
+}
+.level-tab.tab-drag-placeholder { border: 2px dashed var(--olive); background: rgba(74,83,64,0.12); opacity: 0.5; }
+.level-tab.tab-drag-ghost { opacity: 0.35; pointer-events: none; }
+#level-tab-dragging {
+  position: fixed; z-index: 9999; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--olive);
+  border-radius: 4px; padding: 0 14px; height: 38px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--text-bright);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  white-space: nowrap; opacity: 0.92;
 }
 .level-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .level-tab.active { color: var(--text-bright); }
@@ -771,6 +783,9 @@ canvas#fabric-canvas { display: block; }
   font-size: 11px;
   font-family: var(--font-mono);
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--text-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1828,34 +1843,6 @@ option { background: var(--card); color: var(--text); }
 }
 #add-profese-btn:hover { background: rgba(74,83,64,0.5); }
 
-/* ALL TASKS PAGE */
-#tasks-page {
-  display: none;
-  position: fixed; inset: 0; z-index: 3000;
-  background: var(--bg);
-  flex-direction: column;
-  overflow: hidden;
-}
-#tasks-page.visible { display: flex; }
-#tasks-page-header {
-  display: flex; align-items: center; gap: 14px;
-  padding: 0 20px;
-  height: 52px; flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-}
-#tasks-page-title {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-mono); font-size: 14px;
-  font-weight: 700; color: var(--text-bright);
-  letter-spacing: 0.04em; text-transform: uppercase;
-  white-space: nowrap;
-}
-#tasks-stats-row {
-  display: flex; gap: 10px; align-items: center; flex: 1;
-  font-family: var(--font-mono); font-size: 11px;
-  color: var(--text-dim);
-}
 .tstat-pill {
   display: flex; align-items: center; gap: 4px;
   background: var(--card); border: 1px solid var(--border);
@@ -1865,22 +1852,6 @@ option { background: var(--card); color: var(--text); }
 .tstat-pill .tstat-num {
   font-weight: 700; font-size: 13px;
   color: var(--text-bright);
-}
-#close-tasks-btn {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-dim); font-size: 22px;
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; transition: background 0.15s, color 0.15s;
-  margin-left: auto; flex-shrink: 0;
-}
-#close-tasks-btn:hover { background: var(--card); color: var(--text-bright); }
-#tasks-filters-bar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-  flex-shrink: 0;
 }
 .tfilter-group { display: flex; align-items: center; gap: 4px; }
 .tfilter-input {
@@ -1917,40 +1888,9 @@ option { background: var(--card); color: var(--text); }
   transition: background 0.15s;
 }
 .tfilter-export:hover { background: rgba(74,83,64,0.45); }
-#tasks-table-wrap {
-  flex: 1; overflow: auto; padding: 0 20px 20px;
-}
-#tasks-table {
-  width: 100%; border-collapse: collapse;
-  font-family: var(--font-main); font-size: 13px;
-  margin-top: 12px;
-}
-#tasks-table thead th {
-  position: sticky; top: 0; z-index: 2;
-  background: var(--panel);
-  border-bottom: 2px solid var(--border);
-  padding: 8px 10px; text-align: left;
-  font-family: var(--font-mono); font-size: 10px;
-  font-weight: 600; color: var(--text-dim);
-  text-transform: uppercase; letter-spacing: 0.06em;
-  white-space: nowrap; user-select: none;
-}
-#tasks-table thead th.th-sort { cursor: pointer; }
-#tasks-table thead th.th-sort:hover { color: var(--text-bright); }
-#tasks-table thead th.th-wide { min-width: 200px; }
 .sort-arrow { display: inline-block; margin-left: 3px; opacity: 0.4; font-size: 9px; }
 th.sort-asc .sort-arrow::after { content: '▲'; opacity: 1; }
 th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
-#tasks-table tbody tr {
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  transition: background 0.1s;
-}
-#tasks-table tbody tr:hover { background: rgba(255,255,255,0.04); }
-#tasks-table td {
-  padding: 8px 10px; vertical-align: middle;
-  color: var(--text); max-width: 320px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
 .tcell-id {
   font-family: var(--font-mono); font-size: 11px;
   color: var(--text-dim); white-space: nowrap;
@@ -1996,10 +1936,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   transition: all 0.15s; white-space: nowrap;
 }
 .trow-goto-btn:hover { border-color: var(--olive); color: var(--olive-light); background: rgba(74,83,64,0.2); }
-#tasks-empty {
-  display: none; text-align: center; padding: 60px 20px;
-  color: var(--text-dim); font-size: 14px;
-}
 
 /* ZONES MANAGER */
 #zones-manager {
@@ -2391,6 +2327,65 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Level bar – slightly smaller on mobile */
   #level-bar { height: 38px; }
   .level-tab { padding: 0 10px; font-size: 12px; }
+
+  /* Right panel – floating overlay, hidden by default */
+  #right-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    z-index: 1200;
+    width: 280px !important;
+    min-width: 280px !important;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+  }
+  #right-panel.mob-open {
+    transform: translateX(0);
+  }
+  #right-panel-toggle-mob {
+    display: flex !important;
+  }
+  /* Semi-transparent backdrop when panel is open */
+  #right-panel-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 1199;
+    background: rgba(0,0,0,0.45);
+  }
+  #right-panel-backdrop.visible { display: block; }
+}
+
+/* Mobile toggle button – hidden on desktop */
+#right-panel-toggle-mob {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 16px;
+  border-radius: 4px; transition: background 0.15s, color 0.15s;
+}
+#right-panel-toggle-mob:hover { background: var(--card); color: var(--text-bright); }
+
+/* Floating open button – visible on mobile when panel is closed */
+#mob-props-open-btn {
+  display: none;
+  position: fixed;
+  bottom: 70px; right: 12px;
+  z-index: 1100;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 18px;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  transition: background 0.15s, color 0.15s;
+}
+#mob-props-open-btn:hover { background: var(--card); color: var(--text-bright); }
+@media (max-width: 768px) {
+  #mob-props-open-btn { display: flex; }
 }
 
 /* Medium screens – hide text labels on action buttons */
@@ -2588,9 +2583,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn" id="model-3d-btn" title="3D Model">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
     </button>
-    <button class="tb-btn" id="all-tasks-btn" title="Všechny úkoly dodavatelů">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    </button>
   </div>
   <button id="mobile-menu-btn" onclick="toggleMobileMenu()" title="Menu" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -2776,8 +2768,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="panel-resize-handle" id="right-resize-handle" title="Táhněte pro změnu šířky"></div>
 
   <!-- RIGHT PANEL -->
+  <div id="right-panel-backdrop"></div>
   <div id="right-panel">
-    <div id="right-panel-header">Vlastnosti</div>
+    <div id="right-panel-header">
+      Vlastnosti
+      <button id="right-panel-toggle-mob" title="Zavřít vlastnosti">✕</button>
+    </div>
     <div id="right-panel-content">
       <div class="no-sel-state" id="no-sel-state">
         <div class="ns-icon">✏️</div>
@@ -2897,76 +2893,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <div id="members-list"></div>
       <div id="pending-invitations"></div>
     </div>
-  </div>
-</div>
-
-<!-- ALL TASKS PAGE -->
-<div id="tasks-page">
-  <div id="tasks-page-header">
-    <div id="tasks-page-title">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Všechny úkoly
-    </div>
-    <div id="tasks-stats-row"></div>
-    <button id="close-tasks-btn" title="Zavřít">×</button>
-  </div>
-  <div id="tasks-filters-bar">
-    <div class="tfilter-group">
-      <input type="text" id="tfilter-search" class="tfilter-input" placeholder="🔍 Hledat popis, ID, přiřazeného...">
-    </div>
-    <div class="tfilter-group">
-      <select id="tfilter-level" class="tfilter-select">
-        <option value="">Všechna podlaží</option>
-      </select>
-    </div>
-    <div class="tfilter-group">
-      <select id="tfilter-profese" class="tfilter-select">
-        <option value="">Všechny profese</option>
-      </select>
-    </div>
-    <div class="tfilter-group">
-      <select id="tfilter-status" class="tfilter-select">
-        <option value="">Všechny stavy</option>
-        <option value="Otevřeno">Otevřeno</option>
-        <option value="V řešení">V řešení</option>
-        <option value="Hotovo">Hotovo</option>
-        <option value="Urgence">Urgence</option>
-      </select>
-    </div>
-    <div class="tfilter-group">
-      <select id="tfilter-prio" class="tfilter-select">
-        <option value="">Všechny priority</option>
-        <option value="Vysoká">Vysoká</option>
-        <option value="Střední">Střední</option>
-        <option value="Nízká">Nízká</option>
-      </select>
-    </div>
-    <div class="tfilter-group tfilter-date-group">
-      <input type="date" id="tfilter-date-from" class="tfilter-date" title="Vytvořeno od">
-      <span class="tfilter-date-sep">–</span>
-      <input type="date" id="tfilter-date-to" class="tfilter-date" title="Vytvořeno do">
-    </div>
-    <button id="tfilter-reset-btn" class="tfilter-reset" title="Resetovat filtry">✕ Reset</button>
-    <button id="tasks-export-csv-btn" class="tfilter-export" title="Exportovat do CSV">↓ CSV</button>
-  </div>
-  <div id="tasks-table-wrap">
-    <table id="tasks-table">
-      <thead>
-        <tr>
-          <th class="th-sort" data-sort="annotId">ID <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="profese">Profese <span class="sort-arrow"></span></th>
-          <th class="th-sort th-wide" data-sort="popisek">Popis <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="levelName">Podlaží <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="priorita">Priorita <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="status">Status <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="prirazeno">Přiřazeno <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="createdAt">Vytvořeno <span class="sort-arrow"></span></th>
-          <th>Akce</th>
-        </tr>
-      </thead>
-      <tbody id="tasks-tbody"></tbody>
-    </table>
-    <div id="tasks-empty">Žádné úkoly neodpovídají filtrům.</div>
   </div>
 </div>
 
@@ -3353,7 +3279,6 @@ function init() {
   updateStatusBar();
   setup3DUpload();
   setup3DPanelResize();
-  setupTasksPage();
   setupAnotacePage();
   setupDrawingEditor();
   setupCropOverlay();
@@ -3426,25 +3351,21 @@ function switchLevel(idx) {
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
       if (level.backgroundImage) {
-        loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
+        loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
       } else {
         _isProjectLoading = false; // no background – loading done
-      }
-      if (level.viewportTransform) {
-        fabricCanvas.setViewportTransform(level.viewportTransform);
+        fitToWindow();
       }
       rebuildAllLabels();
       fabricCanvas.renderAll();
       updateAnnotList();
     });
   } else if (level.backgroundImage) {
-    loadBackgroundImage(level.backgroundImage, false); // clears _isProjectLoading inside
+    loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
   } else {
     _isProjectLoading = false; // empty canvas – loading done
-    if (level.viewportTransform) {
-      fabricCanvas.setViewportTransform(level.viewportTransform);
-    }
     fabricCanvas.renderAll();
+    fitToWindow();
   }
 
   renderLevelTabs();
@@ -3495,8 +3416,95 @@ function renderLevelTabs() {
       e.stopPropagation();
       startRenameTab(tab, idx);
     });
+    tab.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('tab-close')) return;
+      if (e.button !== 0) return;
+      startTabDrag(e, idx, tab, container);
+    });
     container.appendChild(tab);
   });
+}
+
+function startTabDrag(e, fromIdx, dragTab, container) {
+  const THRESHOLD = 6; // px before drag activates
+  let dragging = false;
+  let ghost = null;
+  let placeholder = null;
+  let currentToIdx = fromIdx;
+
+  const onMove = (mv) => {
+    const dx = Math.abs(mv.clientX - e.clientX);
+    if (!dragging) {
+      if (dx < THRESHOLD) return;
+      dragging = true;
+      // Create floating ghost
+      ghost = document.createElement('div');
+      ghost.id = 'level-tab-dragging';
+      ghost.innerHTML = dragTab.innerHTML;
+      document.body.appendChild(ghost);
+      dragTab.classList.add('tab-drag-ghost');
+      // Placeholder keeps the space
+      placeholder = document.createElement('div');
+      placeholder.className = 'level-tab tab-drag-placeholder';
+      placeholder.style.width = dragTab.offsetWidth + 'px';
+      placeholder.style.minWidth = dragTab.offsetWidth + 'px';
+      container.insertBefore(placeholder, dragTab);
+      dragTab.style.display = 'none';
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+    }
+    // Move ghost
+    const tabH = dragTab.offsetHeight || 38;
+    ghost.style.left = mv.clientX + 10 + 'px';
+    ghost.style.top  = (container.getBoundingClientRect().top + (container.offsetHeight - tabH) / 2) + 'px';
+    // Find target position
+    const tabs = [...container.querySelectorAll('.level-tab:not(.tab-drag-ghost):not(.tab-drag-placeholder)')];
+    let toIdx = appState.levels.length - 1;
+    for (let i = 0; i < tabs.length; i++) {
+      const r = tabs[i].getBoundingClientRect();
+      if (mv.clientX < r.left + r.width / 2) { toIdx = parseInt(tabs[i].dataset.idx); break; }
+    }
+    if (toIdx !== currentToIdx) {
+      currentToIdx = toIdx;
+      // Move placeholder
+      const targetTab = container.querySelector(`.level-tab[data-idx="${toIdx}"]`);
+      if (targetTab) container.insertBefore(placeholder, targetTab);
+      else container.appendChild(placeholder);
+    }
+  };
+
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (!dragging) return;
+    ghost.remove();
+    placeholder.remove();
+    dragTab.style.display = '';
+    dragTab.classList.remove('tab-drag-ghost');
+    // Apply reorder
+    const toIdx = currentToIdx;
+    if (toIdx !== fromIdx) {
+      saveCurrentLevel();
+      const moved = appState.levels.splice(fromIdx, 1)[0];
+      appState.levels.splice(toIdx, 0, moved);
+      if (appState.activeLevel === fromIdx) {
+        appState.activeLevel = toIdx;
+      } else if (fromIdx < toIdx) {
+        if (appState.activeLevel > fromIdx && appState.activeLevel <= toIdx) appState.activeLevel--;
+      } else {
+        if (appState.activeLevel >= toIdx && appState.activeLevel < fromIdx) appState.activeLevel++;
+      }
+      renderLevelTabs();
+      saveState();
+    } else {
+      renderLevelTabs();
+    }
+  };
+
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
 }
 
 function startRenameTab(tabEl, idx) {
@@ -3598,7 +3606,7 @@ async function loadImage(file, levelIdx) {
   });
 }
 
-function loadBackgroundImage(dataUrl, fit) {
+function loadBackgroundImage(dataUrl, fit, onDone) {
   fabric.Image.fromURL(dataUrl, (img) => {
     const level = appState.levels[appState.activeLevel];
     const cw = fabricCanvas.getWidth();
@@ -3629,6 +3637,7 @@ function loadBackgroundImage(dataUrl, fit) {
     showDropZone(false);
     _isProjectLoading = false; // loading complete – saves are now allowed
     saveCurrentLevel();
+    if (onDone) onDone();
   });
 }
 
@@ -5048,6 +5057,7 @@ function onObjectSelected(opt) {
 
   document.getElementById('no-sel-state').style.display = 'none';
   document.getElementById('prop-form').style.display = 'block';
+  if (window.innerWidth <= 768) document.dispatchEvent(new CustomEvent('annotation-selected'));
 
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
@@ -5955,7 +5965,7 @@ function renderHomeTasksStrip() {
 
   populateHomeStripFilters();
 
-  const all = getAllAnnotations();  // reuse from tasks-page module
+  const all = getAllAnnotations();
   const f = getHomeTaskFilters();
   const today = new Date().toISOString().slice(0,10);
 
@@ -6353,22 +6363,8 @@ function resizeCanvas() {
 }
 
 // ============================================================
-// ALL TASKS PAGE
+// SHARED ANNOTATION UTILITIES (used by anotace page, home page)
 // ============================================================
-let tasksSort = { col: 'createdAt', dir: 'desc' };
-
-function openTasksPage() {
-  // Flush current canvas to state first
-  saveCurrentLevel();
-  populateTaskFilters();
-  renderTasksPage();
-  document.getElementById('tasks-page').classList.add('visible');
-}
-
-function closeTasksPage() {
-  document.getElementById('tasks-page').classList.remove('visible');
-}
-
 function getAllAnnotations() {
   const rows = [];
   appState.levels.forEach((level, levelIdx) => {
@@ -6380,42 +6376,6 @@ function getAllAnnotations() {
   return rows;
 }
 
-function populateTaskFilters() {
-  // Levels
-  const lvlSel = document.getElementById('tfilter-level');
-  const curLvl = lvlSel.value;
-  lvlSel.innerHTML = '<option value="">Všechna podlaží</option>';
-  appState.levels.forEach((l, i) => {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = l.name;
-    if (curLvl === String(i)) opt.selected = true;
-    lvlSel.appendChild(opt);
-  });
-  // Profese
-  const profSel = document.getElementById('tfilter-profese');
-  const curProf = profSel.value;
-  profSel.innerHTML = '<option value="">Všechny profese</option>';
-  (appState.profese || []).forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.name;
-    opt.textContent = p.name;
-    if (curProf === p.name) opt.selected = true;
-    profSel.appendChild(opt);
-  });
-}
-
-function getTaskFilters() {
-  return {
-    search:  (document.getElementById('tfilter-search').value  || '').toLowerCase().trim(),
-    levelIdx: document.getElementById('tfilter-level').value,
-    profese: document.getElementById('tfilter-profese').value,
-    status:  document.getElementById('tfilter-status').value,
-    prio:    document.getElementById('tfilter-prio').value,
-    dateFrom: document.getElementById('tfilter-date-from').value,
-    dateTo:   document.getElementById('tfilter-date-to').value
-  };
-}
 
 function filterAnnotations(rows, f) {
   return rows.filter(r => {
@@ -6451,69 +6411,7 @@ function sortAnnotations(rows, col, dir) {
   });
 }
 
-function renderTasksPage() {
-  const all = getAllAnnotations();
-  const filters = getTaskFilters();
-  const filtered = filterAnnotations(all, filters);
-  const sorted = sortAnnotations(filtered, tasksSort.col, tasksSort.dir);
-
-  // Stats
-  const statsRow = document.getElementById('tasks-stats-row');
-  const counts = { total: all.length, filtered: filtered.length };
-  const byStatus = {};
-  filtered.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
-  statsRow.innerHTML = `
-    <div class="tstat-pill"><span class="tstat-num">${counts.filtered}</span>&nbsp;/ ${counts.total} celkem</div>
-    ${byStatus['Otevřeno']  ? `<div class="tstat-pill" style="border-color:#EF4444"><span class="tstat-num" style="color:#EF4444">${byStatus['Otevřeno']}</span>&nbsp;Otevřeno</div>` : ''}
-    ${byStatus['V řešení']  ? `<div class="tstat-pill" style="border-color:#F59E0B"><span class="tstat-num" style="color:#F59E0B">${byStatus['V řešení']}</span>&nbsp;V řešení</div>` : ''}
-    ${byStatus['Hotovo']    ? `<div class="tstat-pill" style="border-color:#10B981"><span class="tstat-num" style="color:#10B981">${byStatus['Hotovo']}</span>&nbsp;Hotovo</div>` : ''}
-  `;
-
-  // Sort arrows
-  document.querySelectorAll('#tasks-table th.th-sort').forEach(th => {
-    th.classList.remove('sort-asc', 'sort-desc');
-    if (th.dataset.sort === tasksSort.col) th.classList.add(tasksSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
-  });
-
-  const tbody = document.getElementById('tasks-tbody');
-  const empty = document.getElementById('tasks-empty');
-
-  if (sorted.length === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-
-  tbody.innerHTML = sorted.map(r => {
-    const color  = getProfColor(r.profese || '');
-    const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
-    const dateStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
-    const statusOpts = ['Otevřeno','V řešení','Hotovo','Urgence'].map(s =>
-      `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
-    ).join('');
-    return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
-      <td class="tcell-id">${escHtml(r.annotId)}</td>
-      <td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${color}"></span>${escHtml(r.profese||'—')}</span></td>
-      <td class="tcell-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek || '(bez popisu)')}</td>
-      <td><span class="tcell-level">${escHtml(r.levelName)}</span></td>
-      <td><span class="tcell-prio ${prioClass}">${escHtml(r.priorita||'Střední')}</span></td>
-      <td class="tcell-status">
-        <select onchange="updateAnnotStatusFromTable('${escHtml(r.annotId)}',${r.levelIdx},this.value)">
-          ${statusOpts}
-        </select>
-      </td>
-      <td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>
-      <td class="tcell-date">${dateStr}</td>
-      <td class="tcell-actions">
-        <button class="trow-goto-btn" onclick="goToAnnotation(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
 function goToAnnotation(levelIdx, annotId) {
-  closeTasksPage();
   switchLevel(levelIdx);
   // Wait for loadFromJSON then select the annotation
   setTimeout(() => {
@@ -6535,67 +6433,6 @@ function goToAnnotation(levelIdx, annotId) {
   }, 350);
 }
 
-function updateAnnotStatusFromTable(annotId, levelIdx, newStatus) {
-  // Update saved annotations in state
-  const level = appState.levels[levelIdx];
-  if (level && level.annotations) {
-    const ann = level.annotations.find(a => a.annotId === annotId);
-    if (ann) ann.status = newStatus;
-  }
-  // If it's the current level, update the canvas object too
-  if (levelIdx === appState.activeLevel) {
-    const obj = fabricCanvas.getObjects().find(o => o.annotId === annotId);
-    if (obj) {
-      obj.set('status', newStatus);
-      applyAnnotColorToCanvas(obj);
-      updateLabelFor(obj.annotId);
-      fabricCanvas.renderAll();
-      saveCurrentLevel();
-      updateAnnotList();
-    }
-  } else {
-    saveState();
-  }
-  renderTasksPage();
-}
-
-function setupTasksPage() {
-  document.getElementById('all-tasks-btn').addEventListener('click', openTasksPage);
-  document.getElementById('close-tasks-btn').addEventListener('click', closeTasksPage);
-  document.getElementById('tfilter-reset-btn').addEventListener('click', () => {
-    ['tfilter-search','tfilter-level','tfilter-profese','tfilter-status','tfilter-prio','tfilter-date-from','tfilter-date-to']
-      .forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-    renderTasksPage();
-  });
-  ['tfilter-search','tfilter-level','tfilter-profese','tfilter-status','tfilter-prio','tfilter-date-from','tfilter-date-to']
-    .forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('input', renderTasksPage);
-      if (el) el.addEventListener('change', renderTasksPage);
-    });
-  document.querySelectorAll('#tasks-table th.th-sort').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.sort;
-      if (tasksSort.col === col) {
-        tasksSort.dir = tasksSort.dir === 'asc' ? 'desc' : 'asc';
-      } else {
-        tasksSort.col = col;
-        tasksSort.dir = 'asc';
-      }
-      renderTasksPage();
-    });
-  });
-  document.getElementById('tasks-export-csv-btn').addEventListener('click', exportTasksCSV);
-  // Close on Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.getElementById('tasks-page').classList.contains('visible')) {
-      closeTasksPage();
-    }
-  });
-}
 
 // ============================================================
 // ANOTACE PAGE
@@ -7161,29 +6998,6 @@ function setupAnotacePage() {
       closeAnotacePage();
     }
   });
-}
-
-function exportTasksCSV() {
-  const all = getAllAnnotations();
-  const filters = getTaskFilters();
-  const filtered = filterAnnotations(all, filters);
-  const sorted = sortAnnotations(filtered, tasksSort.col, tasksSort.dir);
-  const headers = ['ID','Profese','Popis','Podlaží','Priorita','Status','Přiřazeno','Vytvořeno'];
-  const csvRows = [headers.join(';')];
-  sorted.forEach(r => {
-    const row = [
-      r.annotId, r.profese||'', r.popisek||'', r.levelName,
-      r.priorita||'', r.status||'', r.prirazeno||'',
-      r.createdAt ? r.createdAt.slice(0,10) : ''
-    ].map(v => '"' + String(v).replace(/"/g,'""') + '"');
-    csvRows.push(row.join(';'));
-  });
-  const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'ukoly-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 // ============================================================
@@ -8321,6 +8135,36 @@ function _beaconSave() {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
 window.addEventListener('pagehide', _beaconSave);
+
+// ============================================================
+// MOBILE RIGHT PANEL TOGGLE
+// ============================================================
+(function initMobRightPanel() {
+  const panel    = document.getElementById('right-panel');
+  const backdrop = document.getElementById('right-panel-backdrop');
+  const closeBtn = document.getElementById('right-panel-toggle-mob');
+  const openBtn  = document.getElementById('mob-props-open-btn');
+
+  function open()  { panel.classList.add('mob-open');    backdrop.classList.add('visible');    if (openBtn) openBtn.style.display = 'none'; }
+  function close() { panel.classList.remove('mob-open'); backdrop.classList.remove('visible'); if (openBtn) openBtn.style.display = ''; }
+
+  if (closeBtn)  closeBtn.addEventListener('click', close);
+  if (backdrop)  backdrop.addEventListener('click', close);
+  if (openBtn)   openBtn.addEventListener('click', open);
+
+  // Auto-open panel when an annotation is selected on mobile
+  const origOnObjectSelected = window.onObjectSelected;
+  document.addEventListener('annotation-selected', () => {
+    if (window.innerWidth <= 768) open();
+  });
+})();
 </script>
+
+<button id="mob-props-open-btn" title="Vlastnosti anotace">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+</button>
 </body>
 </html>
