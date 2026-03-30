@@ -42,6 +42,22 @@ if (!$projectId) jsonError('Chybí project_id');
 $membership = getProjectMembership($projectId, $userId);
 if (!$membership) jsonError('Nemáš přístup k tomuto projektu', 403);
 
+// Pomocné funkce pro (de)kompresi – JSON se komprimuje 5-10×, čímž obchází max_allowed_packet
+function _compress(string $json): string {
+    return base64_encode(gzencode($json, 6));
+}
+function _decompress(string $val): string {
+    // Detekce: base64(gzip) začíná "H4s"
+    if (str_starts_with($val, 'H4s')) {
+        $decoded = base64_decode($val, true);
+        if ($decoded !== false) {
+            $inflated = gzdecode($decoded);
+            if ($inflated !== false) return $inflated;
+        }
+    }
+    return $val; // starý nekomprimovaný formát
+}
+
 // ============================================================
 // GET – načti canvas data projektu
 // ============================================================
@@ -57,8 +73,8 @@ if ($method === 'GET') {
     }
 
     jsonOk([
-        'state'   => json_decode($row['state_json'],  true),
-        'profese' => $row['profese_json'] ? json_decode($row['profese_json'], true) : null,
+        'state'   => json_decode(_decompress($row['state_json']),  true),
+        'profese' => $row['profese_json'] ? json_decode(_decompress($row['profese_json']), true) : null,
         'counter' => (int)($row['annot_counter'] ?? 1),
     ]);
 }
@@ -75,13 +91,17 @@ if ($method === 'POST') {
 
     if ($state === null) jsonError('Chybí state');
 
-    // Odfiltruj backgroundImage z levels před uložením (příliš velká data)
+    // Odfiltruj backgroundImage z levels (příliš velká data)
     if (isset($state['levels']) && is_array($state['levels'])) {
         foreach ($state['levels'] as &$lvl) {
             unset($lvl['backgroundImage'], $lvl['backgroundImageOriginal']);
         }
         unset($lvl);
     }
+
+    // Komprimuj JSON před uložením (obchází MySQL max_allowed_packet)
+    $stateCompressed   = _compress(json_encode($state,   JSON_UNESCAPED_UNICODE));
+    $proteseCompressed = $profese !== null ? _compress(json_encode($profese, JSON_UNESCAPED_UNICODE)) : null;
 
     getDB()->prepare('
         INSERT INTO plan_canvas_data (project_id, state_json, profese_json, annot_counter)
@@ -91,12 +111,7 @@ if ($method === 'POST') {
             profese_json  = VALUES(profese_json),
             annot_counter = VALUES(annot_counter),
             updated_at    = NOW()
-    ')->execute([
-        $projectId,
-        json_encode($state,   JSON_UNESCAPED_UNICODE),
-        $profese !== null ? json_encode($profese, JSON_UNESCAPED_UNICODE) : null,
-        $counter,
-    ]);
+    ')->execute([$projectId, $stateCompressed, $proteseCompressed, $counter]);
 
     jsonOk();
 }
