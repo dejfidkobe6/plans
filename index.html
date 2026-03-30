@@ -3151,9 +3151,11 @@ function removeLevel(idx) {
 }
 
 function switchLevel(idx) {
-  // Save current canvas state
+  // Save current canvas state (strip background — saved separately)
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
+    _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
+    appState.levels[appState.activeLevel].fabricJSON = _j;
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   }
 
@@ -7844,6 +7846,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // auth screen je viditelný dokud se uživatel nepřihlásí
 });
+
+// Uložení při zavření / přepnutí záložky (sendBeacon = funguje i při zavírání stránky)
+function _beaconSave() {
+  if (!currentProject) return;
+  saveCurrentLevel();
+  clearTimeout(_srvTimer);
+  const body = JSON.stringify({
+    state:   _buildStateObj(),
+    profese: appState.profese,
+    counter: annotIdCounter
+  });
+  const blob = new Blob([body], { type: 'application/json' });
+  navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
+window.addEventListener('pagehide', _beaconSave);
 </script>
 </body>
 </html>
