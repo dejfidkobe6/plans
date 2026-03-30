@@ -3153,7 +3153,7 @@ function removeLevel(idx) {
 function switchLevel(idx) {
   // Save current canvas state
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   }
 
@@ -4827,7 +4827,7 @@ function drawGrid() {
 // UNDO / REDO
 // ============================================================
 function pushUndoState() {
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   undoStack.push(JSON.stringify(json));
   if (undoStack.length > 50) undoStack.shift();
   redoStack = [];
@@ -4835,7 +4835,7 @@ function pushUndoState() {
 
 function undo() {
   if (undoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
@@ -4847,7 +4847,7 @@ function undo() {
 
 function redo() {
   if (redoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
@@ -6715,9 +6715,9 @@ function exportTasksCSV() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   // Strip background image object from fabricJSON — saved separately to IndexedDB
-  json.objects = (json.objects || []).filter(o => !o.isBackground);
+  json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
   appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   // Save background images to IndexedDB + server
