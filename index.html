@@ -473,6 +473,28 @@ canvas#fabric-canvas { display: block; }
 #de-crop-btn:hover, #de-replace-btn:hover { color: var(--text-bright); background: var(--panel); }
 #de-remove-btn { color: #c0392b; border-color: #c0392b44; margin-bottom: 14px; }
 #de-remove-btn:hover { background: #c0392b22; color: #e74c3c; }
+/* ---- Move overlay ---- */
+#move-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 45; display: none; pointer-events: none;
+}
+#move-overlay.active { display: block; }
+#move-info {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.75); color: #fff; font-size: 12px;
+  padding: 5px 14px; border-radius: 5px; pointer-events: none; white-space: nowrap;
+  font-family: var(--font-main);
+}
+#move-actions {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; pointer-events: auto;
+}
+#move-done-btn {
+  padding: 7px 18px; border-radius: 6px; border: none; cursor: pointer;
+  font-family: var(--font-main); font-size: 13px; font-weight: 600;
+  background: var(--olive); color: #fff;
+}
+#move-done-btn:hover { background: var(--olive-hover); }
 /* ---- Crop overlay ---- */
 #crop-overlay {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -2479,6 +2501,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <button id="de-reset-btn">Resetovat</button>
         <button id="de-apply-btn">Použít</button>
       </div>
+      <button id="de-move-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+        Posunout výkres
+      </button>
       <button id="de-crop-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M6 2v14h14M2 6h14v14"/></svg>
         Oříznout výkres
@@ -2493,6 +2519,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       </button>
       <input type="file" id="de-replace-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
     </div>
+    <!-- MOVE OVERLAY (reposition drawing) -->
+    <div id="move-overlay">
+      <div id="move-info">Přetáhněte výkres pro přemístění</div>
+      <div id="move-actions">
+        <button id="move-done-btn">✓ Hotovo</button>
+      </div>
+    </div>
+
     <!-- CROP OVERLAY -->
     <div id="crop-overlay">
       <div class="crop-dim" id="crop-dim-t"></div>
@@ -3302,25 +3336,25 @@ async function loadImage(file, levelIdx) {
 
 function loadBackgroundImage(dataUrl, fit) {
   fabric.Image.fromURL(dataUrl, (img) => {
+    const level = appState.levels[appState.activeLevel];
     const cw = fabricCanvas.getWidth();
     const ch = fabricCanvas.getHeight();
     const scaleX = cw / img.width;
     const scaleY = ch / img.height;
     const scale = Math.min(scaleX, scaleY) * 0.95;
 
+    // Použij uloženou pozici při přepínání podlaží; při novém nahrání vždy vycentruj
+    const left = (!fit && level && level.bgLeft !== undefined) ? level.bgLeft : (cw - img.width * scale) / 2;
+    const top  = (!fit && level && level.bgTop  !== undefined) ? level.bgTop  : (ch - img.height * scale) / 2;
+
     img.set({
-      left: (cw - img.width * scale) / 2,
-      top: (ch - img.height * scale) / 2,
-      scaleX: scale,
-      scaleY: scale,
-      selectable: false,
-      evented: false,
-      lockMovementX: true,
-      lockMovementY: true,
-      hasControls: false,
-      hasBorders: false,
-      name: '__background__',
-      isBackground: true
+      left, top,
+      scaleX: scale, scaleY: scale,
+      selectable: false, evented: false,
+      lockMovementX: true, lockMovementY: true,
+      lockScalingX: true, lockScalingY: true, lockRotation: true,
+      hasControls: false, hasBorders: false,
+      name: '__background__', isBackground: true
     });
 
     // Remove old background
@@ -3439,6 +3473,45 @@ function exitCropMode() {
   document.getElementById('crop-overlay').classList.remove('active');
 }
 
+// ============================================================
+// MOVE MODE – přemístění výkresu
+// ============================================================
+let moveModeActive = false;
+
+function enterMoveMode() {
+  const level = appState.levels[appState.activeLevel];
+  if (!level || !level.backgroundImage) return;
+  closeDrawingEditor();
+  moveModeActive = true;
+  const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+  if (bgObj) {
+    bgObj.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false, hasBorders: true });
+    // Dočasně znepřístupni ostatní objekty
+    fabricCanvas.getObjects().forEach(o => { if (!o.isBackground) { o._moveSave = o.selectable; o.selectable = false; } });
+    fabricCanvas.setActiveObject(bgObj);
+    fabricCanvas.defaultCursor = 'move';
+    fabricCanvas.renderAll();
+  }
+  document.getElementById('move-overlay').classList.add('active');
+}
+
+function exitMoveMode() {
+  if (!moveModeActive) return;
+  moveModeActive = false;
+  const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+  if (bgObj) {
+    const level = appState.levels[appState.activeLevel];
+    if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; }
+    bgObj.set({ selectable: false, evented: false, lockMovementX: true, lockMovementY: true, hasBorders: false });
+    fabricCanvas.discardActiveObject();
+  }
+  fabricCanvas.getObjects().forEach(o => { if (o._moveSave !== undefined) { o.selectable = o._moveSave; delete o._moveSave; } });
+  fabricCanvas.defaultCursor = 'default';
+  fabricCanvas.renderAll();
+  document.getElementById('move-overlay').classList.remove('active');
+  saveCurrentLevel();
+}
+
 function _updateCropUI(x, y, w, h) {
   const area = document.getElementById('canvas-area');
   const TW = area.offsetWidth, TH = area.offsetHeight;
@@ -3546,6 +3619,8 @@ function setupDrawingEditor() {
   document.getElementById('drawing-edit-close').addEventListener('click', closeDrawingEditor);
   document.getElementById('de-apply-btn').addEventListener('click', applyDrawingAdjustments);
   document.getElementById('de-reset-btn').addEventListener('click', resetDrawingAdjustments);
+  document.getElementById('de-move-btn').addEventListener('click', enterMoveMode);
+  document.getElementById('move-done-btn').addEventListener('click', exitMoveMode);
   document.getElementById('de-crop-btn').addEventListener('click', enterCropMode);
   document.getElementById('de-replace-btn').addEventListener('click', () => {
     document.getElementById('de-replace-input').click();
@@ -4365,6 +4440,7 @@ function onKeyDown(e) {
     }
   }
   if (e.key === 'Escape') {
+    if (moveModeActive) { exitMoveMode(); return; }
     if (cropState) { exitCropMode(); return; }
     if (appState.tool === 'polygon' && polyPoints.length > 0) {
       cancelPolygon();
@@ -6629,8 +6705,12 @@ function saveCurrentLevel() {
   // Save background images to IndexedDB + server
   const pid = currentProject ? String(currentProject.id) : '_default';
   const lvl = appState.levels[appState.activeLevel];
+  // Save bgLeft/bgTop from current fabric object
+  const _bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+  if (_bgObj) { lvl.bgLeft = _bgObj.left; lvl.bgTop = _bgObj.top; }
   bgDBSave(pid, lvl.id, lvl.backgroundImage || null, lvl.backgroundImageOriginal || null);
-  if (currentProject && lvl.backgroundImage) {
+  // Upload to server only if it's a data URL (not already a server URL)
+  if (currentProject && lvl.backgroundImage && lvl.backgroundImage.startsWith('data:')) {
     _serverSaveBg(currentProject.id, lvl.id, lvl.backgroundImage, lvl.backgroundImageOriginal || null);
   }
 
@@ -6698,12 +6778,44 @@ async function bgDBLoadAll(pid, levels) {
   }
 }
 
-function _serverSaveBg(projectId, levelId, dataUrl, originalUrl) {
-  apiFetch(`api/background.php?project_id=${projectId}&level_id=${encodeURIComponent(levelId)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dataUrl, originalUrl: originalUrl || null })
-  }).catch(() => {});
+function _dataUrlToBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',');
+  const mime = (header.match(/:(.*?);/) || ['','image/jpeg'])[1];
+  const binary = atob(b64);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+async function _serverSaveBg(projectId, levelId, dataUrl, originalUrl) {
+  const url = `api/background.php?project_id=${projectId}&level_id=${encodeURIComponent(levelId)}`;
+  if (!dataUrl) {
+    fetch(url, { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+    const level = appState.levels.find(l => l.id === levelId);
+    if (level) { level.bgServerUrl = null; level.bgOrigServerUrl = null; }
+    return;
+  }
+  try {
+    const fd = new FormData();
+    fd.append('image', _dataUrlToBlob(dataUrl), dataUrl.startsWith('data:image/png') ? 'image.png' : 'image.jpg');
+    if (originalUrl && originalUrl !== dataUrl) {
+      fd.append('original', _dataUrlToBlob(originalUrl), originalUrl.startsWith('data:image/png') ? 'original.png' : 'original.jpg');
+    }
+    const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && json.url) {
+        const level = appState.levels.find(l => l.id === levelId);
+        if (level) { level.bgServerUrl = json.url; level.bgOrigServerUrl = json.origUrl || json.url; }
+        clearTimeout(_srvTimer);
+        _srvTimer = setTimeout(_serverSaveNow, 500); // persist bgServerUrl in canvas state
+      }
+    } else {
+      showToast('Chyba nahrávání výkresu na server: HTTP ' + res.status, 'error');
+    }
+  } catch(e) {
+    console.error('Background upload failed:', e);
+  }
 }
 
 let saveTimer = null;
@@ -6720,7 +6832,10 @@ function _buildStateObj() {
       annotations: l.annotations,
       fabricJSON: l.fabricJSON,
       viewportTransform: l.viewportTransform,
-      hasBackground: !!l.backgroundImage,
+      bgLeft: l.bgLeft, bgTop: l.bgTop,
+      bgServerUrl: l.bgServerUrl || null,
+      bgOrigServerUrl: l.bgOrigServerUrl || null,
+      hasBackground: !!l.backgroundImage || !!l.bgServerUrl,
       color3D: l.color3D, shape3D: l.shape3D
     })),
     activeLevel: appState.activeLevel,
@@ -7566,9 +7681,16 @@ async function openProject(proj) {
   if (appState.levels.length === 0) {
     addLevel('1.NP', '1.NP');
   } else {
-    // Obnov obrázky pozadí z IndexedDB
     const pid = String(proj.id);
+    // Obnov obrázky z IndexedDB (lokální cache)
     await bgDBLoadAll(pid, appState.levels);
+    // Pro podlaží bez lokální kopie použij URL ze serveru
+    appState.levels.forEach(lvl => {
+      if (!lvl.backgroundImage && lvl.bgServerUrl) {
+        lvl.backgroundImage = lvl.bgServerUrl;
+        lvl.backgroundImageOriginal = lvl.bgOrigServerUrl || lvl.bgServerUrl;
+      }
+    });
     renderLevelTabs();
     switchLevel(appState.activeLevel);
   }
