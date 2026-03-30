@@ -3153,7 +3153,7 @@ function removeLevel(idx) {
 function switchLevel(idx) {
   // Save current canvas state
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+    appState.levels[appState.activeLevel].fabricJSON = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   }
 
@@ -3968,19 +3968,6 @@ function setupEventListeners() {
       return;
     }
 
-    if (e.button === 1) {
-      // Middle mouse button – pan
-      e.preventDefault();
-      isPanning = true;
-      panStartX = e.clientX;
-      panStartY = e.clientY;
-      lastViewportX = cw.viewportTransform[4];
-      lastViewportY = cw.viewportTransform[5];
-      cw.defaultCursor = 'grabbing';
-      cw.renderAll();
-      return;
-    }
-
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
       panStartX = e.clientX;
@@ -4231,10 +4218,34 @@ function setupEventListeners() {
     setTool('select');
   });
 
-  // Middle mouse button: prevent browser autoscroll icon
+  // Middle mouse button pan (native events – Fabric.js doesn't fire mouse:down for button 1)
+  let _midPanning = false, _midStartX = 0, _midStartY = 0, _midVptX = 0, _midVptY = 0;
   const wrapper = document.getElementById('canvas-wrapper');
   wrapper.addEventListener('mousedown', (e) => {
-    if (e.button === 1) e.preventDefault();
+    if (e.button !== 1) return;
+    e.preventDefault();
+    _midPanning = true;
+    _midStartX = e.clientX;
+    _midStartY = e.clientY;
+    _midVptX = cw.viewportTransform[4];
+    _midVptY = cw.viewportTransform[5];
+    cw.defaultCursor = 'grabbing';
+    cw.renderAll();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!_midPanning) return;
+    const vpt = cw.viewportTransform.slice();
+    vpt[4] = _midVptX + (e.clientX - _midStartX);
+    vpt[5] = _midVptY + (e.clientY - _midStartY);
+    cw.setViewportTransform(vpt);
+    cw.renderAll();
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button !== 1 || !_midPanning) return;
+    _midPanning = false;
+    cw.defaultCursor = appState.tool === 'pan' ? 'grab' : 'default';
+    cw.renderAll();
+    saveCurrentLevel();
   });
 
   // Wheel zoom
@@ -4827,7 +4838,7 @@ function drawGrid() {
 // UNDO / REDO
 // ============================================================
 function pushUndoState() {
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   undoStack.push(JSON.stringify(json));
   if (undoStack.length > 50) undoStack.shift();
   redoStack = [];
@@ -4835,7 +4846,7 @@ function pushUndoState() {
 
 function undo() {
   if (undoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
@@ -4847,7 +4858,7 @@ function undo() {
 
 function redo() {
   if (redoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
@@ -6715,9 +6726,9 @@ function exportTasksCSV() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline']);
+  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
   // Strip background image object from fabricJSON — saved separately to IndexedDB
-  json.objects = (json.objects || []).filter(o => !o.isBackground);
+  json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
   appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   // Save background images to IndexedDB + server
