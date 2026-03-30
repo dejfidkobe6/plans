@@ -72,20 +72,28 @@ if ($method === 'POST') {
         $db = getDB();
 
         // Zkontroluj zda uživatel není již členem
-        $check = $db->prepare('SELECT pm.id FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND u.email = ?');
+        $check = $db->prepare('SELECT pm.id FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND LOWER(u.email) = ?');
         $check->execute([$projectId, $email]);
         if ($check->fetch()) jsonError('Uživatel je již členem projektu');
 
-        // Vytvoř/obnov pozvánku (ON DUPLICATE KEY = unikátní klíč project_id+invited_email)
+        // Vytvoř nebo obnov pozvánku (bez spoléhání na UNIQUE constraint)
         $token     = bin2hex(random_bytes(32));
         $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-        $db->prepare(
-            'INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at)
-             VALUES (?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE token=VALUES(token), expires_at=VALUES(expires_at),
-             invited_by=VALUES(invited_by), role=VALUES(role), status="pending"'
-        )->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
+        // Zkus nejdřív aktualizovat existující čekající pozvánku
+        $upd = $db->prepare(
+            'UPDATE invitations SET token=?, expires_at=?, invited_by=?, role=?, status="pending"
+             WHERE project_id=? AND invited_email=? AND status="pending" LIMIT 1'
+        );
+        $upd->execute([$token, $expiresAt, $userId, $role, $projectId, $email]);
+
+        if ($upd->rowCount() === 0) {
+            // Žádná existující – vlož novou
+            $db->prepare(
+                'INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at)
+                 VALUES (?,?,?,?,?,?)'
+            )->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
+        }
 
         // Odešli email pokud je Brevo nakonfigurovaný
         $mailSent = false;

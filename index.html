@@ -4262,6 +4262,52 @@ function setupEventListeners() {
     cw.renderAll();
   }, { passive: false });
 
+  // Touch – two-finger pan (and pinch-zoom)
+  let _touch2 = null; // { x, y, dist, vptX, vptY, zoom }
+  wrapper.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const mx = (t0.clientX + t1.clientX) / 2;
+      const my = (t0.clientY + t1.clientY) / 2;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      _touch2 = { x: mx, y: my, dist, vptX: cw.viewportTransform[4], vptY: cw.viewportTransform[5], zoom: cw.getZoom() };
+    } else {
+      _touch2 = null;
+    }
+  }, { passive: false });
+  wrapper.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && _touch2) {
+      e.preventDefault();
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const mx = (t0.clientX + t1.clientX) / 2;
+      const my = (t0.clientY + t1.clientY) / 2;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      // Pan
+      const vpt = cw.viewportTransform.slice();
+      vpt[4] = _touch2.vptX + (mx - _touch2.x);
+      vpt[5] = _touch2.vptY + (my - _touch2.y);
+      // Pinch zoom
+      const newZoom = Math.min(Math.max(_touch2.zoom * (dist / _touch2.dist), 0.05), 20);
+      const wRect = wrapper.getBoundingClientRect();
+      const ox = mx - wRect.left;
+      const oy = my - wRect.top;
+      vpt[4] = ox - (ox - vpt[4]) * (newZoom / cw.getZoom());
+      vpt[5] = oy - (oy - vpt[5]) * (newZoom / cw.getZoom());
+      vpt[0] = newZoom; vpt[3] = newZoom;
+      cw.setViewportTransform(vpt);
+      updateZoomDisplay();
+      updateAllLabelScales();
+      cw.renderAll();
+    }
+  }, { passive: false });
+  wrapper.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2 && _touch2) {
+      _touch2 = null;
+      saveCurrentLevel();
+    }
+  });
+
   // Keyboard
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
@@ -6906,7 +6952,7 @@ async function _serverSaveNow() {
       console.error('Server save failed:', data?.error);
       showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
     }
-  } catch(e) { /* síťová chyba – data jsou v localStorage */ }
+  } catch(e) { console.error('Server save error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
 }
 
 // ---- Server load ----
@@ -7616,6 +7662,12 @@ async function doLogout() {
 // --- Project Screen ---
 async function showProjectScreen() {
   if (!currentUser) return;
+  // Flush pending save before leaving canvas
+  if (currentProject && fabricCanvas) {
+    saveCurrentLevel();
+    clearTimeout(_srvTimer);
+    await _serverSaveNow();
+  }
   document.getElementById('ps-user-label').textContent = currentUser.name + ' (' + currentUser.email + ')';
   await renderProjectGrid();
   document.getElementById('project-screen').classList.remove('hidden');
@@ -7677,6 +7729,13 @@ async function doCreateProject() {
 
 // --- Open Project ---
 async function openProject(proj) {
+  // Flush pending save for current project BEFORE switching
+  if (currentProject && fabricCanvas) {
+    saveCurrentLevel();
+    clearTimeout(_srvTimer);
+    await _serverSaveNow();
+  }
+
   currentProject = proj;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
