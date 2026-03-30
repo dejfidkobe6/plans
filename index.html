@@ -3309,8 +3309,10 @@ function removeLevel(idx) {
 }
 
 function switchLevel(idx) {
-  // Save current canvas state (strip background — saved separately)
-  if (fabricCanvas && appState.levels[appState.activeLevel]) {
+  // Save current canvas state ONLY when actually switching away from a different level.
+  // If idx === appState.activeLevel (e.g. during openProject after server load), the
+  // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
+  if (fabricCanvas && appState.activeLevel !== idx && appState.levels[appState.activeLevel]) {
     const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','isBackground']);
     _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
     appState.levels[appState.activeLevel].fabricJSON = _j;
@@ -4664,7 +4666,7 @@ function onKeyDown(e) {
     if (e.key === 'c') { e.preventDefault(); copySelected(); return; }
     if (e.key === 'v') { e.preventDefault(); pasteSelected(); return; }
     if (e.key === 'a') { e.preventDefault(); fabricCanvas.discardActiveObject(); fabricCanvas.getObjects().filter(o => !o.isBackground).forEach(o => fabricCanvas.setActiveObject(o)); fabricCanvas.renderAll(); return; }
-    if (e.key === 's') { e.preventDefault(); if (currentProject) { saveCurrentLevel(); _flushSave(); showToast('Projekt uložen', 'success'); } return; }
+    if (e.key === 's') { e.preventDefault(); if (currentProject) { saveCurrentLevel(); _flushSave(); clearTimeout(_srvTimer); _serverSaveNow().then(() => showToast('Projekt uložen', 'success')); } return; }
   }
 
   const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon' };
