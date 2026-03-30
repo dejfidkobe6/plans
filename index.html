@@ -8137,6 +8137,33 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pagehide', _beaconSave);
 
 // ============================================================
+// SERVICE WORKER
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// Offline / online indikátor
+(function initOfflineIndicator() {
+  const bar = document.createElement('div');
+  bar.id = 'offline-bar';
+  bar.textContent = '⚠ Jste offline – výkresy jsou načteny z mezipaměti, uložení není dostupné';
+  bar.style.cssText = [
+    'display:none','position:fixed','bottom:0','left:0','right:0','z-index:9999',
+    'background:#7f1d1d','color:#fecaca','font-size:12px','font-family:monospace',
+    'padding:6px 16px','text-align:center','border-top:1px solid #991b1b'
+  ].join(';');
+  document.body.appendChild(bar);
+
+  function update() {
+    bar.style.display = navigator.onLine ? 'none' : 'block';
+  }
+  window.addEventListener('online',  update);
+  window.addEventListener('offline', update);
+  update();
+})();
+
+// ============================================================
 // MOBILE RIGHT PANEL TOGGLE
 // ============================================================
 (function initMobRightPanel() {
