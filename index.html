@@ -4153,15 +4153,14 @@ function findLabel(annotId) {
 
 function positionLabel(label, obj) {
   if (!label || !obj) return;
-  const zoom = fabricCanvas.getZoom();
   const c = obj.getCenterPoint();
-  const lw = label.width  || 80;
-  const lh = label.height || 34;
+  const lw = (label.width  || 80);
+  const lh = (label.height || 34);
   label.set({
-    left: c.x - lw / (2 * zoom),
-    top:  c.y - lh / (2 * zoom),
-    scaleX: 1 / zoom,
-    scaleY: 1 / zoom,
+    left: c.x - lw / 2,
+    top:  c.y - lh - 8,
+    scaleX: 1,
+    scaleY: 1,
     originX: 'left',
     originY: 'top'
   });
@@ -4172,7 +4171,7 @@ function createAnnotLabel(obj) {
   const zoom  = fabricCanvas.getZoom();
   const color = getAnnotColor(obj);
 
-  const FONT1 = 12, FONT2 = 11, FONT3 = 10;
+  const FONT1 = 10, FONT2 = 9, FONT3 = 8;
   const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
   const fontOpts = 'IBM Plex Mono, monospace';
 
@@ -4218,11 +4217,11 @@ function createAnnotLabel(obj) {
 
   const group = new fabric.Group(items, {
     left: obj.left || 0,
-    top: (obj.top || 0) - H - 6,
+    top: (obj.top || 0) - H - 8,
     selectable: false, evented: false,
     hasControls: false, hasBorders: false,
     annotLabelFor: obj.annotId,
-    scaleX: 1 / zoom, scaleY: 1 / zoom,
+    scaleX: 1, scaleY: 1,
     originX: 'left', originY: 'top'
   });
 
