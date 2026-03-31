@@ -13,6 +13,9 @@
 <script src="https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -8207,5 +8210,44 @@ if ('serviceWorker' in navigator) {
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
   </svg>
 </button>
+<script>
+// ============================================================
+// FLATPICKR – datepicker s pondělím jako prvním dnem
+// ============================================================
+(function initDatepickers() {
+  const FP_OPTS = {
+    locale: { firstDayOfWeek: 1, weekdays: { shorthand: ['Ne','Po','Út','St','Čt','Pá','So'], longhand: ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'] }, months: { shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'], longhand: ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'] } },
+    dateFormat: 'Y-m-d',
+    allowInput: true,
+    disableMobile: false
+  };
+
+  function initFP(el) {
+    if (!el || el._flatpickr) return;
+    flatpickr(el, {
+      ...FP_OPTS,
+      onChange: function(selectedDates, dateStr) {
+        // Trigger native change event so existing listeners fire
+        el.value = dateStr;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+      }
+    });
+  }
+
+  function initAll() {
+    ['prop-date-from','prop-deadline','ae-date-from','ae-deadline',
+     'afilter-deadline-from','afilter-deadline-to'].forEach(id => {
+      initFP(document.getElementById(id));
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+})();
+</script>
 </body>
 </html>
