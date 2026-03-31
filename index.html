@@ -6748,14 +6748,18 @@ function closePDFExport() {
 async function renderLevelToImage(levelIdx) {
   const level = appState.levels[levelIdx];
   if (!level || !level.backgroundImage) return null;
-
   if (levelIdx === appState.activeLevel) saveCurrentLevel();
 
   return new Promise(resolve => {
-    fabric.Image.fromURL(level.backgroundImage, img => {
-      if (!img || !img.width || !img.height) { resolve(null); return; }
+    // Load image via native Image element to reliably get dimensions
+    const htmlImg = new Image();
+    htmlImg.onerror = () => resolve(null);
+    htmlImg.onload = () => {
+      const imgW = htmlImg.naturalWidth || htmlImg.width;
+      const imgH = htmlImg.naturalHeight || htmlImg.height;
+      if (!imgW || !imgH) { resolve(null); return; }
 
-      // Determine stored bg position/scale
+      // Determine bg position/scale
       let bgSX, bgSY, bgL, bgT;
       if (levelIdx === appState.activeLevel) {
         const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
@@ -6766,14 +6770,14 @@ async function renderLevelToImage(levelIdx) {
       }
       if (bgSX === undefined) {
         const cw = fabricCanvas.getWidth(), ch = fabricCanvas.getHeight();
-        bgSX = bgSY = Math.min(cw / img.width, ch / img.height) * 0.95;
-        bgL = (cw - img.width  * bgSX) / 2;
-        bgT = (ch - img.height * bgSY) / 2;
+        bgSX = bgSY = Math.min(cw / imgW, ch / imgH) * 0.95;
+        bgL = (cw - imgW * bgSX) / 2;
+        bgT = (ch - imgH * bgSY) / 2;
       }
 
       const MAX_W = 2400;
-      const rawW  = Math.max(1, Math.round(img.width  * bgSX));
-      const rawH  = Math.max(1, Math.round(img.height * bgSY));
+      const rawW  = Math.max(1, Math.round(imgW * bgSX));
+      const rawH  = Math.max(1, Math.round(imgH * bgSY));
       const ratio = Math.min(1, MAX_W / rawW);
       const renderW = Math.round(rawW * ratio);
       const renderH = Math.round(rawH * ratio);
@@ -6787,46 +6791,20 @@ async function renderLevelToImage(levelIdx) {
         ? appState.levels[appState.activeLevel].fabricJSON
         : level.fabricJSON;
 
-      // Called AFTER loadFromJSON (which clears canvas) – insert bg + ID labels here
-      const finish = () => {
-        img.set({ left: 0, top: 0, scaleX: bgSX * ratio, scaleY: bgSY * ratio,
-                  selectable: false, evented: false, isBackground: true });
-        fc.insertAt(img, 0);
-
-        // Add annotation ID number labels above each annotation symbol
-        const fontSize = Math.max(9, Math.round(11 * ratio));
-        fc.getObjects().filter(o => o.annotId && !o.annotLabelFor && !o.isBackground).forEach(o => {
-          const br = o.getBoundingRect();
-          const cx = br.left + br.width / 2;
-          const ty = br.top - 2;
-          const label = new fabric.Text(o.annotId || '', {
-            left: cx, top: ty,
-            originX: 'center', originY: 'bottom',
-            fontSize,
-            fontFamily: 'Arial, sans-serif',
-            fontWeight: 'bold',
-            fill: '#ffffff',
-            stroke: '#000000',
-            strokeWidth: Math.max(1, ratio * 1.5),
-            paintFirst: 'stroke',
-            selectable: false, evented: false
-          });
-          fc.add(label);
-        });
-
-        fc.renderAll();
-        try {
-          const dataUrl = fc.toDataURL({ format: 'png' });
-          resolve(dataUrl && dataUrl.length > 500 ? dataUrl : null);
-        } catch(e) { console.error('toDataURL failed:', e); resolve(null); }
-        fc.dispose();
-        tempEl.remove();
+      // Build combined JSON: background image as first object, then annotations.
+      // Passing bg inside loadFromJSON lets fabric.js handle async image loading correctly.
+      const bgObjJSON = {
+        type: 'image', version: '5.3.1',
+        src: level.backgroundImage,
+        left: 0, top: 0,
+        scaleX: bgSX * ratio, scaleY: bgSY * ratio,
+        angle: 0, opacity: 1,
+        selectable: false, evented: false,
+        isBackground: true, name: '__background__'
       };
 
-      if (srcJSON && srcJSON.objects && srcJSON.objects.length > 0) {
-        const adjusted = {
-          ...srcJSON,
-          objects: srcJSON.objects
+      const annotObjsJSON = (srcJSON && srcJSON.objects)
+        ? srcJSON.objects
             .filter(o => !o.isBackground && !o.annotLabelFor)
             .map(o => ({
               ...o,
@@ -6835,12 +6813,38 @@ async function renderLevelToImage(levelIdx) {
               scaleX: (o.scaleX  || 1) * ratio,
               scaleY: (o.scaleY  || 1) * ratio
             }))
-        };
-        fc.loadFromJSON(adjusted, finish);
-      } else {
-        finish();
-      }
-    });
+        : [];
+
+      const combinedJSON = { version: '5.3.1', objects: [bgObjJSON, ...annotObjsJSON] };
+
+      fc.loadFromJSON(combinedJSON, () => {
+        // Add ID number labels above each annotation symbol
+        const fontSize = Math.max(9, Math.round(11 * ratio));
+        fc.getObjects()
+          .filter(o => o.annotId && !o.annotLabelFor && !o.isBackground)
+          .forEach(o => {
+            const br = o.getBoundingRect();
+            fc.add(new fabric.Text(o.annotId || '', {
+              left: br.left + br.width / 2, top: br.top - 2,
+              originX: 'center', originY: 'bottom',
+              fontSize, fontFamily: 'Arial, sans-serif', fontWeight: 'bold',
+              fill: '#ffffff', stroke: '#000000',
+              strokeWidth: Math.max(1, ratio * 1.5),
+              paintFirst: 'stroke',
+              selectable: false, evented: false
+            }));
+          });
+
+        fc.renderAll();
+        try {
+          const dataUrl = fc.toDataURL({ format: 'png' });
+          resolve(dataUrl && dataUrl.length > 500 ? dataUrl : null);
+        } catch (e) { console.error('export toDataURL:', e); resolve(null); }
+        fc.dispose();
+        tempEl.remove();
+      });
+    };
+    htmlImg.src = level.backgroundImage;
   });
 }
 
