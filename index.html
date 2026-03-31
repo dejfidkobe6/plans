@@ -401,6 +401,30 @@ body {
 }
 #sidebar-toggle:hover { color: var(--text-bright); background: var(--card); }
 
+/* Button to reopen sidebar when collapsed */
+#sidebar-open-btn {
+  display: none;
+  position: fixed;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  z-index: 200;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 5px 5px 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  width: 20px; height: 56px;
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  transition: background 0.15s, color 0.15s;
+}
+#sidebar-open-btn:hover { color: var(--text-bright); background: var(--card); }
+
 /* FILTERS */
 #filter-row {
   display: flex;
@@ -2679,6 +2703,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="prof-badges"></div>
   </div>
   <div class="panel-resize-handle" id="left-resize-handle" title="Táhněte pro změnu šířky"><span class="resize-grip"></span></div>
+  <button id="sidebar-open-btn" title="Zobrazit panel anotací">›<br><span style="font-size:9px;letter-spacing:0.05em;">AN</span></button>
 
   <!-- CANVAS AREA -->
   <div id="canvas-area">
@@ -4732,14 +4757,23 @@ function setupEventListeners() {
   });
 
   // Sidebar toggle (button is now inside the panel header)
-  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  function setSidebarCollapsed(collapsed) {
     const sidebar = document.getElementById('left-sidebar');
     const handle  = document.getElementById('left-resize-handle');
     const toggle  = document.getElementById('sidebar-toggle');
-    const collapsed = sidebar.classList.toggle('collapsed');
+    const openBtn = document.getElementById('sidebar-open-btn');
+    sidebar.classList.toggle('collapsed', collapsed);
     toggle.textContent = collapsed ? '›' : '‹';
-    if (handle) handle.style.display = collapsed ? 'none' : '';
+    if (handle)  handle.style.display  = collapsed ? 'none' : '';
+    if (openBtn) openBtn.style.display = collapsed ? 'flex' : 'none';
     setTimeout(() => fabricCanvas && resizeCanvas(), 200);
+  }
+  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    const sidebar = document.getElementById('left-sidebar');
+    setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
+  });
+  document.getElementById('sidebar-open-btn').addEventListener('click', () => {
+    setSidebarCollapsed(false);
   });
 
   // ---- Panel resize handles ----
