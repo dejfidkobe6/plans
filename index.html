@@ -3336,7 +3336,7 @@ function switchLevel(idx) {
   // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
   if (fabricCanvas && appState.activeLevel !== idx && appState.levels[appState.activeLevel]) {
     const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-    _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
+    _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
     appState.levels[appState.activeLevel].fabricJSON = _j;
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   }
@@ -7006,8 +7006,8 @@ function setupAnotacePage() {
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
   const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-  // Strip background image object from fabricJSON — saved separately to IndexedDB
-  json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground);
+  // Strip background image and label overlay objects — labels are rebuilt on load
+  json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
   appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   // Save background images to IndexedDB + server
@@ -7143,7 +7143,7 @@ function _buildStateObj() {
       const fj = l.fabricJSON ? {
         ...l.fabricJSON,
         objects: (l.fabricJSON.objects || []).filter(
-          o => o.name !== '__background__' && !o.isBackground
+          o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor
         )
       } : null;
       return {
@@ -7186,6 +7186,18 @@ let _saving = false;
 async function _serverSaveNow() {
   if (!currentProject || _isProjectLoading || _saving) return;
   _saving = true;
+  // Capture active level canvas into appState before serialising
+  if (fabricCanvas && appState.levels[appState.activeLevel]) {
+    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
+    _snap.objects = (_snap.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
+    appState.levels[appState.activeLevel].fabricJSON = _snap;
+    // refresh annotations list for this level
+    appState.levels[appState.activeLevel].annotations = _snap.objects.filter(o => o.annotId).map(o => ({
+      annotId: o.annotId, profese: o.profese, popisek: o.popisek,
+      priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
+      createdAt: o.createdAt || null, deadline: o.deadline || null, dateFrom: o.dateFrom || null
+    }));
+  }
   try {
     let bodyStr;
     try {
