@@ -6749,12 +6749,13 @@ async function renderLevelToImage(levelIdx) {
   const level = appState.levels[levelIdx];
   if (!level || !level.backgroundImage) return null;
 
-  // Ensure active level state is current
   if (levelIdx === appState.activeLevel) saveCurrentLevel();
 
   return new Promise(resolve => {
     fabric.Image.fromURL(level.backgroundImage, img => {
-      // Determine stored bg position/scale for this level
+      if (!img || !img.width || !img.height) { resolve(null); return; }
+
+      // Determine stored bg position/scale
       let bgSX, bgSY, bgL, bgT;
       if (levelIdx === appState.activeLevel) {
         const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
@@ -6764,47 +6765,60 @@ async function renderLevelToImage(levelIdx) {
         bgSX = level.bgScaleX; bgSY = level.bgScaleY; bgL = level.bgLeft; bgT = level.bgTop;
       }
       if (bgSX === undefined) {
-        // Fallback: fit to standard A4-landscape-like canvas
-        const cw = 1600, ch = 1130;
+        const cw = fabricCanvas.getWidth(), ch = fabricCanvas.getHeight();
         bgSX = bgSY = Math.min(cw / img.width, ch / img.height) * 0.95;
         bgL = (cw - img.width  * bgSX) / 2;
         bgT = (ch - img.height * bgSY) / 2;
       }
 
-      // Canvas sized exactly to the rendered background image (max 2400px wide)
       const MAX_W = 2400;
-      const rawW = Math.round(img.width  * bgSX);
-      const rawH = Math.round(img.height * bgSY);
-      const ratio  = Math.min(1, MAX_W / rawW);
+      const rawW  = Math.max(1, Math.round(img.width  * bgSX));
+      const rawH  = Math.max(1, Math.round(img.height * bgSY));
+      const ratio = Math.min(1, MAX_W / rawW);
       const renderW = Math.round(rawW * ratio);
       const renderH = Math.round(rawH * ratio);
 
       const tempEl = document.createElement('canvas');
-      tempEl.width  = renderW;
-      tempEl.height = renderH;
+      tempEl.width = renderW; tempEl.height = renderH;
       document.body.appendChild(tempEl);
-
       const fc = new fabric.Canvas(tempEl, { backgroundColor: '#1a1f14', width: renderW, height: renderH });
 
-      // Background at (0,0) scaled to fit renderW/H
-      img.set({
-        left: 0, top: 0,
-        scaleX: bgSX * ratio, scaleY: bgSY * ratio,
-        selectable: false, evented: false, isBackground: true
-      });
-      fc.insertAt(img, 0);
-
-      // Load annotations shifted by (-bgL, -bgT) so they align with bg at origin
       const srcJSON = (levelIdx === appState.activeLevel)
         ? appState.levels[appState.activeLevel].fabricJSON
         : level.fabricJSON;
 
+      // Called AFTER loadFromJSON (which clears canvas) – insert bg + ID labels here
       const finish = () => {
+        img.set({ left: 0, top: 0, scaleX: bgSX * ratio, scaleY: bgSY * ratio,
+                  selectable: false, evented: false, isBackground: true });
+        fc.insertAt(img, 0);
+
+        // Add annotation ID number labels above each annotation symbol
+        const fontSize = Math.max(9, Math.round(11 * ratio));
+        fc.getObjects().filter(o => o.annotId && !o.annotLabelFor && !o.isBackground).forEach(o => {
+          const br = o.getBoundingRect();
+          const cx = br.left + br.width / 2;
+          const ty = br.top - 2;
+          const label = new fabric.Text(o.annotId || '', {
+            left: cx, top: ty,
+            originX: 'center', originY: 'bottom',
+            fontSize,
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold',
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeWidth: Math.max(1, ratio * 1.5),
+            paintFirst: 'stroke',
+            selectable: false, evented: false
+          });
+          fc.add(label);
+        });
+
         fc.renderAll();
         try {
           const dataUrl = fc.toDataURL({ format: 'png' });
-          resolve(dataUrl.length > 200 ? dataUrl : null);
-        } catch(e) { resolve(null); }
+          resolve(dataUrl && dataUrl.length > 500 ? dataUrl : null);
+        } catch(e) { console.error('toDataURL failed:', e); resolve(null); }
         fc.dispose();
         tempEl.remove();
       };
@@ -6832,37 +6846,50 @@ async function renderLevelToImage(levelIdx) {
 
 function renderAnnotListToPDF(pdf, anns, x, y, w, maxH) {
   const STATUS_COLORS = {
-    'Urgence':  [239, 68,  68],
+    'Urgence':   [239, 68,  68],
     'Nový úkol': [245, 158, 11],
-    'Probíhá': [59,  130, 246],
-    'Hotovo':   [16,  185, 129],
+    'Probíhá':   [59,  130, 246],
+    'Hotovo':    [16,  185, 129],
   };
+  const fmtD = d => {
+    if (!d) return null;
+    const p = d.split('-');
+    return p.length === 3 ? `${p[2]}.${p[1]}.${p[0].slice(2)}` : d;
+  };
+
+  // Column x-offsets (relative to x)
+  // dot(4) | ID(13) | Profese(22) | Popis(dynamic) | Termín(26) | Status(14)
+  const C_ID     = 5;
+  const C_PROF   = 19;
+  const C_POPIS  = 43;
+  const C_TERMIN = w - 40;
+  const C_STATUS = w - 14;
+  const POPIS_W  = C_TERMIN - C_POPIS - 2;
 
   pdf.setFontSize(7);
   pdf.setTextColor(160, 190, 100);
   pdf.setFont('helvetica', 'bold');
   pdf.text('ANOTACE', x, y + 4);
 
-  // Column headers
   const hy = y + 9;
-  pdf.setFontSize(6); pdf.setTextColor(100, 115, 85);
-  pdf.text('ID',       x + 4,      hy);
-  pdf.text('Profese',  x + 16,     hy);
-  pdf.text('Popis',    x + 38,     hy);
-  pdf.text('Přiřazeno', x + w - 32, hy);
-  pdf.text('Status',   x + w - 14, hy);
+  pdf.setFontSize(5.5); pdf.setTextColor(100, 115, 85);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('ID',       x + C_ID,     hy);
+  pdf.text('Profese',  x + C_PROF,   hy);
+  pdf.text('Popis',    x + C_POPIS,  hy);
+  pdf.text('Termín',   x + C_TERMIN, hy);
+  pdf.text('Status',   x + C_STATUS, hy);
   pdf.setDrawColor(55, 65, 40);
   pdf.line(x, hy + 1.5, x + w, hy + 1.5);
 
   let curY = hy + 6;
-  const ROW_H = 7.5;
+  const ROW_H = 8;
   const maxY  = y + maxH - 2;
 
   for (const ann of anns) {
     if (curY + ROW_H > maxY) {
       pdf.setFontSize(6); pdf.setTextColor(100, 110, 85);
-      pdf.text('…', x, curY + 3);
-      break;
+      pdf.text('…', x, curY + 3); break;
     }
     const isUrgent = ann.status === 'Urgence';
     const sc = STATUS_COLORS[ann.status] || [150, 150, 150];
@@ -6872,37 +6899,53 @@ function renderAnnotListToPDF(pdf, anns, x, y, w, maxH) {
       pdf.roundedRect(x, curY - 1.5, w, ROW_H, 1, 1, 'F');
     }
 
-    // dot
+    // status dot
     pdf.setFillColor(...sc);
-    pdf.circle(x + 2, curY + 2, 1.5, 'F');
+    pdf.circle(x + 2, curY + 2.5, 1.5, 'F');
 
-    pdf.setFontSize(6.5);
     pdf.setFont('helvetica', isUrgent ? 'bold' : 'normal');
 
     // ID
+    pdf.setFontSize(6);
     pdf.setTextColor(isUrgent ? 239 : 130, isUrgent ? 68 : 140, isUrgent ? 68 : 120);
-    pdf.text((ann.annotId || '').slice(0, 9), x + 4, curY + 2.5);
+    pdf.text((ann.annotId || '').slice(0, 8), x + C_ID, curY + 2.8);
 
     // Profese
+    pdf.setFontSize(6);
     pdf.setTextColor(isUrgent ? 255 : 175, isUrgent ? 165 : 185, isUrgent ? 100 : 135);
-    pdf.text((ann.profese || '—').slice(0, 12), x + 16, curY + 2.5);
+    pdf.text((ann.profese || '—').slice(0, 13), x + C_PROF, curY + 2.8);
 
-    // Popis – available width varies
-    const descW = Math.max(8, Math.floor((w - 60) / 1.9));
+    // Popis – 2 lines if needed
+    pdf.setFontSize(6);
     pdf.setTextColor(isUrgent ? 255 : 220, 222, 218);
-    pdf.text((ann.popisek || '(bez popisu)').slice(0, descW), x + 38, curY + 2.5);
+    const popisText = ann.popisek || '(bez popisu)';
+    const popisLines = pdf.splitTextToSize(popisText, POPIS_W);
+    pdf.text(popisLines.slice(0, 2), x + C_POPIS, curY + 2.8);
 
-    // Přiřazeno
-    pdf.setTextColor(120, 130, 110);
-    pdf.text((ann.prirazeno || '—').slice(0, 13), x + w - 32, curY + 2.5);
+    // Termín
+    const df = fmtD(ann.dateFrom);
+    const dt = fmtD(ann.deadline);
+    let terminStr = '';
+    if (df && dt) terminStr = df + '–' + dt;
+    else if (dt)  terminStr = 'do ' + dt;
+    else if (df)  terminStr = 'od ' + df;
+    pdf.setFontSize(5.5);
+    pdf.setTextColor(isUrgent ? 220 : 140, isUrgent ? 200 : 150, isUrgent ? 130 : 120);
+    if (terminStr) {
+      const tLines = pdf.splitTextToSize(terminStr, 38);
+      pdf.text(tLines.slice(0, 2), x + C_TERMIN, curY + 2.8);
+    } else {
+      pdf.text('—', x + C_TERMIN, curY + 2.8);
+    }
 
     // Status
+    pdf.setFontSize(6);
     pdf.setTextColor(...sc);
-    pdf.text((ann.status || '').slice(0, 9), x + w - 14, curY + 2.5);
+    pdf.text((ann.status || '').slice(0, 10), x + C_STATUS, curY + 2.8);
 
     if (!isUrgent) {
       pdf.setDrawColor(45, 52, 36);
-      pdf.line(x, curY + ROW_H - 2, x + w, curY + ROW_H - 2);
+      pdf.line(x, curY + ROW_H - 1.5, x + w, curY + ROW_H - 1.5);
     }
     curY += ROW_H;
   }
