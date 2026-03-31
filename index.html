@@ -4153,14 +4153,16 @@ function findLabel(annotId) {
 
 function positionLabel(label, obj) {
   if (!label || !obj) return;
+  const zoom = fabricCanvas.getZoom();
+  const s = 1 / Math.sqrt(zoom);   // partial compensation – smaller when zoomed out
   const c = obj.getCenterPoint();
-  const lw = (label.width  || 80);
-  const lh = (label.height || 34);
+  const lw = label.width  || 80;
+  const lh = label.height || 34;
   label.set({
-    left: c.x - lw / 2,
-    top:  c.y - lh - 8,
-    scaleX: 1,
-    scaleY: 1,
+    left: c.x - (lw * s) / 2,
+    top:  c.y - (lh * s) - 8 / zoom,
+    scaleX: s,
+    scaleY: s,
     originX: 'left',
     originY: 'top'
   });
@@ -4171,7 +4173,7 @@ function createAnnotLabel(obj) {
   const zoom  = fabricCanvas.getZoom();
   const color = getAnnotColor(obj);
 
-  const FONT1 = 10, FONT2 = 9, FONT3 = 8;
+  const FONT1 = 12, FONT2 = 11, FONT3 = 10;
   const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
   const fontOpts = 'IBM Plex Mono, monospace';
 
@@ -4215,13 +4217,14 @@ function createAnnotLabel(obj) {
   const items = [bg, stripe, txtTop, txtBot];
   if (txtDates) items.push(txtDates);
 
+  const s = 1 / Math.sqrt(zoom);
   const group = new fabric.Group(items, {
     left: obj.left || 0,
-    top: (obj.top || 0) - H - 8,
+    top: (obj.top || 0) - H * s - 8,
     selectable: false, evented: false,
     hasControls: false, hasBorders: false,
     annotLabelFor: obj.annotId,
-    scaleX: 1, scaleY: 1,
+    scaleX: s, scaleY: s,
     originX: 'left', originY: 'top'
   });
 
