@@ -13,6 +13,9 @@
 <script src="https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -3615,13 +3618,15 @@ function loadBackgroundImage(dataUrl, fit, onDone) {
     const scaleY = ch / img.height;
     const scale = Math.min(scaleX, scaleY) * 0.95;
 
-    // Použij uloženou pozici při přepínání podlaží; při novém nahrání vždy vycentruj
-    const left = (!fit && level && level.bgLeft !== undefined) ? level.bgLeft : (cw - img.width * scale) / 2;
-    const top  = (!fit && level && level.bgTop  !== undefined) ? level.bgTop  : (ch - img.height * scale) / 2;
+    // Použij uloženou pozici+měřítko při přepínání podlaží; při novém nahrání vždy vycentruj
+    const useSaved = !fit && level && level.bgLeft !== undefined && level.bgScaleX !== undefined;
+    const finalScale = useSaved ? level.bgScaleX : scale;
+    const left = useSaved ? level.bgLeft : (cw - img.width * finalScale) / 2;
+    const top  = useSaved ? level.bgTop  : (ch - img.height * finalScale) / 2;
 
     img.set({
       left, top,
-      scaleX: scale, scaleY: scale,
+      scaleX: finalScale, scaleY: useSaved ? level.bgScaleY : finalScale,
       selectable: false, evented: false,
       lockMovementX: true, lockMovementY: true,
       lockScalingX: true, lockScalingY: true, lockRotation: true,
@@ -3759,6 +3764,8 @@ function enterMoveMode() {
   moveModeActive = true;
   const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
   if (bgObj) {
+    bgObj._moveStartLeft = bgObj.left;
+    bgObj._moveStartTop  = bgObj.top;
     bgObj.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false, hasBorders: true });
     // Dočasně znepřístupni ostatní objekty
     fabricCanvas.getObjects().forEach(o => { if (!o.isBackground) { o._moveSave = o.selectable; o.selectable = false; } });
@@ -3775,7 +3782,20 @@ function exitMoveMode() {
   const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
   if (bgObj) {
     const level = appState.levels[appState.activeLevel];
-    if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; }
+    if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; level.bgScaleX = bgObj.scaleX; level.bgScaleY = bgObj.scaleY; }
+    // Posun všechny anotace o stejný delta jako výkres
+    const dx = bgObj.left - (bgObj._moveStartLeft || bgObj.left);
+    const dy = bgObj.top  - (bgObj._moveStartTop  || bgObj.top);
+    if (dx !== 0 || dy !== 0) {
+      fabricCanvas.getObjects().forEach(o => {
+        if (!o.isBackground && !o.annotLabelFor) {
+          o.set({ left: o.left + dx, top: o.top + dy });
+          o.setCoords();
+        }
+      });
+    }
+    delete bgObj._moveStartLeft;
+    delete bgObj._moveStartTop;
     bgObj.set({ selectable: false, evented: false, lockMovementX: true, lockMovementY: true, hasBorders: false });
     fabricCanvas.discardActiveObject();
   }
@@ -7015,7 +7035,7 @@ function saveCurrentLevel() {
   const lvl = appState.levels[appState.activeLevel];
   // Save bgLeft/bgTop from current fabric object
   const _bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
-  if (_bgObj) { lvl.bgLeft = _bgObj.left; lvl.bgTop = _bgObj.top; }
+  if (_bgObj) { lvl.bgLeft = _bgObj.left; lvl.bgTop = _bgObj.top; lvl.bgScaleX = _bgObj.scaleX; lvl.bgScaleY = _bgObj.scaleY; }
   bgDBSave(pid, lvl.id, lvl.backgroundImage || null, lvl.backgroundImageOriginal || null);
   // Upload to server only if it's a data URL (not already a server URL)
   if (currentProject && lvl.backgroundImage && lvl.backgroundImage.startsWith('data:')) {
@@ -7151,7 +7171,7 @@ function _buildStateObj() {
         annotations: l.annotations,
         fabricJSON: fj,
         viewportTransform: l.viewportTransform,
-        bgLeft: l.bgLeft, bgTop: l.bgTop,
+        bgLeft: l.bgLeft, bgTop: l.bgTop, bgScaleX: l.bgScaleX, bgScaleY: l.bgScaleY,
         bgServerUrl: l.bgServerUrl || null,
         bgOrigServerUrl: l.bgOrigServerUrl || null,
         hasBackground: !!l.backgroundImage || !!l.bgServerUrl,
@@ -8205,5 +8225,44 @@ if ('serviceWorker' in navigator) {
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
   </svg>
 </button>
+<script>
+// ============================================================
+// FLATPICKR – datepicker s pondělím jako prvním dnem
+// ============================================================
+(function initDatepickers() {
+  const FP_OPTS = {
+    locale: { firstDayOfWeek: 1, weekdays: { shorthand: ['Ne','Po','Út','St','Čt','Pá','So'], longhand: ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'] }, months: { shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'], longhand: ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'] } },
+    dateFormat: 'Y-m-d',
+    allowInput: true,
+    disableMobile: false
+  };
+
+  function initFP(el) {
+    if (!el || el._flatpickr) return;
+    flatpickr(el, {
+      ...FP_OPTS,
+      onChange: function(selectedDates, dateStr) {
+        // Trigger native change event so existing listeners fire
+        el.value = dateStr;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+      }
+    });
+  }
+
+  function initAll() {
+    ['prop-date-from','prop-deadline','ae-date-from','ae-deadline',
+     'afilter-deadline-from','afilter-deadline-to'].forEach(id => {
+      initFP(document.getElementById(id));
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+})();
+</script>
 </body>
 </html>
