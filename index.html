@@ -4151,10 +4151,13 @@ function findLabel(annotId) {
   return fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
 }
 
+const LABEL_COMPACT_ZOOM = 1.5; // below this threshold show only contractor name
+let _labelsCompact = null;       // tracks current label mode to detect threshold crossing
+
 function positionLabel(label, obj) {
   if (!label || !obj) return;
   const zoom = fabricCanvas.getZoom();
-  const s = 1 / Math.sqrt(zoom);   // partial compensation – smaller when zoomed out
+  const s = 1 / zoom;
   const c = obj.getCenterPoint();
   const lw = label.width  || 80;
   const lh = label.height || 34;
@@ -4170,57 +4173,57 @@ function positionLabel(label, obj) {
 }
 
 function createAnnotLabel(obj) {
-  const zoom  = fabricCanvas.getZoom();
-  const color = getAnnotColor(obj);
+  const zoom    = fabricCanvas.getZoom();
+  const compact = zoom < LABEL_COMPACT_ZOOM;
+  const color   = getAnnotColor(obj);
 
-  const FONT1 = 12, FONT2 = 11, FONT3 = 10;
+  const FONT1 = 14, FONT2 = 13, FONT3 = 11;
   const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
   const fontOpts = 'IBM Plex Mono, monospace';
 
-  // ── 1. Create text nodes first so fabric measures real width/height ──
+  // ── Top line (contractor / profese) – always shown ──
   const txtTop = new fabric.Text(labelLineTop(obj), {
     fontFamily: fontOpts, fontSize: FONT1, fontWeight: '700', fill: color,
     left: 0, top: 0
   });
-  const txtBot = new fabric.Text(labelLineBot(obj), {
-    fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd',
-    left: 0, top: 0
-  });
-  const line3 = labelLineDates(obj);
-  const txtDates = line3 ? new fabric.Text(line3, {
-    fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa',
-    left: 0, top: 0
-  }) : null;
 
-  // ── 2. Measure actual rendered size (fabric computes on instantiation) ──
-  const contentW = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0);
-  const W = contentW + PAD_L * 2 + STRIPE;
+  let items, W, H;
 
-  let curY = PAD_T;
-  txtTop.set({ left: STRIPE + PAD_L, top: curY });
-  curY += txtTop.height + GAP;
-  txtBot.set({ left: STRIPE + PAD_L, top: curY });
-  curY += txtBot.height + GAP;
-  if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
-  const H = curY - GAP + PAD_T;
+  if (compact) {
+    // ── Compact: only contractor name ──
+    W = txtTop.width + PAD_L * 2 + STRIPE;
+    txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
+    H = PAD_T + txtTop.height + PAD_T;
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
+    items = [bg, stripe, txtTop];
+  } else {
+    // ── Full: contractor + popis + dates ──
+    const txtBot = new fabric.Text(labelLineBot(obj), {
+      fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd', left: 0, top: 0
+    });
+    const line3 = labelLineDates(obj);
+    const txtDates = line3 ? new fabric.Text(line3, {
+      fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa', left: 0, top: 0
+    }) : null;
 
-  // ── 3. Build background and stripe with correct dimensions ──
-  const bg = new fabric.Rect({
-    left: 0, top: 0, width: W, height: H,
-    fill: 'rgba(18,18,18,0.92)',
-    rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5
-  });
-  const stripe = new fabric.Rect({
-    left: 0, top: 0, width: STRIPE, height: H, fill: color
-  });
+    W = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0) + PAD_L * 2 + STRIPE;
+    let curY = PAD_T;
+    txtTop.set({ left: STRIPE + PAD_L, top: curY }); curY += txtTop.height + GAP;
+    txtBot.set({ left: STRIPE + PAD_L, top: curY }); curY += txtBot.height + GAP;
+    if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
+    H = curY - GAP + PAD_T;
 
-  const items = [bg, stripe, txtTop, txtBot];
-  if (txtDates) items.push(txtDates);
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
+    items = [bg, stripe, txtTop, txtBot];
+    if (txtDates) items.push(txtDates);
+  }
 
-  const s = 1 / Math.sqrt(zoom);
+  const s = 1 / zoom;
   const group = new fabric.Group(items, {
     left: obj.left || 0,
-    top: (obj.top || 0) - H * s - 8,
+    top:  (obj.top || 0) - H / zoom - 8 / zoom,
     selectable: false, evented: false,
     hasControls: false, hasBorders: false,
     annotLabelFor: obj.annotId,
@@ -4235,6 +4238,19 @@ function createAnnotLabel(obj) {
 
 function updateAllLabelScales() {
   if (!fabricCanvas) return;
+  const zoom    = fabricCanvas.getZoom();
+  const compact = zoom < LABEL_COMPACT_ZOOM;
+
+  // Rebuild labels when crossing compact/full threshold
+  if (compact !== _labelsCompact) {
+    _labelsCompact = compact;
+    const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
+    existing.forEach(l => fabricCanvas.remove(l));
+    getAnnotObjects().forEach(obj => createAnnotLabel(obj));
+    fabricCanvas.renderAll();
+    return;
+  }
+
   fabricCanvas.getObjects().forEach(o => {
     if (!o.annotLabelFor) return;
     const annot = fabricCanvas.getObjects().find(a => a.annotId === o.annotLabelFor);
