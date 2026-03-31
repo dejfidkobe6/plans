@@ -6749,52 +6749,84 @@ async function renderLevelToImage(levelIdx) {
   const level = appState.levels[levelIdx];
   if (!level || !level.backgroundImage) return null;
 
-  if (levelIdx === appState.activeLevel) {
-    saveCurrentLevel();
-    return fabricCanvas.toDataURL({ format: 'png', multiplier: 1 });
-  }
+  // Ensure active level state is current
+  if (levelIdx === appState.activeLevel) saveCurrentLevel();
 
   return new Promise(resolve => {
-    const tempEl = document.createElement('canvas');
-    tempEl.width  = fabricCanvas.getWidth();
-    tempEl.height = fabricCanvas.getHeight();
-    tempEl.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
-    document.body.appendChild(tempEl);
+    fabric.Image.fromURL(level.backgroundImage, img => {
+      // Determine stored bg position/scale for this level
+      let bgSX, bgSY, bgL, bgT;
+      if (levelIdx === appState.activeLevel) {
+        const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
+        if (bgObj) { bgSX = bgObj.scaleX; bgSY = bgObj.scaleY; bgL = bgObj.left; bgT = bgObj.top; }
+      }
+      if (bgSX === undefined && level.bgScaleX !== undefined) {
+        bgSX = level.bgScaleX; bgSY = level.bgScaleY; bgL = level.bgLeft; bgT = level.bgTop;
+      }
+      if (bgSX === undefined) {
+        // Fallback: fit to standard A4-landscape-like canvas
+        const cw = 1600, ch = 1130;
+        bgSX = bgSY = Math.min(cw / img.width, ch / img.height) * 0.95;
+        bgL = (cw - img.width  * bgSX) / 2;
+        bgT = (ch - img.height * bgSY) / 2;
+      }
 
-    const fc = new fabric.Canvas(tempEl, { backgroundColor: '#1a1f14' });
+      // Canvas sized exactly to the rendered background image (max 2400px wide)
+      const MAX_W = 2400;
+      const rawW = Math.round(img.width  * bgSX);
+      const rawH = Math.round(img.height * bgSY);
+      const ratio  = Math.min(1, MAX_W / rawW);
+      const renderW = Math.round(rawW * ratio);
+      const renderH = Math.round(rawH * ratio);
 
-    const finish = () => {
-      fc.renderAll();
-      const dataUrl = fc.toDataURL({ format: 'png' });
-      fc.dispose();
-      tempEl.remove();
-      resolve(dataUrl);
-    };
+      const tempEl = document.createElement('canvas');
+      tempEl.width  = renderW;
+      tempEl.height = renderH;
+      document.body.appendChild(tempEl);
 
-    const loadJSON = () => {
-      if (level.fabricJSON) {
-        fc.loadFromJSON(level.fabricJSON, finish);
+      const fc = new fabric.Canvas(tempEl, { backgroundColor: '#1a1f14', width: renderW, height: renderH });
+
+      // Background at (0,0) scaled to fit renderW/H
+      img.set({
+        left: 0, top: 0,
+        scaleX: bgSX * ratio, scaleY: bgSY * ratio,
+        selectable: false, evented: false, isBackground: true
+      });
+      fc.insertAt(img, 0);
+
+      // Load annotations shifted by (-bgL, -bgT) so they align with bg at origin
+      const srcJSON = (levelIdx === appState.activeLevel)
+        ? appState.levels[appState.activeLevel].fabricJSON
+        : level.fabricJSON;
+
+      const finish = () => {
+        fc.renderAll();
+        try {
+          const dataUrl = fc.toDataURL({ format: 'png' });
+          resolve(dataUrl.length > 200 ? dataUrl : null);
+        } catch(e) { resolve(null); }
+        fc.dispose();
+        tempEl.remove();
+      };
+
+      if (srcJSON && srcJSON.objects && srcJSON.objects.length > 0) {
+        const adjusted = {
+          ...srcJSON,
+          objects: srcJSON.objects
+            .filter(o => !o.isBackground && !o.annotLabelFor)
+            .map(o => ({
+              ...o,
+              left:   ((o.left   || 0) - bgL) * ratio,
+              top:    ((o.top    || 0) - bgT) * ratio,
+              scaleX: (o.scaleX  || 1) * ratio,
+              scaleY: (o.scaleY  || 1) * ratio
+            }))
+        };
+        fc.loadFromJSON(adjusted, finish);
       } else {
         finish();
       }
-    };
-
-    if (level.backgroundImage) {
-      fabric.Image.fromURL(level.backgroundImage, img => {
-        const cw = fc.getWidth(), ch = fc.getHeight();
-        const scale = Math.min(cw / img.width, ch / img.height) * 0.95;
-        img.set({
-          left: (cw - img.width  * scale) / 2,
-          top:  (ch - img.height * scale) / 2,
-          scaleX: scale, scaleY: scale,
-          selectable: false, evented: false, isBackground: true
-        });
-        fc.insertAt(img, 0);
-        loadJSON();
-      });
-    } else {
-      loadJSON();
-    }
+    });
   });
 }
 
