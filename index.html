@@ -3764,6 +3764,8 @@ function enterMoveMode() {
   moveModeActive = true;
   const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
   if (bgObj) {
+    bgObj._moveStartLeft = bgObj.left;
+    bgObj._moveStartTop  = bgObj.top;
     bgObj.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false, hasBorders: true });
     // Dočasně znepřístupni ostatní objekty
     fabricCanvas.getObjects().forEach(o => { if (!o.isBackground) { o._moveSave = o.selectable; o.selectable = false; } });
@@ -3781,6 +3783,19 @@ function exitMoveMode() {
   if (bgObj) {
     const level = appState.levels[appState.activeLevel];
     if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; level.bgScaleX = bgObj.scaleX; level.bgScaleY = bgObj.scaleY; }
+    // Posun všechny anotace o stejný delta jako výkres
+    const dx = bgObj.left - (bgObj._moveStartLeft || bgObj.left);
+    const dy = bgObj.top  - (bgObj._moveStartTop  || bgObj.top);
+    if (dx !== 0 || dy !== 0) {
+      fabricCanvas.getObjects().forEach(o => {
+        if (!o.isBackground && !o.annotLabelFor) {
+          o.set({ left: o.left + dx, top: o.top + dy });
+          o.setCoords();
+        }
+      });
+    }
+    delete bgObj._moveStartLeft;
+    delete bgObj._moveStartTop;
     bgObj.set({ selectable: false, evented: false, lockMovementX: true, lockMovementY: true, hasBorders: false });
     fabricCanvas.discardActiveObject();
   }
