@@ -3615,13 +3615,15 @@ function loadBackgroundImage(dataUrl, fit, onDone) {
     const scaleY = ch / img.height;
     const scale = Math.min(scaleX, scaleY) * 0.95;
 
-    // Použij uloženou pozici při přepínání podlaží; při novém nahrání vždy vycentruj
-    const left = (!fit && level && level.bgLeft !== undefined) ? level.bgLeft : (cw - img.width * scale) / 2;
-    const top  = (!fit && level && level.bgTop  !== undefined) ? level.bgTop  : (ch - img.height * scale) / 2;
+    // Použij uloženou pozici+měřítko při přepínání podlaží; při novém nahrání vždy vycentruj
+    const useSaved = !fit && level && level.bgLeft !== undefined && level.bgScaleX !== undefined;
+    const finalScale = useSaved ? level.bgScaleX : scale;
+    const left = useSaved ? level.bgLeft : (cw - img.width * finalScale) / 2;
+    const top  = useSaved ? level.bgTop  : (ch - img.height * finalScale) / 2;
 
     img.set({
       left, top,
-      scaleX: scale, scaleY: scale,
+      scaleX: finalScale, scaleY: useSaved ? level.bgScaleY : finalScale,
       selectable: false, evented: false,
       lockMovementX: true, lockMovementY: true,
       lockScalingX: true, lockScalingY: true, lockRotation: true,
@@ -3775,7 +3777,7 @@ function exitMoveMode() {
   const bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
   if (bgObj) {
     const level = appState.levels[appState.activeLevel];
-    if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; }
+    if (level) { level.bgLeft = bgObj.left; level.bgTop = bgObj.top; level.bgScaleX = bgObj.scaleX; level.bgScaleY = bgObj.scaleY; }
     bgObj.set({ selectable: false, evented: false, lockMovementX: true, lockMovementY: true, hasBorders: false });
     fabricCanvas.discardActiveObject();
   }
@@ -7015,7 +7017,7 @@ function saveCurrentLevel() {
   const lvl = appState.levels[appState.activeLevel];
   // Save bgLeft/bgTop from current fabric object
   const _bgObj = fabricCanvas.getObjects().find(o => o.isBackground);
-  if (_bgObj) { lvl.bgLeft = _bgObj.left; lvl.bgTop = _bgObj.top; }
+  if (_bgObj) { lvl.bgLeft = _bgObj.left; lvl.bgTop = _bgObj.top; lvl.bgScaleX = _bgObj.scaleX; lvl.bgScaleY = _bgObj.scaleY; }
   bgDBSave(pid, lvl.id, lvl.backgroundImage || null, lvl.backgroundImageOriginal || null);
   // Upload to server only if it's a data URL (not already a server URL)
   if (currentProject && lvl.backgroundImage && lvl.backgroundImage.startsWith('data:')) {
@@ -7151,7 +7153,7 @@ function _buildStateObj() {
         annotations: l.annotations,
         fabricJSON: fj,
         viewportTransform: l.viewportTransform,
-        bgLeft: l.bgLeft, bgTop: l.bgTop,
+        bgLeft: l.bgLeft, bgTop: l.bgTop, bgScaleX: l.bgScaleX, bgScaleY: l.bgScaleY,
         bgServerUrl: l.bgServerUrl || null,
         bgOrigServerUrl: l.bgOrigServerUrl || null,
         hasBackground: !!l.backgroundImage || !!l.bgServerUrl,
