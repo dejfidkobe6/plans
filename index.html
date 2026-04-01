@@ -4194,7 +4194,7 @@ function findLabel(annotId) {
   return fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
 }
 
-const LABEL_COMPACT_ZOOM = 1.5; // below this threshold show only contractor name
+const LABEL_COMPACT_ZOOM = 2.0; // below this threshold show only contractor name
 let _labelsCompact = null;       // tracks current label mode to detect threshold crossing
 
 function positionLabel(label, obj) {
@@ -7133,7 +7133,7 @@ function renderAnnotListToImage(anns, widthMM, heightMM, targetCount) {
   ctx.font = `${F_COL}px Arial`;
   ctx.fillStyle = '#647850';
   ctx.fillText('ID',      C_ID,   COLH_Y);
-  ctx.fillText('Profese', C_PROF, COLH_Y);
+  ctx.fillText('Subdodavatel', C_PROF, COLH_Y);
   ctx.fillText('Popis',   C_POPIS, COLH_Y);
   ctx.fillText('Termín',  C_TERM,  COLH_Y);
   ctx.fillText('Status',  C_STAT,  COLH_Y);
@@ -7200,7 +7200,7 @@ function renderAnnotListToImage(anns, widthMM, heightMM, targetCount) {
 
     // Profese
     ctx.fillStyle = profColor;
-    ctx.fillText(fitTxt(ann.profese || '\u2014', C_POPIS - C_PROF - 3), C_PROF, tY1);
+    ctx.fillText(fitTxt(profObj?.firma || '\u2014', C_POPIS - C_PROF - 3), C_PROF, tY1);
 
     // Popis
     ctx.fillStyle = isUrgent ? '#fff5e0' : '#dcdec8';
