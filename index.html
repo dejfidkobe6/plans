@@ -7042,7 +7042,7 @@ async function renderLevelToImage(levelIdx) {
 // Canvas-based annotation list renderer — uses browser font engine for full Czech diacritics support.
 // Returns a PNG data URL that can be addImage'd into the PDF.
 function renderAnnotListToImage(anns, widthMM, heightMM, targetCount) {
-  const PPM = 4; // pixels per mm → ~100 DPI (plenty for print)
+  const PPM = 12; // pixels per mm → ~300 DPI, print-quality (sharp at any PDF zoom)
   const W = Math.round(widthMM * PPM);
   const H = Math.round(heightMM * PPM);
 
