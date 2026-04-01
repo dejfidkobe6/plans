@@ -6917,12 +6917,13 @@ async function renderLevelToImage(levelIdx) {
         bgT = (ch - imgH * bgSY) / 2;
       }
 
-      // Render at up to 4000px wide for sharp quality
+      // Always render at exactly MAX_W px wide — upscale if needed so labels/shapes
+      // are always rasterised at full resolution regardless of the Fabric canvas zoom level.
       const MAX_W = 4000;
       const rawW  = Math.max(1, Math.round(imgW * bgSX));
       const rawH  = Math.max(1, Math.round(imgH * bgSY));
-      const ratio = Math.min(1, MAX_W / rawW);
-      const renderW = Math.round(rawW * ratio);
+      const ratio = MAX_W / rawW;          // no min(1,…) — always target 4000 px
+      const renderW = MAX_W;
       const renderH = Math.round(rawH * ratio);
 
       const tempEl = document.createElement('canvas');
