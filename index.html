@@ -6524,6 +6524,17 @@ function closeAnotacePage() {
   document.getElementById('anotace-btn').classList.remove('active');
 }
 
+function toggleAnotacePage() {
+  const isVisible = document.getElementById('anotace-page').classList.contains('visible');
+  if (isVisible) {
+    closeAnotacePage();
+  } else {
+    toggleHomePage(false);
+    toggleUsersPage(false);
+    openAnotacePage();
+  }
+}
+
 function populateAnotaceFilters() {
   const lvlSel = document.getElementById('afilter-level');
   const curLvl = lvlSel.value;
@@ -7118,7 +7129,7 @@ function exportAnotaceCSV() {
 }
 
 function setupAnotacePage() {
-  document.getElementById('anotace-btn').addEventListener('click', openAnotacePage);
+  document.getElementById('anotace-btn').addEventListener('click', toggleAnotacePage);
   document.getElementById('close-anotace-btn').addEventListener('click', closeAnotacePage);
   document.getElementById('afilter-reset-btn').addEventListener('click', () => {
     ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio','afilter-deadline-from','afilter-deadline-to']
@@ -7797,23 +7808,17 @@ function toggleHomePage(forceState) {
   const hp = document.getElementById('home-page');
   const btn = document.getElementById('subddodavatele-btn');
   if (forceState === true) {
-    toggleUsersPage(false);
-    hp.classList.add('visible');
-    btn.classList.add('active');
-    renderHomePage();
+    closeAnotacePage(); toggleUsersPage(false);
+    hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
   } else if (forceState === false) {
-    hp.classList.remove('visible');
-    btn.classList.remove('active');
+    hp.classList.remove('visible'); btn.classList.remove('active');
   } else {
     const isVisible = hp.classList.contains('visible');
     if (isVisible) {
-      hp.classList.remove('visible');
-      btn.classList.remove('active');
+      hp.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      toggleUsersPage(false);
-      hp.classList.add('visible');
-      btn.classList.add('active');
-      renderHomePage();
+      closeAnotacePage(); toggleUsersPage(false);
+      hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
     }
   }
 }
@@ -7822,23 +7827,17 @@ function toggleUsersPage(forceState) {
   const up = document.getElementById('users-page');
   const btn = document.getElementById('users-mgmt-btn');
   if (forceState === true) {
-    toggleHomePage(false);
-    up.classList.add('visible');
-    btn.classList.add('active');
-    loadMembers();
+    closeAnotacePage(); toggleHomePage(false);
+    up.classList.add('visible'); btn.classList.add('active'); loadMembers();
   } else if (forceState === false) {
-    up.classList.remove('visible');
-    btn.classList.remove('active');
+    up.classList.remove('visible'); btn.classList.remove('active');
   } else {
     const isVisible = up.classList.contains('visible');
     if (isVisible) {
-      up.classList.remove('visible');
-      btn.classList.remove('active');
+      up.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      toggleHomePage(false);
-      up.classList.add('visible');
-      btn.classList.add('active');
-      loadMembers();
+      closeAnotacePage(); toggleHomePage(false);
+      up.classList.add('visible'); btn.classList.add('active'); loadMembers();
     }
   }
 }
