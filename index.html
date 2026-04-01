@@ -4215,6 +4215,65 @@ function positionLabel(label, obj) {
   label.setCoords();
 }
 
+// Iteratively push overlapping labels apart so they never cover each other.
+// Uses fast manual rect calculation (no matrix math) for performance.
+function deconflictLabels() {
+  if (!fabricCanvas) return;
+  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
+  if (labels.length < 2) return;
+
+  const PAD = 2 / fabricCanvas.getZoom(); // 2 screen-px gap between labels
+  const MAX_ITER = 20;
+
+  // Fast bounding rect from stored properties (originX/Y = 'left'/'top')
+  const getR = l => ({
+    l: l.left,
+    t: l.top,
+    r: l.left  + (l.width  || 80) * (l.scaleX || 1),
+    b: l.top   + (l.height || 34) * (l.scaleY || 1)
+  });
+
+  // Cache annotation centre-y positions once (expensive find())
+  const cyArr = labels.map(lbl => {
+    const a = fabricCanvas.getObjects().find(o => o.annotId === lbl.annotLabelFor);
+    return a ? a.getCenterPoint().y : 0;
+  });
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const rects = labels.map(getR);
+    let moved = false;
+
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const ri = rects[i], rj = rects[j];
+        const ox = Math.min(ri.r, rj.r) - Math.max(ri.l, rj.l);
+        const oy = Math.min(ri.b, rj.b) - Math.max(ri.t, rj.t);
+        if (ox <= 0 || oy <= 0) continue; // no overlap
+        moved = true;
+
+        // Move the label whose annotation sits lower on screen (larger y = more "in the way")
+        const mi = cyArr[i] >= cyArr[j] ? i : j;
+        const lbl = labels[mi];
+
+        if (oy <= ox) {
+          // Overlap is taller in Y — resolve by moving up
+          lbl.top -= (oy + PAD);
+        } else {
+          // Overlap is wider in X — resolve horizontally
+          const ci = (rects[i].l + rects[i].r) / 2;
+          const cj = (rects[j].l + rects[j].r) / 2;
+          const dir = mi === i ? (ci <= cj ? -1 : 1) : (cj <= ci ? -1 : 1);
+          lbl.left += dir * (ox + PAD);
+        }
+        lbl.setCoords();
+        rects[mi] = getR(lbl); // update cached rect immediately
+      }
+    }
+
+    if (!moved) break; // converged — no more overlaps
+  }
+}
+
 function createAnnotLabel(obj) {
   const zoom    = fabricCanvas.getZoom();
   const compact = zoom < LABEL_COMPACT_ZOOM;
@@ -4290,6 +4349,7 @@ function updateAllLabelScales() {
     const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
     existing.forEach(l => fabricCanvas.remove(l));
     getAnnotObjects().forEach(obj => createAnnotLabel(obj));
+    deconflictLabels();
     fabricCanvas.renderAll();
     return;
   }
@@ -4299,6 +4359,7 @@ function updateAllLabelScales() {
     const annot = fabricCanvas.getObjects().find(a => a.annotId === o.annotLabelFor);
     if (annot) positionLabel(o, annot);
   });
+  deconflictLabels();
   fabricCanvas.renderAll();
 }
 
