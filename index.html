@@ -1381,7 +1381,9 @@ option { background: var(--card); color: var(--text); }
 
 /* ANOTACE PAGE */
 #anotace-page {
-  display: none; position: fixed; inset: 0; z-index: 3000;
+  display: none; position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 26px;
+  z-index: 50;
   background: var(--bg); flex-direction: column; overflow: hidden;
 }
 #anotace-page.visible { display: flex; }
