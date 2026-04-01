@@ -6901,7 +6901,7 @@ async function renderLevelToImage(levelIdx) {
 
       fc.loadFromJSON(combinedJSON, () => {
         // Label font size calibrated to be ~3mm in the final PDF (PDF drawing area ≈ 178mm wide)
-        const fontSize = Math.max(20, Math.round(3.0 * renderW / 178));
+        const fontSize = Math.max(14, Math.round(1.5 * renderW / 178));
         const PAD_H = Math.round(fontSize * 0.28);
         const PAD_V = Math.round(fontSize * 0.14);
 
@@ -6961,9 +6961,19 @@ async function renderLevelToImage(levelIdx) {
 // Canvas-based annotation list renderer — uses browser font engine for full Czech diacritics support.
 // Returns a PNG data URL that can be addImage'd into the PDF.
 function renderAnnotListToImage(anns, widthMM, heightMM) {
-  const PPM = 6; // pixels per mm → ~152 DPI
+  const PPM = 4; // pixels per mm → ~100 DPI (plenty for print)
   const W = Math.round(widthMM * PPM);
   const H = Math.round(heightMM * PPM);
+
+  // All UI metrics are PPM-relative so the PDF looks the same regardless of PPM
+  const F_TITLE  = Math.round(3.5 * PPM);   // ~3.5mm title
+  const F_BADGE  = Math.round(2.2 * PPM);   // ~2.2mm badge
+  const F_COL    = Math.round(2.0 * PPM);   // ~2.0mm col headers
+  const TITLE_PX = Math.round(F_TITLE * 2.2);
+  const BADGE_PX = Math.round(F_BADGE * 1.8);
+  const COLH_PX  = Math.round(F_COL  * 2.4);
+  // Max row height: 5mm so rows don't balloon when few annotations
+  const ROW_H_MAX = Math.round(5 * PPM);
 
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -7004,43 +7014,42 @@ function renderAnnotListToImage(anns, widthMM, heightMM) {
   ctx.fillRect(0, 0, W, H);
 
   // ---- Title bar ----
-  const TITLE_H = 34;
   ctx.fillStyle = '#1c2214';
-  ctx.fillRect(0, 0, W, TITLE_H);
-  ctx.font = 'bold 14px Arial';
+  ctx.fillRect(0, 0, W, TITLE_PX);
+  ctx.font = `bold ${F_TITLE}px Arial`;
   ctx.fillStyle = '#a0c464';
-  ctx.fillText('ANOTACE', 8, 22);
+  ctx.fillText('ANOTACE', Math.round(0.02 * W), Math.round(TITLE_PX * 0.70));
 
   // Stats badges
   const counts = {};
   anns.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-  let bx = 102;
-  ctx.font = 'bold 9px Arial';
+  ctx.font = `bold ${F_BADGE}px Arial`;
+  let bx = Math.round(F_TITLE * 7);
   for (const [st, color] of Object.entries(STATUS_COLORS)) {
     if (!counts[st]) continue;
     const label = `${counts[st]} ${st}`;
     const tw = ctx.measureText(label).width;
-    const bw = tw + 10, bh = 16, by = (TITLE_H - bh) / 2;
+    const bPad = Math.round(F_BADGE * 0.55);
+    const bw = tw + bPad * 2, bh = BADGE_PX, by = (TITLE_PX - bh) / 2;
     rr(bx, by, bw, bh, 3);
     ctx.fillStyle = color + '30'; ctx.fill();
     ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
     ctx.fillStyle = color;
-    ctx.fillText(label, bx + 5, by + 11.5);
-    bx += bw + 6;
+    ctx.fillText(label, bx + bPad, by + bh * 0.73);
+    bx += bw + Math.round(F_BADGE * 0.7);
   }
 
   // ---- Column header ----
-  const COLH_H = 20;
-  const COLH_Y = TITLE_H + COLH_H - 5;
+  const COLH_Y = TITLE_PX + COLH_PX - Math.round(F_COL * 0.35);
 
-  const C_DOT   = 5;
-  const C_ID    = 17;
+  const C_DOT   = Math.round(0.012 * W);
+  const C_ID    = Math.round(0.045 * W);
   const C_PROF  = Math.round(W * 0.14);
   const C_POPIS = Math.round(W * 0.32);
   const C_TERM  = Math.round(W * 0.68);
   const C_STAT  = Math.round(W * 0.85);
 
-  ctx.font = '9px Arial';
+  ctx.font = `${F_COL}px Arial`;
   ctx.fillStyle = '#647850';
   ctx.fillText('ID',      C_ID,   COLH_Y);
   ctx.fillText('Profese', C_PROF, COLH_Y);
@@ -7050,14 +7059,15 @@ function renderAnnotListToImage(anns, widthMM, heightMM) {
 
   ctx.strokeStyle = '#374028'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, TITLE_H + COLH_H); ctx.lineTo(W, TITLE_H + COLH_H);
+  ctx.moveTo(0, TITLE_PX + COLH_PX); ctx.lineTo(W, TITLE_PX + COLH_PX);
   ctx.stroke();
 
   // ---- Rows ----
-  const ROWS_START = TITLE_H + COLH_H + 2;
+  const ROWS_START = TITLE_PX + COLH_PX + 2;
   const availH = H - ROWS_START - 4;
-  const ROW_H = Math.max(12, Math.floor(availH / Math.max(1, anns.length)));
-  const FS = Math.max(7, Math.round(ROW_H * 0.55)); // font size
+  // Cap row height so rows never balloon when few annotations
+  const ROW_H = Math.min(ROW_H_MAX, Math.max(10, Math.floor(availH / Math.max(1, anns.length))));
+  const FS = Math.max(7, Math.round(ROW_H * 0.58)); // font size
 
   let curY = ROWS_START;
   for (const ann of anns) {
