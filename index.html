@@ -7346,7 +7346,7 @@ function _serverSave() {
 }
 let _saving = false;
 async function _serverSaveNow() {
-  if (!currentProject || _isProjectLoading || _saving) return;
+  if (!currentProject || _isProjectLoading || _saving || !canEdit()) return;
   _saving = true;
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
@@ -7975,6 +7975,45 @@ const LS_MEMBER_PROFESE       = (pid) => `besix_plans_member_profese_${pid}`;
 let currentUser    = null;  // {id, name, email, avatar_color}
 let currentProject = null;  // {id, name, created_at, role}
 
+function canEdit() {
+  return currentProject && ['owner','admin','member'].includes(currentProject.role);
+}
+
+function applyViewerMode() {
+  const viewer = !canEdit();
+  // Toolbar drawing tools
+  document.querySelectorAll('.tool-btn:not([data-tool="select"]):not([data-tool="pan"])')
+    .forEach(el => { el.style.display = viewer ? 'none' : ''; });
+  // Drawing editor, move-drawing, upload buttons
+  ['drawing-edit-btn','move-overlay','drawing-upload-btn','add-level-btn']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = viewer ? 'none' : ''; });
+  // Right panel (properties) – hide in viewer mode
+  const rp = document.getElementById('right-panel');
+  if (rp) rp.style.display = viewer ? 'none' : '';
+  // Status bar save indicator
+  const si = document.getElementById('status-save-info');
+  if (si) si.style.display = viewer ? 'none' : '';
+  // Canvas: disable object interaction for viewer
+  if (fabricCanvas) {
+    fabricCanvas.selection = !viewer;
+    fabricCanvas.getObjects().forEach(o => { if (!o.isBackground) o.selectable = !viewer; });
+  }
+  // Show viewer badge if applicable
+  let badge = document.getElementById('viewer-badge');
+  if (viewer) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'viewer-badge';
+      badge.title = 'Pouze prohlížení';
+      badge.textContent = '👁 Pozorovatel';
+      badge.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.85);color:#aaa;font-size:11px;padding:4px 12px;border-radius:12px;z-index:9999;pointer-events:none;font-family:monospace;';
+      document.body.appendChild(badge);
+    }
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -8169,6 +8208,7 @@ async function openProject(proj) {
   currentProject = proj;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
+  applyViewerMode();
   if (fabricCanvas) {
     fabricCanvas.clear();
     fabricCanvas.backgroundColor = '#181818';
@@ -8280,7 +8320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Uložení při zavření / přepnutí záložky (sendBeacon = funguje i při zavírání stránky)
 function _beaconSave() {
-  if (!currentProject || _isProjectLoading) return;
+  if (!currentProject || _isProjectLoading || !canEdit()) return;
   saveCurrentLevel();
   clearTimeout(_srvTimer);
   try {
