@@ -6856,7 +6856,8 @@ async function renderLevelToImage(levelIdx) {
         bgT = (ch - imgH * bgSY) / 2;
       }
 
-      const MAX_W = 2400;
+      // Render at up to 4000px wide for sharp quality
+      const MAX_W = 4000;
       const rawW  = Math.max(1, Math.round(imgW * bgSX));
       const rawH  = Math.max(1, Math.round(imgH * bgSY));
       const ratio = Math.min(1, MAX_W / rawW);
@@ -6899,19 +6900,45 @@ async function renderLevelToImage(levelIdx) {
       const combinedJSON = { version: '5.3.1', objects: [bgObjJSON, ...annotObjsJSON] };
 
       fc.loadFromJSON(combinedJSON, () => {
-        // Add ID number labels above each annotation symbol
-        const fontSize = Math.max(9, Math.round(11 * ratio));
+        // Label font size calibrated to be ~3mm in the final PDF (PDF drawing area ≈ 178mm wide)
+        const fontSize = Math.max(20, Math.round(3.0 * renderW / 178));
+        const PAD_H = Math.round(fontSize * 0.28);
+        const PAD_V = Math.round(fontSize * 0.14);
+
         fc.getObjects()
           .filter(o => o.annotId && !o.annotLabelFor && !o.isBackground)
           .forEach(o => {
             const br = o.getBoundingRect();
-            fc.add(new fabric.Text(o.annotId || '', {
-              left: br.left + br.width / 2, top: br.top - 2,
-              originX: 'center', originY: 'bottom',
+            // Use profese color or fall back to object stroke color
+            const profColor = (appState.profese || []).find(p => p.name === o.profese)?.color
+                              || o.stroke || '#4a8f3f';
+            const labelText = o.annotId || '';
+
+            // Measure text dimensions via temporary fabric.Text
+            const tmpT = new fabric.Text(labelText, {
+              fontSize, fontFamily: 'Arial, sans-serif', fontWeight: 'bold'
+            });
+            const tw = tmpT.width;
+            const th = tmpT.height;
+
+            const cx = br.left + br.width / 2;
+            const labelTop = br.top - th - PAD_V * 2 - 3;
+
+            // Colored background rect
+            fc.add(new fabric.Rect({
+              left: cx - tw / 2 - PAD_H,
+              top:  labelTop,
+              width:  tw + PAD_H * 2,
+              height: th + PAD_V * 2,
+              fill: profColor, rx: 3, ry: 3,
+              selectable: false, evented: false
+            }));
+            // White text on top
+            fc.add(new fabric.Text(labelText, {
+              left: cx, top: labelTop + PAD_V,
+              originX: 'center', originY: 'top',
               fontSize, fontFamily: 'Arial, sans-serif', fontWeight: 'bold',
-              fill: '#ffffff', stroke: '#000000',
-              strokeWidth: Math.max(1, ratio * 1.5),
-              paintFirst: 'stroke',
+              fill: '#ffffff',
               selectable: false, evented: false
             }));
           });
@@ -6919,7 +6946,9 @@ async function renderLevelToImage(levelIdx) {
         fc.renderAll();
         try {
           const dataUrl = fc.toDataURL({ format: 'png' });
-          resolve(dataUrl && dataUrl.length > 500 ? dataUrl : null);
+          resolve(dataUrl && dataUrl.length > 500
+            ? { dataUrl, aspect: renderW / renderH }
+            : null);
         } catch (e) { console.error('export toDataURL:', e); resolve(null); }
         fc.dispose();
         tempEl.remove();
@@ -6929,111 +6958,186 @@ async function renderLevelToImage(levelIdx) {
   });
 }
 
-function renderAnnotListToPDF(pdf, anns, x, y, w, maxH) {
+// Canvas-based annotation list renderer — uses browser font engine for full Czech diacritics support.
+// Returns a PNG data URL that can be addImage'd into the PDF.
+function renderAnnotListToImage(anns, widthMM, heightMM) {
+  const PPM = 6; // pixels per mm → ~152 DPI
+  const W = Math.round(widthMM * PPM);
+  const H = Math.round(heightMM * PPM);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
   const STATUS_COLORS = {
-    'Urgence':   [239, 68,  68],
-    'Nový úkol': [245, 158, 11],
-    'Probíhá':   [59,  130, 246],
-    'Hotovo':    [16,  185, 129],
+    'Urgence': '#ef4444', 'Nový úkol': '#f59e0b',
+    'Probíhá': '#3b82f6', 'Hotovo':    '#10b981'
   };
+
   const fmtD = d => {
     if (!d) return null;
     const p = d.split('-');
     return p.length === 3 ? `${p[2]}.${p[1]}.${p[0].slice(2)}` : d;
   };
 
-  // Column x-offsets (relative to x)
-  // dot(4) | ID(13) | Profese(22) | Popis(dynamic) | Termín(26) | Status(14)
-  const C_ID     = 5;
-  const C_PROF   = 19;
-  const C_POPIS  = 43;
-  const C_TERMIN = w - 40;
-  const C_STATUS = w - 14;
-  const POPIS_W  = C_TERMIN - C_POPIS - 2;
+  // Helper: draw a rounded rectangle path (compatible with older browsers)
+  const rr = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
 
-  pdf.setFontSize(7);
-  pdf.setTextColor(160, 190, 100);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('ANOTACE', x, y + 4);
+  // Helper: fit text into maxW with ellipsis, respecting current ctx.font
+  const fitTxt = (text, maxW) => {
+    let t = String(text || '');
+    if (ctx.measureText(t).width <= maxW) return t;
+    while (t.length > 1 && ctx.measureText(t + '\u2026').width > maxW) t = t.slice(0, -1);
+    return t + '\u2026';
+  };
 
-  const hy = y + 9;
-  pdf.setFontSize(5.5); pdf.setTextColor(100, 115, 85);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('ID',       x + C_ID,     hy);
-  pdf.text('Profese',  x + C_PROF,   hy);
-  pdf.text('Popis',    x + C_POPIS,  hy);
-  pdf.text('Termín',   x + C_TERMIN, hy);
-  pdf.text('Status',   x + C_STATUS, hy);
-  pdf.setDrawColor(55, 65, 40);
-  pdf.line(x, hy + 1.5, x + w, hy + 1.5);
+  // ---- Background ----
+  ctx.fillStyle = '#12160d';
+  ctx.fillRect(0, 0, W, H);
 
-  let curY = hy + 6;
-  const ROW_H = 8;
-  const maxY  = y + maxH - 2;
+  // ---- Title bar ----
+  const TITLE_H = 34;
+  ctx.fillStyle = '#1c2214';
+  ctx.fillRect(0, 0, W, TITLE_H);
+  ctx.font = 'bold 14px Arial';
+  ctx.fillStyle = '#a0c464';
+  ctx.fillText('ANOTACE', 8, 22);
 
+  // Stats badges
+  const counts = {};
+  anns.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+  let bx = 102;
+  ctx.font = 'bold 9px Arial';
+  for (const [st, color] of Object.entries(STATUS_COLORS)) {
+    if (!counts[st]) continue;
+    const label = `${counts[st]} ${st}`;
+    const tw = ctx.measureText(label).width;
+    const bw = tw + 10, bh = 16, by = (TITLE_H - bh) / 2;
+    rr(bx, by, bw, bh, 3);
+    ctx.fillStyle = color + '30'; ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.fillText(label, bx + 5, by + 11.5);
+    bx += bw + 6;
+  }
+
+  // ---- Column header ----
+  const COLH_H = 20;
+  const COLH_Y = TITLE_H + COLH_H - 5;
+
+  const C_DOT   = 5;
+  const C_ID    = 17;
+  const C_PROF  = Math.round(W * 0.14);
+  const C_POPIS = Math.round(W * 0.32);
+  const C_TERM  = Math.round(W * 0.68);
+  const C_STAT  = Math.round(W * 0.85);
+
+  ctx.font = '9px Arial';
+  ctx.fillStyle = '#647850';
+  ctx.fillText('ID',      C_ID,   COLH_Y);
+  ctx.fillText('Profese', C_PROF, COLH_Y);
+  ctx.fillText('Popis',   C_POPIS, COLH_Y);
+  ctx.fillText('Termín',  C_TERM,  COLH_Y);
+  ctx.fillText('Status',  C_STAT,  COLH_Y);
+
+  ctx.strokeStyle = '#374028'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, TITLE_H + COLH_H); ctx.lineTo(W, TITLE_H + COLH_H);
+  ctx.stroke();
+
+  // ---- Rows ----
+  const ROWS_START = TITLE_H + COLH_H + 2;
+  const availH = H - ROWS_START - 4;
+  const ROW_H = Math.max(12, Math.floor(availH / Math.max(1, anns.length)));
+  const FS = Math.max(7, Math.round(ROW_H * 0.55)); // font size
+
+  let curY = ROWS_START;
   for (const ann of anns) {
-    if (curY + ROW_H > maxY) {
-      pdf.setFontSize(6); pdf.setTextColor(100, 110, 85);
-      pdf.text('…', x, curY + 3); break;
-    }
+    if (curY + ROW_H > H - 2) break;
+
     const isUrgent = ann.status === 'Urgence';
-    const sc = STATUS_COLORS[ann.status] || [150, 150, 150];
+    const sc = STATUS_COLORS[ann.status] || '#969696';
+    const profObj = (appState.profese || []).find(p => p.name === ann.profese);
+    const profColor = profObj?.color || '#888888';
 
     if (isUrgent) {
-      pdf.setFillColor(65, 12, 12);
-      pdf.roundedRect(x, curY - 1.5, w, ROW_H, 1, 1, 'F');
+      ctx.fillStyle = 'rgba(239,68,68,0.12)';
+      ctx.fillRect(0, curY, W, ROW_H);
     }
 
-    // status dot
-    pdf.setFillColor(...sc);
-    pdf.circle(x + 2, curY + 2.5, 1.5, 'F');
+    // Profese-color dot
+    const dotR = Math.max(3, Math.round(ROW_H * 0.22));
+    ctx.fillStyle = profColor;
+    ctx.beginPath();
+    ctx.arc(C_DOT + dotR, curY + ROW_H / 2, dotR, 0, Math.PI * 2);
+    ctx.fill();
 
-    pdf.setFont('helvetica', isUrgent ? 'bold' : 'normal');
+    const tY = curY + ROW_H * 0.68;
+    ctx.font = `${isUrgent ? 'bold ' : ''}${FS}px Arial`;
 
     // ID
-    pdf.setFontSize(6);
-    pdf.setTextColor(isUrgent ? 239 : 130, isUrgent ? 68 : 140, isUrgent ? 68 : 120);
-    pdf.text((ann.annotId || '').slice(0, 8), x + C_ID, curY + 2.8);
+    ctx.fillStyle = isUrgent ? '#ef8888' : '#8a9870';
+    ctx.fillText(fitTxt(ann.annotId || '', C_PROF - C_ID - 3), C_ID, tY);
 
     // Profese
-    pdf.setFontSize(6);
-    pdf.setTextColor(isUrgent ? 255 : 175, isUrgent ? 165 : 185, isUrgent ? 100 : 135);
-    pdf.text((ann.profese || '—').slice(0, 13), x + C_PROF, curY + 2.8);
+    ctx.fillStyle = profColor;
+    ctx.fillText(fitTxt(ann.profese || '\u2014', C_POPIS - C_PROF - 3), C_PROF, tY);
 
-    // Popis – 2 lines if needed
-    pdf.setFontSize(6);
-    pdf.setTextColor(isUrgent ? 255 : 220, 222, 218);
-    const popisText = ann.popisek || '(bez popisu)';
-    const popisLines = pdf.splitTextToSize(popisText, POPIS_W);
-    pdf.text(popisLines.slice(0, 2), x + C_POPIS, curY + 2.8);
+    // Popis — 2 lines for taller rows, 1 line otherwise
+    const popisMaxW = C_TERM - C_POPIS - 4;
+    ctx.fillStyle = isUrgent ? '#fff5e0' : '#dcdec8';
+    if (ROW_H >= 20) {
+      const words = (ann.popisek || '(bez popisu)').split(' ');
+      let l1 = '', l2 = '', onL2 = false;
+      for (const w of words) {
+        if (!onL2) {
+          const t = l1 ? l1 + ' ' + w : w;
+          if (ctx.measureText(t).width <= popisMaxW) l1 = t;
+          else { onL2 = true; l2 = w; }
+        } else {
+          const t = l2 ? l2 + ' ' + w : w;
+          if (ctx.measureText(t).width <= popisMaxW) l2 = t;
+          else { l2 = fitTxt(l2, popisMaxW); break; }
+        }
+      }
+      ctx.fillText(l1, C_POPIS, curY + ROW_H * 0.38);
+      if (l2) ctx.fillText(fitTxt(l2, popisMaxW), C_POPIS, curY + ROW_H * 0.78);
+    } else {
+      ctx.fillText(fitTxt(ann.popisek || '(bez popisu)', popisMaxW), C_POPIS, tY);
+    }
 
     // Termín
-    const df = fmtD(ann.dateFrom);
-    const dt = fmtD(ann.deadline);
-    let terminStr = '';
-    if (df && dt) terminStr = df + '–' + dt;
-    else if (dt)  terminStr = 'do ' + dt;
-    else if (df)  terminStr = 'od ' + df;
-    pdf.setFontSize(5.5);
-    pdf.setTextColor(isUrgent ? 220 : 140, isUrgent ? 200 : 150, isUrgent ? 130 : 120);
-    if (terminStr) {
-      const tLines = pdf.splitTextToSize(terminStr, 38);
-      pdf.text(tLines.slice(0, 2), x + C_TERMIN, curY + 2.8);
-    } else {
-      pdf.text('—', x + C_TERMIN, curY + 2.8);
-    }
+    const df = fmtD(ann.dateFrom), dt = fmtD(ann.deadline);
+    const ts = df && dt ? `${df}\u2013${dt}` : dt ? `do ${dt}` : df ? `od ${df}` : '\u2014';
+    ctx.font = `${Math.max(6, FS - 1)}px Arial`;
+    ctx.fillStyle = isUrgent ? '#e0c878' : '#909870';
+    ctx.fillText(fitTxt(ts, C_STAT - C_TERM - 4), C_TERM, tY);
 
     // Status
-    pdf.setFontSize(6);
-    pdf.setTextColor(...sc);
-    pdf.text((ann.status || '').slice(0, 10), x + C_STATUS, curY + 2.8);
+    ctx.font = `${FS}px Arial`;
+    ctx.fillStyle = sc;
+    ctx.fillText(fitTxt(ann.status || '', W - C_STAT - 4), C_STAT, tY);
 
+    // Row separator
     if (!isUrgent) {
-      pdf.setDrawColor(45, 52, 36);
-      pdf.line(x, curY + ROW_H - 1.5, x + w, curY + ROW_H - 1.5);
+      ctx.strokeStyle = '#2d3424'; ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, curY + ROW_H); ctx.lineTo(W, curY + ROW_H);
+      ctx.stroke();
     }
+
     curY += ROW_H;
   }
+
+  return canvas.toDataURL('image/png');
 }
 
 async function doExportPDF() {
@@ -7087,17 +7191,32 @@ async function doExportPDF() {
 
       if (includeDrawing && level.backgroundImage) {
         const drawW = includeList ? Math.round(PW * 0.60) : PW - 8;
-        const imgData = await renderLevelToImage(idx);
-        if (imgData) pdf.addImage(imgData, 'PNG', 4, BY, drawW - 6, BH);
+        const imgResult = await renderLevelToImage(idx);
+        if (imgResult) {
+          const { dataUrl, aspect } = imgResult;
+          const availW = drawW - 6, availH = BH;
+          // Preserve aspect ratio — fit inside available area
+          let dw, dh, dx, dy;
+          if (aspect > availW / availH) {
+            dw = availW; dh = availW / aspect;
+            dx = 4; dy = BY + (availH - dh) / 2;
+          } else {
+            dh = availH; dw = availH * aspect;
+            dx = 4 + (availW - dw) / 2; dy = BY;
+          }
+          pdf.addImage(dataUrl, 'PNG', dx, dy, dw, dh);
+        }
 
         if (includeList) {
-          // vertical divider
+          const listW = PW - drawW - 7, listH = BH;
           pdf.setDrawColor(60, 70, 45);
-          pdf.line(drawW, BY, drawW, BY + BH);
-          renderAnnotListToPDF(pdf, anns, drawW + 3, BY, PW - drawW - 7, BH);
+          pdf.line(drawW, BY, drawW, BY + listH);
+          const listImg = renderAnnotListToImage(anns, listW, listH);
+          pdf.addImage(listImg, 'PNG', drawW + 1, BY, listW - 2, listH);
         }
       } else if (includeList) {
-        renderAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH);
+        const listImg = renderAnnotListToImage(anns, PW - 8, BH);
+        pdf.addImage(listImg, 'PNG', 4, BY, PW - 8, BH);
       }
     }
 
