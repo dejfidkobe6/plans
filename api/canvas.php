@@ -69,28 +69,36 @@ function _decompress(string $val): string {
 // GET – načti canvas data projektu
 // ============================================================
 if ($method === 'GET') {
+    // Lightweight timestamp-only poll for live sync
+    if (!empty($_GET['ts_only'])) {
+        $stmt = getDB()->prepare('SELECT updated_at FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
+        $stmt->execute([$projectId]);
+        $row = $stmt->fetch();
+        jsonOk(['updated_at' => $row['updated_at'] ?? null]);
+    }
+
     $stmt = getDB()->prepare(
-        'SELECT state_json, profese_json, annot_counter FROM plan_canvas_data WHERE project_id = ? LIMIT 1'
+        'SELECT state_json, profese_json, annot_counter, updated_at FROM plan_canvas_data WHERE project_id = ? LIMIT 1'
     );
     $stmt->execute([$projectId]);
     $row = $stmt->fetch();
 
     if (!$row || !$row['state_json']) {
-        jsonOk(['state' => null, 'profese' => null, 'counter' => 1]);
+        jsonOk(['state' => null, 'profese' => null, 'counter' => 1, 'updated_at' => null]);
     }
 
     $state   = json_decode(_decompress($row['state_json']), true);
     $profese = $row['profese_json'] ? json_decode(_decompress($row['profese_json']), true) : null;
 
     if ($state === null) {
-        // Dekomprese nebo parsování selhalo – vrať prázdný stav
-        jsonOk(['state' => null, 'profese' => null, 'counter' => 1]);
+        jsonOk(['state' => null, 'profese' => null, 'counter' => 1, 'updated_at' => null]);
     }
 
     jsonOk([
-        'state'   => $state,
-        'profese' => $profese,
-        'counter' => (int)($row['annot_counter'] ?? 1),
+        'state'      => $state,
+        'profese'    => $profese,
+        'counter'    => (int)($row['annot_counter'] ?? 1),
+        'updated_at' => $row['updated_at'] ?? null,
     ]);
 }
 
