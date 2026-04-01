@@ -7100,8 +7100,8 @@ function renderAnnotListToImage(anns, widthMM, heightMM, targetCount) {
     return { rows, totalH: rows.reduce((s, r) => s + r.rowH, 0) };
   };
 
-  // Start from a reasonable max, decrease until it fits
-  let FS = Math.min(ROW_H_MAX, Math.max(7, Math.round(availH / (Math.max(1, refCount) * 1.7))));
+  // FS capped at F_BADGE so row text is the same size as the badge text ("Nový úkol" etc.)
+  let FS = Math.max(7, Math.min(F_BADGE, Math.round(availH / (Math.max(1, refCount) * 1.7))));
   let layout = computeLayout(FS);
   while (layout.totalH > availH && FS > 7) { FS--; layout = computeLayout(FS); }
 
@@ -7120,8 +7120,8 @@ function renderAnnotListToImage(anns, widthMM, heightMM, targetCount) {
       ctx.fillRect(0, curY, W, rowH);
     }
 
-    // Profese-color dot
-    const dotR = Math.max(3, Math.round(rowH * 0.18));
+    // Profese-color dot — fixed radius tied to badge font size for consistency
+    const dotR = Math.round(F_BADGE * 0.45);
     ctx.fillStyle = profColor;
     ctx.beginPath();
     ctx.arc(C_DOT + dotR, curY + rowH / 2, dotR, 0, Math.PI * 2);
