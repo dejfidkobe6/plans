@@ -6919,10 +6919,12 @@ async function renderLevelToImage(levelIdx) {
 
       // Always render at exactly MAX_W px wide — upscale if needed so labels/shapes
       // are always rasterised at full resolution regardless of the Fabric canvas zoom level.
-      const MAX_W = 4000;
+      // 2500 px @ ~100 mm PDF width ≈ 635 DPI — more than enough for screen + print;
+      // exporting as JPEG keeps file size small (~200–600 KB vs 5–20 MB PNG).
+      const MAX_W = 2500;
       const rawW  = Math.max(1, Math.round(imgW * bgSX));
       const rawH  = Math.max(1, Math.round(imgH * bgSY));
-      const ratio = MAX_W / rawW;          // no min(1,…) — always target 4000 px
+      const ratio = MAX_W / rawW;          // no min(1,…) — always target MAX_W px
       const renderW = MAX_W;
       const renderH = Math.round(rawH * ratio);
 
@@ -7027,7 +7029,9 @@ async function renderLevelToImage(levelIdx) {
 
         fc.renderAll();
         try {
-          const dataUrl = fc.toDataURL({ format: 'png' });
+          // JPEG quality 0.88 — visually lossless for technical drawings,
+          // ~10–30× smaller than PNG (no transparency needed, bg is solid colour).
+          const dataUrl = fc.toDataURL({ format: 'jpeg', quality: 0.88 });
           resolve(dataUrl && dataUrl.length > 500
             ? { dataUrl, aspect: renderW / renderH }
             : null);
@@ -7324,7 +7328,7 @@ async function doExportPDF() {
             dh = availH; dw = availH * aspect;
             dx = 4 + (availW - dw) / 2; dy = BY;
           }
-          pdf.addImage(dataUrl, 'PNG', dx, dy, dw, dh);
+          pdf.addImage(dataUrl, 'JPEG', dx, dy, dw, dh);
         }
 
         if (includeList) {
