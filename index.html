@@ -2567,6 +2567,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn" id="tool-arrow" data-tool="arrow" title="Šipka (A)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
     </button>
+    <button class="tb-btn tool-btn" id="tool-polyline" data-tool="polyline" title="Lom – klik přidá bod, dvojklik ukončí (Y)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 18 8 7 15 13 21 5"/><circle cx="3" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="7" r="1.8" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="1.8" fill="currentColor" stroke="none"/><circle cx="21" cy="5" r="1.8" fill="currentColor" stroke="none"/></svg>
+    </button>
     <button class="tb-btn tool-btn" id="tool-polygon" data-tool="polygon" title="Víceuhelník – klik přidá bod, dvojklik ukončí (L)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L8 5 L19 9 L16 19 Z"/><circle cx="4" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.8" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1.8" fill="currentColor" stroke="none"/></svg>
     </button>
@@ -3245,7 +3248,36 @@ function applyAnnotColorToCanvas(obj) {
   }
 }
 
-const LEVEL_TYPES = {
+// Recolors all annotation shapes and labels for the given profese name.
+// Called after profese color changes in the management panel.
+function recolorAnnotationsByProfese(profeseName) {
+  const color = getProfColor(profeseName);
+  // Update stored fabricJSON for every level (including non-active ones)
+  appState.levels.forEach(level => {
+    if (!level.fabricJSON || !level.fabricJSON.objects) return;
+    level.fabricJSON.objects.forEach(o => {
+      if (o.profese !== profeseName) return;
+      if (o.type === 'rect') {
+        const fa = o.annotType === 'partition' ? '66' : '22';
+        o.stroke = color; o.fill = color + fa;
+      } else if (o.type === 'ellipse' || o.type === 'polygon') {
+        o.stroke = color; o.fill = color + '22';
+      } else if (o.type === 'polyline' || o.type === 'path') {
+        o.stroke = color;
+      }
+    });
+  });
+  // Update live canvas objects
+  if (fabricCanvas) {
+    fabricCanvas.getObjects().forEach(obj => {
+      if (obj.profese !== profeseName || obj.isBackground || obj.annotLabelFor) return;
+      applyAnnotColorToCanvas(obj);
+      updateLabelFor(obj.annotId);
+    });
+    fabricCanvas.renderAll();
+    saveCurrentLevel();
+  }
+}
   '1.NP': { icon: '→', color: '#3B82F6', cssClass: 'tab-type-np1' },
   '2.NP': { icon: '↑', color: '#10B981', cssClass: 'tab-type-np2' },
   '3.NP': { icon: '↑', color: '#10B981', cssClass: 'tab-type-np2' },
@@ -3257,7 +3289,7 @@ const TOOL_NAMES = {
   select: 'Výběr', pan: 'Posun', freehand: 'Volná čára',
   rect: 'Obdélník', circle: 'Kruh', arrow: 'Šipka',
   pin: 'Špendlík', text: 'Text', polygon: 'Víceuhelník',
-  partition: 'Příčka'
+  polyline: 'Lom', partition: 'Příčka'
 };
 
 window.appState = {
@@ -4018,7 +4050,7 @@ function setupDrawingEditor() {
 // DRAWING TOOLS
 // ============================================================
 function setTool(tool) {
-  if (appState.tool === 'polygon' && tool !== 'polygon' && polyPoints.length > 0) {
+  if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool && polyPoints.length > 0) {
     cancelPolygon();
   }
   appState.tool = tool;
@@ -4126,6 +4158,35 @@ function finishPolygon() {
     strokeWidth: 2, strokeUniform: true
   });
   addAnnotationProperties(poly, 'polygon');
+  cw.add(poly);
+  createAnnotLabel(poly);
+  cw.setActiveObject(poly);
+  pushUndoState();
+  updateAnnotList();
+  onObjectSelected({ target: poly });
+  saveCurrentLevel();
+  setTool('select');
+  cw.renderAll();
+}
+
+function finishPolyline() {
+  const cw = fabricCanvas;
+  polyTempObjects.forEach(o => cw.remove(o));
+  polyTempObjects = []; polyPointSnap = [];
+  if (polyPreviewLine) { cw.remove(polyPreviewLine); polyPreviewLine = null; }
+
+  const pts = polyPoints.slice();
+  polyPoints = [];
+
+  if (pts.length < 2) { cw.renderAll(); return; }
+
+  const color = getActiveProfeseColor();
+  const poly = new fabric.Polyline(pts, {
+    fill: 'transparent', stroke: color,
+    strokeWidth: 2, strokeUniform: true,
+    strokeLineJoin: 'round', strokeLineCap: 'round'
+  });
+  addAnnotationProperties(poly, 'polyline');
   cw.add(poly);
   createAnnotLabel(poly);
   cw.setActiveObject(poly);
@@ -4424,7 +4485,7 @@ function setupEventListeners() {
       return;
     }
 
-    if (appState.tool === 'polygon') {
+    if (appState.tool === 'polygon' || appState.tool === 'polyline') {
       polyAddPoint(pointer.x, pointer.y);
       return;
     }
@@ -4510,7 +4571,7 @@ function setupEventListeners() {
       return;
     }
 
-    if (appState.tool === 'polygon' && polyPreviewLine) {
+    if ((appState.tool === 'polygon' || appState.tool === 'polyline') && polyPreviewLine) {
       polyPreviewLine.set({ x2: pointer.x, y2: pointer.y });
       fabricCanvas.renderAll();
       return;
@@ -4651,6 +4712,11 @@ function setupEventListeners() {
     if (appState.tool === 'polygon') {
       polyRemoveLastPoint(); // second click of dblclick added an extra point
       finishPolygon();
+      return;
+    }
+    if (appState.tool === 'polyline') {
+      polyRemoveLastPoint(); // second click of dblclick added an extra point
+      finishPolyline();
       return;
     }
     const obj = opt.target;
@@ -5053,7 +5119,7 @@ function onKeyDown(e) {
     if (e.key === 's') { e.preventDefault(); if (currentProject) { saveCurrentLevel(); _flushSave(); clearTimeout(_srvTimer); _serverSaveNow().then(() => showToast('Projekt uložen', 'success')); } return; }
   }
 
-  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon' };
+  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon', y: 'polyline' };
   if (toolKeys[e.key.toLowerCase()]) { setTool(toolKeys[e.key.toLowerCase()]); return; }
 
   if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -7911,11 +7977,13 @@ function renderProfeseList() {
       const kontakt = form.querySelector('.pf-kontakt').value.trim();
       const telefon = form.querySelector('.pf-telefon').value.trim();
       const email = form.querySelector('.pf-email').value.trim();
+      const oldName = appState.profese[idx].name; // capture before update
       appState.profese[idx] = { name, color, firma, kontakt, telefon, email };
       saveState();
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
+      recolorAnnotationsByProfese(oldName); // recolor all shapes with this profese
       showToast('Profese uložena', 'success');
     });
   });
