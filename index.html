@@ -2981,6 +2981,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <tr>
           <th class="th-sort" data-sort="annotId">ID <span class="sort-arrow"></span></th>
           <th class="th-sort" data-sort="profese">Profese <span class="sort-arrow"></span></th>
+          <th class="th-sort" data-sort="firma">Firma <span class="sort-arrow"></span></th>
           <th class="th-sort ac-popisek" data-sort="popisek">Popis <span class="sort-arrow"></span></th>
           <th class="th-sort" data-sort="levelName">Podlaží <span class="sort-arrow"></span></th>
           <th class="th-sort" data-sort="priorita">Priorita <span class="sort-arrow"></span></th>
@@ -6521,7 +6522,8 @@ function getAllAnnotations() {
   appState.levels.forEach((level, levelIdx) => {
     const annots = level.annotations || [];
     annots.forEach(a => {
-      rows.push({ ...a, levelName: level.name, levelIdx });
+      const firma = (appState.profese || []).find(p => p.name === a.profese)?.firma || '';
+      rows.push({ ...a, levelName: level.name, levelIdx, firma });
     });
   });
   return rows;
@@ -6701,6 +6703,7 @@ function renderAnotacePage() {
     return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
       <td class="tcell-id">${escHtml(r.annotId)}</td>
       <td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${color}"></span>${escHtml(r.profese||'—')}</span></td>
+      <td>${escHtml(r.firma||'—')}</td>
       <td class="ac-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek || '(bez popisu)')}</td>
       <td><span class="tcell-level">${escHtml(r.levelName)}</span></td>
       <td><span class="tcell-prio ${prioClass}">${escHtml(r.priorita||'Střední')}</span></td>
@@ -7807,7 +7810,8 @@ function rebuildProfeseSelects() {
     profese.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      opt.textContent = p.name;
+      // prop-profese shows the company name (firma); filter shows profession name
+      opt.textContent = (id === 'prop-profese' && p.firma) ? p.firma : p.name;
       sel.appendChild(opt);
     });
     // Restore previous value if still valid
