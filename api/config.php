@@ -21,10 +21,12 @@ define('PLANS_APP_KEY', 'plans');
 
 // PHP session – sdílená přes celou doménu .besix.cz
 // DŮLEŽITÉ: stejné nastavení musí být i v board.besix.cz/api/config.php!
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_samesite', 'Lax');
-ini_set('session.cookie_secure',   1);
-ini_set('session.cookie_domain',   '.besix.cz');  // ← klíč pro sdílení session
+ini_set('session.cookie_httponly',  1);
+ini_set('session.cookie_samesite',  'Lax');
+ini_set('session.cookie_secure',    1);
+ini_set('session.cookie_domain',    '.besix.cz');  // ← klíč pro sdílení session
+ini_set('session.gc_maxlifetime',   60*60*24*30);  // 30 dní na serveru
+ini_set('session.cookie_lifetime',  60*60*24*30);  // 30 dní v prohlížeči
 session_name('BESIX_SESS');
 if (session_status() === PHP_SESSION_NONE) session_start();
 
