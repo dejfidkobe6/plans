@@ -231,6 +231,16 @@ body {
   z-index: 99;
   overflow: hidden;
 }
+#level-tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#level-tabs::-webkit-scrollbar { display: none; }
+.level-tab { scroll-snap-align: start; }
 
 #add-level-btn {
   display: flex; align-items: center; justify-content: center;
@@ -2343,6 +2353,15 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #topbar-actions { display: none; }
   #toolbar-right { display: none; }
 
+  /* Overlay pages – extend to cover full height minus bottom bar */
+  #home-page, #users-page, #anotace-page {
+    bottom: 54px;
+    z-index: 950; /* above bottom bar so it doesn't conflict */
+  }
+
+  /* Hide status bar (replaced by bottom bar on mobile) */
+  #status-bar { display: none; }
+
   /* Compact user info – hide name/project text, keep buttons */
   #topbar-user-name,
   #topbar-project-name,
@@ -2353,20 +2372,43 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #logo .logo-plans { display: none; }
   #logo { padding: 0 10px; }
 
-  /* Level bar – slightly smaller on mobile */
+  /* Level bar – slightly smaller, scrollable */
   #level-bar { height: 38px; }
-  .level-tab { padding: 0 10px; font-size: 12px; }
+  .level-tab { padding: 0 12px; font-size: 12px; flex-shrink: 0; }
+
+  /* Left sidebar – floating overlay from left on mobile */
+  #left-sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 1200;
+    width: min(85vw, 320px) !important;
+    min-width: 0 !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+    overflow-y: auto;
+  }
+  #left-sidebar.mob-open {
+    transform: translateX(0);
+  }
+  /* Hide desktop collapse button inside sidebar on mobile */
+  #sidebar-toggle { display: none; }
+  /* Hide the old desktop sidebar-open-btn (replaced by bottom bar) */
+  #sidebar-open-btn { display: none !important; }
+  /* Resize handle */
+  .panel-resize-handle { display: none; }
 
   /* Right panel – floating overlay, hidden by default */
   #right-panel {
     position: fixed;
     top: 0; right: 0; bottom: 0;
     z-index: 1200;
-    width: 280px !important;
-    min-width: 280px !important;
+    width: min(85vw, 320px) !important;
+    min-width: 0 !important;
     transform: translateX(100%);
     transition: transform 0.25s ease;
     box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+    overflow-y: auto;
   }
   #right-panel.mob-open {
     transform: translateX(0);
@@ -2381,6 +2423,19 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     background: rgba(0,0,0,0.45);
   }
   #right-panel-backdrop.visible { display: block; }
+
+  /* Old floating props button – replaced by bottom bar */
+  #mob-props-open-btn { display: none !important; }
+
+  /* Annotation list items – bigger tap targets */
+  .annot-item { padding: 10px 10px; min-height: 44px; }
+  /* Status buttons – flow nicely on small screen */
+  .status-select-row { flex-wrap: wrap; }
+  .status-btn { flex: 1 1 calc(50% - 4px); font-size: 11px; padding: 7px 4px; }
+  /* Priority buttons */
+  .prio-btn { flex: 1; padding: 7px 4px; }
+  /* Field inputs bigger tap area */
+  .field-input, .field-select, .field-textarea { font-size: 14px; }
 }
 
 /* Mobile toggle button – hidden on desktop */
@@ -2424,6 +2479,159 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #users-mgmt-btn span,
   #pdf-export-btn span { display: none; }
 }
+
+/* ============================================================
+   COLLAPSIBLE PROP SECTIONS
+   ============================================================ */
+.prop-section {
+  border-bottom: 1px solid var(--border);
+}
+.prop-section summary.prop-section-hd {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  user-select: none;
+  background: var(--panel);
+  transition: color 0.15s, background 0.15s;
+}
+.prop-section summary.prop-section-hd::-webkit-details-marker { display: none; }
+.prop-section summary.prop-section-hd:hover { color: var(--text-bright); background: var(--card); }
+.prop-section-chevron {
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  color: var(--text-dim);
+}
+.prop-section[open] .prop-section-chevron { transform: rotate(90deg); }
+.prop-section-body { padding: 4px 0 8px; }
+.prop-section-body .field-group { padding: 6px 12px 0; }
+.prop-section-body .field-group:first-child { padding-top: 6px; }
+/* Delete button outside sections */
+#delete-annot-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 10px 12px 12px;
+}
+
+/* ============================================================
+   LEFT SIDEBAR BACKDROP (mobile)
+   ============================================================ */
+#left-sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0; z-index: 1199;
+  background: rgba(0,0,0,0.45);
+}
+#left-sidebar-backdrop.visible { display: block; }
+
+/* ============================================================
+   MOBILE BOTTOM BAR
+   ============================================================ */
+#mobile-bottom-bar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 54px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  z-index: 900;
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (max-width: 768px) {
+  #mobile-bottom-bar { display: flex; }
+  /* Push canvas area up so it isn't hidden behind bottom bar */
+  #main-layout { padding-bottom: 54px; }
+  #main-layout { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px)); }
+  /* Toast above bottom bar */
+  .toast-container { bottom: 64px !important; }
+}
+.mbb-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  padding: 4px 2px;
+  transition: color 0.15s, background 0.15s;
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+.mbb-btn:last-child { border-right: none; }
+.mbb-btn svg { flex-shrink: 0; }
+.mbb-btn:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
+.mbb-btn.active { color: var(--olive-light); background: rgba(74,83,64,0.18); }
+.mbb-btn.mbb-draw-open { color: var(--olive-light); }
+.mbb-badge {
+  position: absolute;
+  top: 4px; right: 6px;
+  background: var(--olive);
+  color: #fff;
+  font-size: 9px;
+  min-width: 14px; height: 14px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  font-family: var(--font-mono);
+}
+.mbb-label {
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+/* ============================================================
+   MOBILE DRAW MENU (popup above bottom bar)
+   ============================================================ */
+#mob-draw-menu {
+  display: none;
+  position: fixed;
+  bottom: 54px;
+  left: 0; right: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  z-index: 1100;
+  padding: 10px;
+}
+#mob-draw-menu.open { display: block; }
+#mob-draw-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.mob-draw-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.mob-draw-tool:hover { color: var(--text-bright); background: var(--card); border-color: var(--olive); }
+.mob-draw-tool.active { color: var(--olive-light); border-color: var(--olive); background: rgba(74,83,64,0.18); }
 </style>
 </head>
 <body>
@@ -2800,6 +3008,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 
   <div class="panel-resize-handle" id="right-resize-handle" title="Táhněte pro změnu šířky"></div>
 
+  <!-- LEFT SIDEBAR BACKDROP (mobile) -->
+  <div id="left-sidebar-backdrop"></div>
+
   <!-- RIGHT PANEL -->
   <div id="right-panel-backdrop"></div>
   <div id="right-panel">
@@ -2813,54 +3024,95 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <p>Vyberte anotaci pro zobrazení vlastností nebo použijte nástroj pro kreslení nové.</p>
       </div>
       <div id="prop-form" style="display:none;">
-        <div class="field-group">
-          <label class="field-label">Profese</label>
-          <select class="field-select" id="prop-profese">
-            <option>Elektro</option>
-            <option>Voda</option>
-            <option>Vzduchotechnika</option>
-            <option>Konstrukce</option>
-            <option>Interiér</option>
-            <option>Koordinace</option>
-            <option>Vlastní</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Popisek</label>
-          <textarea class="field-textarea" id="prop-popisek" placeholder="Popis anotace..."></textarea>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Priorita</label>
-          <div class="priority-btns">
-            <button class="prio-btn" data-prio="Nízká">Nízká</button>
-            <button class="prio-btn" data-prio="Střední">Střední</button>
-            <button class="prio-btn" data-prio="Vysoká">Vysoká</button>
+
+        <!-- Section: Základní -->
+        <details class="prop-section" open>
+          <summary class="prop-section-hd">
+            <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            Základní
+          </summary>
+          <div class="prop-section-body">
+            <div class="field-group">
+              <label class="field-label">Profese</label>
+              <select class="field-select" id="prop-profese">
+                <option>Elektro</option>
+                <option>Voda</option>
+                <option>Vzduchotechnika</option>
+                <option>Konstrukce</option>
+                <option>Interiér</option>
+                <option>Koordinace</option>
+                <option>Vlastní</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Popisek</label>
+              <textarea class="field-textarea" id="prop-popisek" placeholder="Popis anotace..."></textarea>
+            </div>
           </div>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Přiřazeno</label>
-          <input type="text" class="field-input" id="prop-prirazeno" placeholder="Jméno / tým...">
-        </div>
-        <div class="field-group">
-          <label class="field-label">Status</label>
-          <div class="status-select-row">
-            <button class="status-btn" data-status="Nový úkol">Nový úkol</button>
-            <button class="status-btn" data-status="Probíhá">Probíhá</button>
-            <button class="status-btn" data-status="Hotovo">Hotovo</button>
-            <button class="status-btn" data-status="Urgence">🔴 Urgence</button>
+        </details>
+
+        <!-- Section: Status -->
+        <details class="prop-section" open>
+          <summary class="prop-section-hd">
+            <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            Status &amp; Priorita
+          </summary>
+          <div class="prop-section-body">
+            <div class="field-group">
+              <label class="field-label">Status</label>
+              <div class="status-select-row">
+                <button class="status-btn" data-status="Nový úkol">Nový úkol</button>
+                <button class="status-btn" data-status="Probíhá">Probíhá</button>
+                <button class="status-btn" data-status="Hotovo">Hotovo</button>
+                <button class="status-btn" data-status="Urgence">🔴 Urgence</button>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Priorita</label>
+              <div class="priority-btns">
+                <button class="prio-btn" data-prio="Nízká">Nízká</button>
+                <button class="prio-btn" data-prio="Střední">Střední</button>
+                <button class="prio-btn" data-prio="Vysoká">Vysoká</button>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Přiřazeno</label>
+              <input type="text" class="field-input" id="prop-prirazeno" placeholder="Jméno / tým...">
+            </div>
           </div>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Termín od / do</label>
-          <div style="display:flex;gap:4px;">
-            <input type="date" class="field-input" id="prop-date-from" style="color-scheme:dark;flex:1;" title="Termín od">
-            <input type="date" class="field-input" id="prop-deadline"  style="color-scheme:dark;flex:1;" title="Termín do">
+        </details>
+
+        <!-- Section: Termíny -->
+        <details class="prop-section" open>
+          <summary class="prop-section-hd">
+            <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            Termíny
+          </summary>
+          <div class="prop-section-body">
+            <div class="field-group">
+              <label class="field-label">Termín od / do</label>
+              <div style="display:flex;gap:4px;">
+                <input type="date" class="field-input" id="prop-date-from" style="color-scheme:dark;flex:1;" title="Termín od">
+                <input type="date" class="field-input" id="prop-deadline"  style="color-scheme:dark;flex:1;" title="Termín do">
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="field-group">
-          <label class="field-label">ID anotace</label>
-          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 4px 0;" id="prop-annot-id">-</div>
-        </div>
+        </details>
+
+        <!-- Section: Info -->
+        <details class="prop-section">
+          <summary class="prop-section-hd">
+            <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            Informace
+          </summary>
+          <div class="prop-section-body">
+            <div class="field-group">
+              <label class="field-label">ID anotace</label>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 4px 0;" id="prop-annot-id">-</div>
+            </div>
+          </div>
+        </details>
+
         <button id="delete-annot-btn">🗑 Smazat anotaci</button>
       </div>
     </div>
@@ -2885,6 +3137,83 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="model-legend"></div>
     <div id="zones-manager"></div>
   </div>
+</div>
+
+<!-- MOBILE DRAW MENU (slides up above bottom bar) -->
+<div id="mob-draw-menu">
+  <div id="mob-draw-grid">
+    <button class="mob-draw-tool tool-btn" data-tool="freehand" onclick="setTool('freehand');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 17c3-3 6-3 9-1s6 2 9-1"/></svg>
+      Čára
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="rect" onclick="setTool('rect');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      Obdélník
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="circle" onclick="setTool('circle');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="9"/></svg>
+      Kruh
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="arrow" onclick="setTool('arrow');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      Šipka
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="polyline" onclick="setTool('polyline');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="3 18 8 7 15 13 21 5"/></svg>
+      Lom
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="polygon" onclick="setTool('polygon');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 18 L8 5 L19 9 L16 19 Z"/></svg>
+      Polygon
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="partition" onclick="setTool('partition');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="2" y="9" width="20" height="6" rx="1" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="17" y1="9" x2="17" y2="15"/></svg>
+      Příčka
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="pin" onclick="setTool('pin');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
+      Špendlík
+    </button>
+    <button class="mob-draw-tool tool-btn" data-tool="text" onclick="setTool('text');closeMobDrawMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+      Text
+    </button>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM BAR -->
+<div id="mobile-bottom-bar">
+  <!-- Annotations list -->
+  <button class="mbb-btn" id="mbb-annot" title="Anotace" onclick="toggleMobileLeftSidebar()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span class="mbb-label">Anotace</span>
+    <span class="mbb-badge" id="mbb-annot-count" style="display:none;">0</span>
+  </button>
+  <!-- Select -->
+  <button class="mbb-btn tool-btn" data-tool="select" title="Výběr" onclick="setTool('select')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M5 3l14 9-7 2-4 7L5 3z"/></svg>
+    <span class="mbb-label">Výběr</span>
+  </button>
+  <!-- Pan -->
+  <button class="mbb-btn tool-btn" data-tool="pan" title="Posun" onclick="setTool('pan')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0m0 0v2M10 10V5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0v9l-1-1a2 2 0 0 0-3 0v0l5 6a4 4 0 0 0 3 1h3a4 4 0 0 0 4-4v-5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v1"/></svg>
+    <span class="mbb-label">Posun</span>
+  </button>
+  <!-- Fit -->
+  <button class="mbb-btn" title="Zobrazit vše" onclick="document.getElementById('fit-btn').click()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    <span class="mbb-label">Celý</span>
+  </button>
+  <!-- Draw tools toggle -->
+  <button class="mbb-btn" id="mbb-draw" title="Kreslit" onclick="toggleMobDrawMenu()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <span class="mbb-label">Kreslit</span>
+  </button>
+  <!-- Properties -->
+  <button class="mbb-btn" id="mbb-props" title="Vlastnosti" onclick="openMobRightPanel()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    <span class="mbb-label">Vlastnosti</span>
+  </button>
 </div>
 
 <!-- HOME PAGE (SUBDODAVATELE) -->
@@ -4906,6 +5235,12 @@ function setupEventListeners() {
 
   // Sidebar toggle (button is now inside the panel header)
   function setSidebarCollapsed(collapsed) {
+    if (window.innerWidth <= 768) {
+      // On mobile the sidebar is an overlay – use the overlay toggle instead
+      if (collapsed) { if (window.closeMobileLeftSidebar) closeMobileLeftSidebar(); }
+      else           { if (window.toggleMobileLeftSidebar) toggleMobileLeftSidebar(); }
+      return;
+    }
     const sidebar = document.getElementById('left-sidebar');
     const handle  = document.getElementById('left-resize-handle');
     const toggle  = document.getElementById('sidebar-toggle');
@@ -5604,6 +5939,10 @@ function toggleMobileMenu() {
   const btn  = document.getElementById('mobile-menu-btn');
   const open = menu.classList.toggle('open');
   btn.classList.toggle('active', open);
+  if (open) {
+    if (window.closeMobileLeftSidebar) closeMobileLeftSidebar();
+    if (window.closeMobDrawMenu) closeMobDrawMenu();
+  }
 }
 function closeMobileMenu() {
   const menu = document.getElementById('mobile-dropdown');
@@ -5623,7 +5962,8 @@ document.addEventListener('click', (e) => {
 function showToast(message, type = 'info') {
   if (!toastContainer) {
     toastContainer = document.createElement('div');
-    toastContainer.style.cssText = 'position:fixed;bottom:40px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:6px;';
+    const bottomOffset = window.innerWidth <= 768 ? '68px' : '40px';
+    toastContainer.style.cssText = `position:fixed;bottom:${bottomOffset};right:16px;z-index:99999;display:flex;flex-direction:column;gap:6px;`;
     document.body.appendChild(toastContainer);
   }
   const colors = { info: '#3B82F6', success: '#10B981', warn: '#F59E0B', error: '#EF4444' };
@@ -8692,26 +9032,95 @@ if ('serviceWorker' in navigator) {
 })();
 
 // ============================================================
-// MOBILE RIGHT PANEL TOGGLE
+// MOBILE PANEL TOGGLES (right panel, left sidebar, draw menu)
 // ============================================================
-(function initMobRightPanel() {
-  const panel    = document.getElementById('right-panel');
-  const backdrop = document.getElementById('right-panel-backdrop');
-  const closeBtn = document.getElementById('right-panel-toggle-mob');
-  const openBtn  = document.getElementById('mob-props-open-btn');
+(function initMobPanels() {
+  // ---- RIGHT PANEL ----
+  const rPanel    = document.getElementById('right-panel');
+  const rBackdrop = document.getElementById('right-panel-backdrop');
+  const rCloseBtn = document.getElementById('right-panel-toggle-mob');
 
-  function open()  { panel.classList.add('mob-open');    backdrop.classList.add('visible');    if (openBtn) openBtn.style.display = 'none'; }
-  function close() { panel.classList.remove('mob-open'); backdrop.classList.remove('visible'); if (openBtn) openBtn.style.display = ''; }
+  function openRightPanel()  {
+    rPanel.classList.add('mob-open');
+    rBackdrop.classList.add('visible');
+    closeMobileLeftSidebar();
+    closeMobDrawMenu();
+  }
+  function closeRightPanel() {
+    rPanel.classList.remove('mob-open');
+    rBackdrop.classList.remove('visible');
+  }
+  window.openMobRightPanel  = openRightPanel;
+  window.closeMobRightPanel = closeRightPanel;
 
-  if (closeBtn)  closeBtn.addEventListener('click', close);
-  if (backdrop)  backdrop.addEventListener('click', close);
-  if (openBtn)   openBtn.addEventListener('click', open);
+  if (rCloseBtn) rCloseBtn.addEventListener('click', closeRightPanel);
+  if (rBackdrop) rBackdrop.addEventListener('click', closeRightPanel);
 
-  // Auto-open panel when an annotation is selected on mobile
-  const origOnObjectSelected = window.onObjectSelected;
+  // Auto-open on annotation select on mobile
   document.addEventListener('annotation-selected', () => {
-    if (window.innerWidth <= 768) open();
+    if (window.innerWidth <= 768) openRightPanel();
   });
+
+  // ---- LEFT SIDEBAR ----
+  const lSidebar  = document.getElementById('left-sidebar');
+  const lBackdrop = document.getElementById('left-sidebar-backdrop');
+
+  function openLeftSidebar() {
+    if (!lSidebar) return;
+    lSidebar.classList.add('mob-open');
+    if (lBackdrop) lBackdrop.classList.add('visible');
+    closeRightPanel();
+    closeMobDrawMenu();
+    // Ensure sidebar not collapsed (desktop class)
+    lSidebar.classList.remove('collapsed');
+  }
+  function closeLeftSidebar() {
+    if (!lSidebar) return;
+    lSidebar.classList.remove('mob-open');
+    if (lBackdrop) lBackdrop.classList.remove('visible');
+  }
+  window.toggleMobileLeftSidebar = () => {
+    if (lSidebar && lSidebar.classList.contains('mob-open')) closeLeftSidebar();
+    else openLeftSidebar();
+  };
+  window.closeMobileLeftSidebar = closeLeftSidebar;
+
+  if (lBackdrop) lBackdrop.addEventListener('click', closeLeftSidebar);
+
+  // ---- DRAW MENU ----
+  const drawMenu = document.getElementById('mob-draw-menu');
+  const drawBtn  = document.getElementById('mbb-draw');
+
+  window.toggleMobDrawMenu = () => {
+    if (!drawMenu) return;
+    const open = drawMenu.classList.toggle('open');
+    if (drawBtn) drawBtn.classList.toggle('mbb-draw-open', open);
+    if (open) { closeRightPanel(); closeLeftSidebar(); }
+  };
+  window.closeMobDrawMenu = () => {
+    if (drawMenu) drawMenu.classList.remove('open');
+    if (drawBtn)  drawBtn.classList.remove('mbb-draw-open');
+  };
+
+  // Close draw menu when tapping outside
+  document.addEventListener('click', (e) => {
+    if (!drawMenu || !drawMenu.classList.contains('open')) return;
+    if (drawMenu.contains(e.target) || (drawBtn && drawBtn.contains(e.target))) return;
+    closeMobDrawMenu();
+  });
+})();
+
+// Sync annotation count badge on bottom bar
+(function initMbbCountSync() {
+  const badge = document.getElementById('mbb-annot-count');
+  const src   = document.getElementById('annot-total-count');
+  if (!badge || !src) return;
+  const obs = new MutationObserver(() => {
+    const n = parseInt(src.textContent) || 0;
+    badge.textContent = n;
+    badge.style.display = n > 0 ? 'flex' : 'none';
+  });
+  obs.observe(src, { childList: true, characterData: true, subtree: true });
 })();
 
 // ============================================================
