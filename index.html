@@ -3626,7 +3626,7 @@ const TOOL_NAMES = {
 window.appState = {
   levels: [],
   activeLevel: 0,
-  tool: 'select',
+  tool: window.innerWidth <= 768 ? 'pan' : 'select',
   showGrid: false,
   clipboard: null,
   profese: JSON.parse(JSON.stringify(DEFAULT_PROFESE)),
@@ -3785,6 +3785,9 @@ function switchLevel(idx) {
   updateChangeDrawingBtn();
   undoStack = [];
   redoStack = [];
+
+  // On mobile default to pan when switching levels
+  if (window.innerWidth <= 768) setTool('pan');
 
   // Sync 3D panel if open
   if (document.getElementById('model-3d-panel').classList.contains('open')) {
@@ -8097,7 +8100,7 @@ function loadState() {
         drawGrid();
       }
 
-      setTool(appState.tool);
+      setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
     }
   } catch(e) {
     appState.levels = [];
@@ -8899,7 +8902,7 @@ async function openProject(proj) {
     }
     rebuildProfeseSelects();
     if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
-    setTool(appState.tool);
+    setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
   } else {
     loadState(); // fallback na localStorage
   }
