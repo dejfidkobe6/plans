@@ -8,7 +8,16 @@ $action = $_GET['action'] ?? '';
 // ============================================================
 if ($action === 'me' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $user = $_SESSION['user'] ?? null;
-    if (!$user) jsonError('Nepřihlášen', 401);
+    if (!$user) {
+        // Session expired – try remember-me cookie before returning 401
+        $remembered = checkRememberCookie();
+        if ($remembered) {
+            loginSession($remembered);
+            $user = $_SESSION['user'];
+        } else {
+            jsonError('Nepřihlášen', 401);
+        }
+    }
     jsonOk(['user' => $user, 'pending_invite' => $_SESSION['pending_invite'] ?? null]);
 }
 
@@ -31,6 +40,7 @@ if ($action === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!password_verify($password, $user['password_hash'])) jsonError('Nesprávný email nebo heslo');
 
     loginSession($user);
+    setRememberCookie((int)$user['id']);   // persistent 30-day token
     jsonOk(['user' => $_SESSION['user'], 'pending_invite' => $_SESSION['pending_invite'] ?? null]);
 }
 
@@ -139,6 +149,7 @@ if ($action === 'google_callback') {
     }
 
     loginSession($user);
+    setRememberCookie((int)$user['id']);   // persistent 30-day token
     header('Location: https://plans.besix.cz/');
     exit;
 }
