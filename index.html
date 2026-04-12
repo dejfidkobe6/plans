@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BeSix Plans</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -2550,7 +2550,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #mobile-bottom-bar { display: flex; }
   /* Push canvas area up so it isn't hidden behind bottom bar */
   #main-layout { padding-bottom: 54px; }
-  #main-layout { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px)); }
   /* Toast above bottom bar */
   .toast-container { bottom: 64px !important; }
 }
@@ -3626,7 +3625,7 @@ const TOOL_NAMES = {
 window.appState = {
   levels: [],
   activeLevel: 0,
-  tool: 'select',
+  tool: window.innerWidth <= 768 ? 'pan' : 'select',
   showGrid: false,
   clipboard: null,
   profese: JSON.parse(JSON.stringify(DEFAULT_PROFESE)),
@@ -3785,6 +3784,9 @@ function switchLevel(idx) {
   updateChangeDrawingBtn();
   undoStack = [];
   redoStack = [];
+
+  // On mobile default to pan when switching levels
+  if (window.innerWidth <= 768) setTool('pan');
 
   // Sync 3D panel if open
   if (document.getElementById('model-3d-panel').classList.contains('open')) {
@@ -4807,8 +4809,10 @@ function setupEventListeners() {
 
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
-      panStartX = e.clientX;
-      panStartY = e.clientY;
+      // Touch events have clientX on touches[0], not directly on e
+      const pos = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      panStartX = pos.clientX || 0;
+      panStartY = pos.clientY || 0;
       lastViewportX = cw.viewportTransform[4];
       lastViewportY = cw.viewportTransform[5];
       cw.defaultCursor = 'grabbing';
@@ -4891,9 +4895,10 @@ function setupEventListeners() {
     const pointer = cw.getPointer(e);
     document.getElementById('cursor-pos').textContent = 'X: ' + Math.round(pointer.x) + ' Y: ' + Math.round(pointer.y);
 
-    if (isPanning) {
-      const dx = e.clientX - panStartX;
-      const dy = e.clientY - panStartY;
+    if (isPanning && !_touch2) {
+      const pos = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      const dx = (pos.clientX || 0) - panStartX;
+      const dy = (pos.clientY || 0) - panStartY;
       const vpt = cw.viewportTransform.slice();
       vpt[4] = lastViewportX + dx;
       vpt[5] = lastViewportY + dy;
@@ -5135,11 +5140,41 @@ function setupEventListeners() {
     cw.renderAll();
   }, { passive: false });
 
-  // Touch – two-finger pan (and pinch-zoom)
-  let _touch2 = null; // { x, y, dist, vptX, vptY, zoom }
+  // Touch – two-finger pan/pinch-zoom + tap-to-select in pan mode
+  let _touch2 = null;   // { x, y, dist, vptX, vptY, zoom }
+  let _tap1   = null;   // { x, y, time } – single-finger tap detection
+  let _panMoved = false;// did the finger actually move?
+
+  // Helper: find annotation object at canvas point (for tap-select)
+  function _findAnnotAtPointer(clientX, clientY) {
+    const canvasEl = cw.upperCanvasEl || cw.getElement();
+    const rect = canvasEl.getBoundingClientRect();
+    // Build a minimal event-like object that getPointer understands
+    const fakeE = { clientX, clientY, target: canvasEl,
+                    touches: [{ clientX, clientY }] };
+    const pointer = cw.getPointer(fakeE);
+    const objs = cw.getObjects();
+    for (let i = objs.length - 1; i >= 0; i--) {
+      const o = objs[i];
+      // Labels have annotLabelFor – resolve to their parent annotation
+      if (o.annotLabelFor) {
+        const parent = objs.find(p => p.annotId === o.annotLabelFor);
+        if (parent && parent.containsPoint(pointer)) return parent;
+        continue;
+      }
+      if (!o.annotId || o.isBackground) continue;
+      if (o.containsPoint(pointer)) return o;
+    }
+    return null;
+  }
+
   wrapper.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       e.preventDefault();
+      // Cancel any single-finger pan that may have started from touch[0]
+      isPanning = false;
+      _tap1 = null;
+      cw.defaultCursor = appState.tool === 'pan' ? 'grab' : 'default';
       const t0 = e.touches[0], t1 = e.touches[1];
       const mx = (t0.clientX + t1.clientX) / 2;
       const my = (t0.clientY + t1.clientY) / 2;
@@ -5147,27 +5182,42 @@ function setupEventListeners() {
       _touch2 = { x: mx, y: my, dist, vptX: cw.viewportTransform[4], vptY: cw.viewportTransform[5], zoom: cw.getZoom() };
     } else {
       _touch2 = null;
+      // Single-finger: start tap detection
+      const t = e.touches[0];
+      _tap1 = { x: t.clientX, y: t.clientY, time: Date.now() };
+      _panMoved = false;
     }
   }, { passive: false });
   wrapper.addEventListener('touchmove', (e) => {
+    // Mark as "real drag" if finger moved more than 8px
+    if (_tap1 && e.touches.length === 1) {
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - _tap1.x, t.clientY - _tap1.y) > 8) _panMoved = true;
+    }
     if (e.touches.length === 2 && _touch2) {
       e.preventDefault();
       const t0 = e.touches[0], t1 = e.touches[1];
       const mx = (t0.clientX + t1.clientX) / 2;
       const my = (t0.clientY + t1.clientY) / 2;
       const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-      // Pan
-      const vpt = cw.viewportTransform.slice();
-      vpt[4] = _touch2.vptX + (mx - _touch2.x);
-      vpt[5] = _touch2.vptY + (my - _touch2.y);
-      // Pinch zoom
+
+      // Compute new zoom from the reference snapshot (absolute, no drift)
       const newZoom = Math.min(Math.max(_touch2.zoom * (dist / _touch2.dist), 0.05), 20);
+      const zoomRatio = newZoom / _touch2.zoom;
+
+      // Compute pan: current midpoint vs reference midpoint
+      const panDx = mx - _touch2.x;
+      const panDy = my - _touch2.y;
+
+      // Apply: scale around reference midpoint, then add pan
       const wRect = wrapper.getBoundingClientRect();
-      const ox = mx - wRect.left;
-      const oy = my - wRect.top;
-      vpt[4] = ox - (ox - vpt[4]) * (newZoom / cw.getZoom());
-      vpt[5] = oy - (oy - vpt[5]) * (newZoom / cw.getZoom());
-      vpt[0] = newZoom; vpt[3] = newZoom;
+      const ox = _touch2.x - wRect.left; // reference midpoint in canvas coords
+      const oy = _touch2.y - wRect.top;
+
+      const vpt = [newZoom, 0, 0, newZoom,
+        ox - (ox - _touch2.vptX) * zoomRatio + panDx,
+        oy - (oy - _touch2.vptY) * zoomRatio + panDy
+      ];
       cw.setViewportTransform(vpt);
       updateZoomDisplay();
       updateAllLabelScales();
@@ -5178,6 +5228,27 @@ function setupEventListeners() {
     if (e.touches.length < 2 && _touch2) {
       _touch2 = null;
       saveCurrentLevel();
+    }
+
+    // Tap-to-select: short tap with no significant movement in pan mode
+    if (e.touches.length === 0 && _tap1 && !_touch2 && !_panMoved) {
+      const t = e.changedTouches[0];
+      const elapsed = Date.now() - _tap1.time;
+      if (elapsed < 400) {
+        const found = _findAnnotAtPointer(t.clientX, t.clientY);
+        if (found) {
+          cw.setActiveObject(found);
+          cw.renderAll();
+          onObjectSelected({ target: found });
+          if (window.innerWidth <= 768 && window.openMobRightPanel) openMobRightPanel();
+        } else if (appState.tool === 'pan') {
+          // Tapped empty space – deselect
+          cw.discardActiveObject();
+          cw.renderAll();
+          deselectAnnot();
+        }
+      }
+      _tap1 = null;
     }
   });
 
@@ -5379,8 +5450,13 @@ function setupEventListeners() {
   // Home page search
   document.getElementById('home-search').addEventListener('input', renderHomePage);
 
-  // Resize observer
-  const ro = new ResizeObserver(() => resizeCanvas());
+  // Resize observer – debounced so rapid browser-chrome resizes (iOS address
+  // bar appearing / disappearing) don't cascade into repeated canvas clears.
+  let _resizeTimer = null;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => fabricCanvas && resizeCanvas(), 60);
+  });
   ro.observe(document.getElementById('canvas-area'));
 
   // Hover tooltip
@@ -6909,8 +6985,19 @@ function remove3DModel() {
 // ============================================================
 function resizeCanvas() {
   const area = document.getElementById('canvas-area');
-  fabricCanvas.setWidth(area.clientWidth);
-  fabricCanvas.setHeight(area.clientHeight);
+  const w = area.clientWidth;
+  const h = area.clientHeight;
+  if (w < 20 || h < 20) return; // ignore transient 0-size during layout
+
+  // Fabric's setWidth/Height resets the backing store which can wipe the
+  // viewport transform on some browsers – save it and restore after.
+  const savedVpt = fabricCanvas.viewportTransform
+    ? fabricCanvas.viewportTransform.slice()
+    : [1, 0, 0, 1, 0, 0];
+
+  fabricCanvas.setWidth(w);
+  fabricCanvas.setHeight(h);
+  fabricCanvas.setViewportTransform(savedVpt);
   fabricCanvas.renderAll();
   drawGrid();
 
@@ -8097,7 +8184,7 @@ function loadState() {
         drawGrid();
       }
 
-      setTool(appState.tool);
+      setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
     }
   } catch(e) {
     appState.levels = [];
@@ -8899,7 +8986,7 @@ async function openProject(proj) {
     }
     rebuildProfeseSelects();
     if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
-    setTool(appState.tool);
+    setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
   } else {
     loadState(); // fallback na localStorage
   }
