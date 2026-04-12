@@ -52,29 +52,35 @@ function _ensureRememberTable(): void {
     $done = true;
 }
 
-/** Issue a new remember-me cookie and store its hash in DB. */
+/** Issue a new remember-me cookie and store its hash in DB.
+ *  Silently skips if DB table is missing or user has no CREATE rights. */
 function setRememberCookie(int $userId): void {
-    _ensureRememberTable();
-    $db    = getDB();
-    $token = bin2hex(random_bytes(32));   // 64 hex chars
-    $hash  = hash('sha256', $token);
-    $exp   = date('Y-m-d H:i:s', time() + 86400 * REMEMBER_DAYS);
+    try {
+        _ensureRememberTable();
+        $db    = getDB();
+        $token = bin2hex(random_bytes(32));   // 64 hex chars
+        $hash  = hash('sha256', $token);
+        $exp   = date('Y-m-d H:i:s', time() + 86400 * REMEMBER_DAYS);
 
-    // Remove all existing tokens for this user + any expired tokens
-    $db->prepare("DELETE FROM remember_tokens WHERE user_id = ? OR expires_at < NOW()")
-       ->execute([$userId]);
+        // Remove all existing tokens for this user + any expired tokens
+        $db->prepare("DELETE FROM remember_tokens WHERE user_id = ? OR expires_at < NOW()")
+           ->execute([$userId]);
 
-    $db->prepare("INSERT INTO remember_tokens (user_id, token_hash, expires_at) VALUES (?,?,?)")
-       ->execute([$userId, $hash, $exp]);
+        $db->prepare("INSERT INTO remember_tokens (user_id, token_hash, expires_at) VALUES (?,?,?)")
+           ->execute([$userId, $hash, $exp]);
 
-    setcookie(REMEMBER_COOKIE, $userId . ':' . $token, [
-        'expires'  => time() + 86400 * REMEMBER_DAYS,
-        'path'     => '/',
-        'domain'   => '.besix.cz',
-        'secure'   => true,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+        setcookie(REMEMBER_COOKIE, $userId . ':' . $token, [
+            'expires'  => time() + 86400 * REMEMBER_DAYS,
+            'path'     => '/',
+            'domain'   => '.besix.cz',
+            'secure'   => true,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } catch (\Throwable $e) {
+        // Remember token is non-critical – login still succeeds without it
+        error_log('setRememberCookie failed: ' . $e->getMessage());
+    }
 }
 
 /**

@@ -34,3 +34,15 @@ CREATE TABLE IF NOT EXISTS plan_backgrounds (
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (project_id, level_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Remember-me tokens – trvalé přihlášení (30 dní)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS remember_tokens (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  INDEX idx_tok (token_hash),
+  INDEX idx_uid (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
