@@ -4894,7 +4894,7 @@ function setupEventListeners() {
     const pointer = cw.getPointer(e);
     document.getElementById('cursor-pos').textContent = 'X: ' + Math.round(pointer.x) + ' Y: ' + Math.round(pointer.y);
 
-    if (isPanning) {
+    if (isPanning && !_touch2) {
       const dx = e.clientX - panStartX;
       const dy = e.clientY - panStartY;
       const vpt = cw.viewportTransform.slice();
@@ -5143,6 +5143,9 @@ function setupEventListeners() {
   wrapper.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       e.preventDefault();
+      // Cancel any single-finger pan that may have started from touch[0]
+      isPanning = false;
+      cw.defaultCursor = appState.tool === 'pan' ? 'grab' : 'default';
       const t0 = e.touches[0], t1 = e.touches[1];
       const mx = (t0.clientX + t1.clientX) / 2;
       const my = (t0.clientY + t1.clientY) / 2;
@@ -5159,18 +5162,24 @@ function setupEventListeners() {
       const mx = (t0.clientX + t1.clientX) / 2;
       const my = (t0.clientY + t1.clientY) / 2;
       const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-      // Pan
-      const vpt = cw.viewportTransform.slice();
-      vpt[4] = _touch2.vptX + (mx - _touch2.x);
-      vpt[5] = _touch2.vptY + (my - _touch2.y);
-      // Pinch zoom
+
+      // Compute new zoom from the reference snapshot (absolute, no drift)
       const newZoom = Math.min(Math.max(_touch2.zoom * (dist / _touch2.dist), 0.05), 20);
+      const zoomRatio = newZoom / _touch2.zoom;
+
+      // Compute pan: current midpoint vs reference midpoint
+      const panDx = mx - _touch2.x;
+      const panDy = my - _touch2.y;
+
+      // Apply: scale around reference midpoint, then add pan
       const wRect = wrapper.getBoundingClientRect();
-      const ox = mx - wRect.left;
-      const oy = my - wRect.top;
-      vpt[4] = ox - (ox - vpt[4]) * (newZoom / cw.getZoom());
-      vpt[5] = oy - (oy - vpt[5]) * (newZoom / cw.getZoom());
-      vpt[0] = newZoom; vpt[3] = newZoom;
+      const ox = _touch2.x - wRect.left; // reference midpoint in canvas coords
+      const oy = _touch2.y - wRect.top;
+
+      const vpt = [newZoom, 0, 0, newZoom,
+        ox - (ox - _touch2.vptX) * zoomRatio + panDx,
+        oy - (oy - _touch2.vptY) * zoomRatio + panDy
+      ];
       cw.setViewportTransform(vpt);
       updateZoomDisplay();
       updateAllLabelScales();
