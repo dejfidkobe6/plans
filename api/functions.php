@@ -32,13 +32,126 @@ function jsonError(string $msg, int $code = 400): void {
 }
 
 // ============================================================
+// Remember-me persistent cookie (token stored in DB)
+// ============================================================
+define('REMEMBER_COOKIE', 'BESIX_REM');
+define('REMEMBER_DAYS',   30);
+
+/** Ensure remember_tokens table exists (idempotent). */
+function _ensureRememberTable(): void {
+    static $done = false;
+    if ($done) return;
+    getDB()->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        user_id    INT NOT NULL,
+        token_hash CHAR(64) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        INDEX idx_tok (token_hash),
+        INDEX idx_uid (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $done = true;
+}
+
+/** Issue a new remember-me cookie and store its hash in DB. */
+function setRememberCookie(int $userId): void {
+    _ensureRememberTable();
+    $db    = getDB();
+    $token = bin2hex(random_bytes(32));   // 64 hex chars
+    $hash  = hash('sha256', $token);
+    $exp   = date('Y-m-d H:i:s', time() + 86400 * REMEMBER_DAYS);
+
+    // Remove all existing tokens for this user + any expired tokens
+    $db->prepare("DELETE FROM remember_tokens WHERE user_id = ? OR expires_at < NOW()")
+       ->execute([$userId]);
+
+    $db->prepare("INSERT INTO remember_tokens (user_id, token_hash, expires_at) VALUES (?,?,?)")
+       ->execute([$userId, $hash, $exp]);
+
+    setcookie(REMEMBER_COOKIE, $userId . ':' . $token, [
+        'expires'  => time() + 86400 * REMEMBER_DAYS,
+        'path'     => '/',
+        'domain'   => '.besix.cz',
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
+
+/**
+ * Validate the remember-me cookie.
+ * Returns the user row on success (and rotates the token), null otherwise.
+ */
+function checkRememberCookie(): ?array {
+    $raw = $_COOKIE[REMEMBER_COOKIE] ?? '';
+    if (!$raw) return null;
+
+    $parts = explode(':', $raw, 2);
+    if (count($parts) !== 2) return null;
+    [$userId, $token] = $parts;
+    if (!ctype_digit($userId) || strlen($token) !== 64) return null;
+
+    try {
+        _ensureRememberTable();
+        $hash = hash('sha256', $token);
+        $stmt = getDB()->prepare(
+            'SELECT rt.user_id, u.name, u.email, u.avatar_color
+               FROM remember_tokens rt
+               JOIN users u ON u.id = rt.user_id
+              WHERE rt.user_id = ? AND rt.token_hash = ? AND rt.expires_at > NOW()
+              LIMIT 1'
+        );
+        $stmt->execute([(int)$userId, $hash]);
+        $user = $stmt->fetch();
+    } catch (\Throwable $e) {
+        return null; // table not yet created on first deploy
+    }
+
+    if (!$user) return null;
+
+    // Rotate: issue a fresh token (old one deleted inside setRememberCookie)
+    setRememberCookie((int)$user['user_id']);
+    return $user;
+}
+
+/** Expire the cookie in the browser and revoke its DB record. */
+function clearRememberCookie(): void {
+    $raw = $_COOKIE[REMEMBER_COOKIE] ?? '';
+    if ($raw) {
+        $parts = explode(':', $raw, 2);
+        if (count($parts) === 2 && ctype_digit($parts[0]) && strlen($parts[1]) === 64) {
+            try {
+                _ensureRememberTable();
+                $hash = hash('sha256', $parts[1]);
+                getDB()->prepare("DELETE FROM remember_tokens WHERE token_hash = ?")
+                       ->execute([$hash]);
+            } catch (\Throwable $e) {}
+        }
+    }
+    setcookie(REMEMBER_COOKIE, '', [
+        'expires'  => time() - 3600,
+        'path'     => '/',
+        'domain'   => '.besix.cz',
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
+
+// ============================================================
 // Auth – PHP native session (sdílená s board.besix.cz)
 // Session je nastartovaná v config.php
 // ============================================================
 function requireAuth(): array {
     $user = $_SESSION['user'] ?? null;
     if (!$user || empty($user['id'])) {
-        jsonError('Nepřihlášen', 401);
+        // Session expired or missing – fall back to remember-me cookie
+        $remembered = checkRememberCookie();
+        if ($remembered) {
+            loginSession($remembered);
+            $user = $_SESSION['user'];
+        } else {
+            jsonError('Nepřihlášen', 401);
+        }
     }
     return $user; // ['id', 'name', 'email', 'avatar_color']
 }
@@ -54,6 +167,7 @@ function loginSession(array $user): void {
 }
 
 function logoutSession(): void {
+    clearRememberCookie();   // revoke persistent token before destroying session
     $_SESSION = [];
     session_destroy();
 }
