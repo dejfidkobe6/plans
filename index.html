@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BeSix Plans</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -2550,7 +2550,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #mobile-bottom-bar { display: flex; }
   /* Push canvas area up so it isn't hidden behind bottom bar */
   #main-layout { padding-bottom: 54px; }
-  #main-layout { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px)); }
   /* Toast above bottom bar */
   .toast-container { bottom: 64px !important; }
 }
@@ -5451,8 +5450,13 @@ function setupEventListeners() {
   // Home page search
   document.getElementById('home-search').addEventListener('input', renderHomePage);
 
-  // Resize observer
-  const ro = new ResizeObserver(() => resizeCanvas());
+  // Resize observer – debounced so rapid browser-chrome resizes (iOS address
+  // bar appearing / disappearing) don't cascade into repeated canvas clears.
+  let _resizeTimer = null;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => fabricCanvas && resizeCanvas(), 60);
+  });
   ro.observe(document.getElementById('canvas-area'));
 
   // Hover tooltip
@@ -6981,8 +6985,19 @@ function remove3DModel() {
 // ============================================================
 function resizeCanvas() {
   const area = document.getElementById('canvas-area');
-  fabricCanvas.setWidth(area.clientWidth);
-  fabricCanvas.setHeight(area.clientHeight);
+  const w = area.clientWidth;
+  const h = area.clientHeight;
+  if (w < 20 || h < 20) return; // ignore transient 0-size during layout
+
+  // Fabric's setWidth/Height resets the backing store which can wipe the
+  // viewport transform on some browsers – save it and restore after.
+  const savedVpt = fabricCanvas.viewportTransform
+    ? fabricCanvas.viewportTransform.slice()
+    : [1, 0, 0, 1, 0, 0];
+
+  fabricCanvas.setWidth(w);
+  fabricCanvas.setHeight(h);
+  fabricCanvas.setViewportTransform(savedVpt);
   fabricCanvas.renderAll();
   drawGrid();
 
