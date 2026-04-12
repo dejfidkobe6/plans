@@ -4810,8 +4810,10 @@ function setupEventListeners() {
 
     if (appState.tool === 'pan' || (spacePressed && appState.tool !== 'pan')) {
       isPanning = true;
-      panStartX = e.clientX;
-      panStartY = e.clientY;
+      // Touch events have clientX on touches[0], not directly on e
+      const pos = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      panStartX = pos.clientX || 0;
+      panStartY = pos.clientY || 0;
       lastViewportX = cw.viewportTransform[4];
       lastViewportY = cw.viewportTransform[5];
       cw.defaultCursor = 'grabbing';
@@ -4895,8 +4897,9 @@ function setupEventListeners() {
     document.getElementById('cursor-pos').textContent = 'X: ' + Math.round(pointer.x) + ' Y: ' + Math.round(pointer.y);
 
     if (isPanning && !_touch2) {
-      const dx = e.clientX - panStartX;
-      const dy = e.clientY - panStartY;
+      const pos = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      const dx = (pos.clientX || 0) - panStartX;
+      const dy = (pos.clientY || 0) - panStartY;
       const vpt = cw.viewportTransform.slice();
       vpt[4] = lastViewportX + dx;
       vpt[5] = lastViewportY + dy;
@@ -5138,13 +5141,40 @@ function setupEventListeners() {
     cw.renderAll();
   }, { passive: false });
 
-  // Touch – two-finger pan (and pinch-zoom)
-  let _touch2 = null; // { x, y, dist, vptX, vptY, zoom }
+  // Touch – two-finger pan/pinch-zoom + tap-to-select in pan mode
+  let _touch2 = null;   // { x, y, dist, vptX, vptY, zoom }
+  let _tap1   = null;   // { x, y, time } – single-finger tap detection
+  let _panMoved = false;// did the finger actually move?
+
+  // Helper: find annotation object at canvas point (for tap-select)
+  function _findAnnotAtPointer(clientX, clientY) {
+    const canvasEl = cw.upperCanvasEl || cw.getElement();
+    const rect = canvasEl.getBoundingClientRect();
+    // Build a minimal event-like object that getPointer understands
+    const fakeE = { clientX, clientY, target: canvasEl,
+                    touches: [{ clientX, clientY }] };
+    const pointer = cw.getPointer(fakeE);
+    const objs = cw.getObjects();
+    for (let i = objs.length - 1; i >= 0; i--) {
+      const o = objs[i];
+      // Labels have annotLabelFor – resolve to their parent annotation
+      if (o.annotLabelFor) {
+        const parent = objs.find(p => p.annotId === o.annotLabelFor);
+        if (parent && parent.containsPoint(pointer)) return parent;
+        continue;
+      }
+      if (!o.annotId || o.isBackground) continue;
+      if (o.containsPoint(pointer)) return o;
+    }
+    return null;
+  }
+
   wrapper.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       e.preventDefault();
       // Cancel any single-finger pan that may have started from touch[0]
       isPanning = false;
+      _tap1 = null;
       cw.defaultCursor = appState.tool === 'pan' ? 'grab' : 'default';
       const t0 = e.touches[0], t1 = e.touches[1];
       const mx = (t0.clientX + t1.clientX) / 2;
@@ -5153,9 +5183,18 @@ function setupEventListeners() {
       _touch2 = { x: mx, y: my, dist, vptX: cw.viewportTransform[4], vptY: cw.viewportTransform[5], zoom: cw.getZoom() };
     } else {
       _touch2 = null;
+      // Single-finger: start tap detection
+      const t = e.touches[0];
+      _tap1 = { x: t.clientX, y: t.clientY, time: Date.now() };
+      _panMoved = false;
     }
   }, { passive: false });
   wrapper.addEventListener('touchmove', (e) => {
+    // Mark as "real drag" if finger moved more than 8px
+    if (_tap1 && e.touches.length === 1) {
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - _tap1.x, t.clientY - _tap1.y) > 8) _panMoved = true;
+    }
     if (e.touches.length === 2 && _touch2) {
       e.preventDefault();
       const t0 = e.touches[0], t1 = e.touches[1];
@@ -5190,6 +5229,27 @@ function setupEventListeners() {
     if (e.touches.length < 2 && _touch2) {
       _touch2 = null;
       saveCurrentLevel();
+    }
+
+    // Tap-to-select: short tap with no significant movement in pan mode
+    if (e.touches.length === 0 && _tap1 && !_touch2 && !_panMoved) {
+      const t = e.changedTouches[0];
+      const elapsed = Date.now() - _tap1.time;
+      if (elapsed < 400) {
+        const found = _findAnnotAtPointer(t.clientX, t.clientY);
+        if (found) {
+          cw.setActiveObject(found);
+          cw.renderAll();
+          onObjectSelected({ target: found });
+          if (window.innerWidth <= 768 && window.openMobRightPanel) openMobRightPanel();
+        } else if (appState.tool === 'pan') {
+          // Tapped empty space – deselect
+          cw.discardActiveObject();
+          cw.renderAll();
+          deselectAnnot();
+        }
+      }
+      _tap1 = null;
     }
   });
 
