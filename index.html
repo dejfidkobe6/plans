@@ -2780,8 +2780,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn" id="tool-polygon" data-tool="polygon" title="Víceuhelník – klik přidá bod, dvojklik ukončí (L)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L8 5 L19 9 L16 19 Z"/><circle cx="4" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.8" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1.8" fill="currentColor" stroke="none"/></svg>
     </button>
-    <button class="tb-btn tool-btn" id="tool-partition" data-tool="partition" title="Příčka – tažením nakreslit zeď/příčku">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+    <button class="tb-btn tool-btn" id="tool-partition" data-tool="partition" title="Příčka – klikni 1. bod, klikni 2. bod">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>
     </button>
     <button class="tb-btn tool-btn" id="tool-pin" data-tool="pin" title="Špendlík (P)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
@@ -3646,6 +3646,8 @@ let polyPoints = [];
 let polyTempObjects = [];
 let polyPointSnap = [];
 let polyPreviewLine = null;
+// Partition (line) tool state
+let partitionStartPt = null;
 let panStartX = 0, panStartY = 0;
 let lastViewportX = 0, lastViewportY = 0;
 let spacePressed = false;
@@ -4387,6 +4389,10 @@ function setTool(tool) {
   if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool && polyPoints.length > 0) {
     cancelPolygon();
   }
+  if (appState.tool === 'partition' && tool !== 'partition' && partitionStartPt) {
+    partitionStartPt = null;
+    if (tempShape) { fabricCanvas.remove(tempShape); tempShape = null; fabricCanvas.renderAll(); }
+  }
   appState.tool = tool;
   // Update UI
   document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -4792,7 +4798,7 @@ function addAnnotationProperties(obj, type) {
     lockRotation: true,
     hasControls: false,
     hasBorders: true,
-    perPixelTargetFind: (type === 'polyline' || type === 'arrow'),
+    perPixelTargetFind: (type === 'polyline' || type === 'arrow' || type === 'partition'),
   });
   return obj;
 }
@@ -4807,7 +4813,7 @@ function applyAnnotationLocks() {
       lockRotation: true,
       hasControls: false,
       hasBorders: true,
-      perPixelTargetFind: (o.annotType === 'polyline' || o.annotType === 'arrow'),
+      perPixelTargetFind: (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition'),
     });
   });
 }
@@ -4852,7 +4858,7 @@ function setupEventListeners() {
       const hits = [];
       this.getObjects().forEach(o => {
         if (!o.annotId || o.isBackground || o.annotLabelFor) return;
-        const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow');
+        const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition');
         if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
       });
       if (hits.length === 0) return _origFindTarget(e, skipGroup);
@@ -4895,6 +4901,44 @@ function setupEventListeners() {
       return;
     }
 
+    // Partition: two-click line tool (click start, click end)
+    if (appState.tool === 'partition') {
+      const color = getActiveProfeseColor();
+      if (!partitionStartPt) {
+        partitionStartPt = { x: pointer.x, y: pointer.y };
+        tempShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+          stroke: color, strokeWidth: 6,
+          strokeLineCap: 'round',
+          selectable: false, evented: false,
+        });
+        cw.add(tempShape);
+      } else {
+        const x1 = partitionStartPt.x, y1 = partitionStartPt.y;
+        const x2 = pointer.x, y2 = pointer.y;
+        partitionStartPt = null;
+        if (tempShape) { cw.remove(tempShape); tempShape = null; }
+        if (Math.hypot(x2 - x1, y2 - y1) < 3) { cw.renderAll(); return; }
+        const wall = new fabric.Polyline([{ x: x1, y: y1 }, { x: x2, y: y2 }], {
+          stroke: color, strokeWidth: 6,
+          fill: 'transparent',
+          strokeLineCap: 'round',
+          strokeUniform: true,
+          perPixelTargetFind: true,
+        });
+        addAnnotationProperties(wall, 'partition');
+        cw.add(wall);
+        createAnnotLabel(wall);
+        cw.setActiveObject(wall);
+        pushUndoState();
+        updateAnnotList();
+        onObjectSelected({ target: wall });
+        setTool('select');
+        saveCurrentLevel();
+        cw.renderAll();
+      }
+      return;
+    }
+
     if (appState.tool === 'select' || appState.tool === 'freehand') return;
 
     isDrawing = true;
@@ -4910,18 +4954,6 @@ function setupEventListeners() {
     } else if (appState.tool === 'text') {
       isDrawing = false;
       placeTextAt(pointer.x, pointer.y);
-    } else if (appState.tool === 'partition') {
-      tempShape = new fabric.Rect({
-        left: pointer.x, top: pointer.y,
-        width: 1, height: 1,
-        fill: color + '66',
-        stroke: color,
-        strokeWidth: 2,
-        strokeUniform: true,
-        selectable: false, evented: false,
-        originX: 'left', originY: 'top'
-      });
-      cw.add(tempShape);
     } else if (appState.tool === 'rect') {
       tempShape = new fabric.Rect({
         left: pointer.x, top: pointer.y,
@@ -4983,12 +5015,18 @@ function setupEventListeners() {
       return;
     }
 
+    if (appState.tool === 'partition' && partitionStartPt && tempShape) {
+      tempShape.set({ x2: pointer.x, y2: pointer.y });
+      cw.renderAll();
+      return;
+    }
+
     if (!isDrawing || !tempShape) return;
 
     const dx = pointer.x - drawStartX;
     const dy = pointer.y - drawStartY;
 
-    if (appState.tool === 'rect' || appState.tool === 'partition') {
+    if (appState.tool === 'rect') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       tempShape.set({ left, top, width: Math.abs(dx), height: Math.abs(dy) });
@@ -5034,26 +5072,7 @@ function setupEventListeners() {
 
     const color = getActiveProfeseColor();
 
-    if (appState.tool === 'partition') {
-      const left = dx < 0 ? pointer.x : drawStartX;
-      const top = dy < 0 ? pointer.y : drawStartY;
-      const wall = new fabric.Rect({
-        left, top,
-        width: Math.abs(dx), height: Math.abs(dy),
-        fill: color + '66',
-        stroke: color,
-        strokeWidth: 2,
-        strokeUniform: true
-      });
-      addAnnotationProperties(wall, 'partition');
-      cw.add(wall);
-      createAnnotLabel(wall);
-      cw.setActiveObject(wall);
-      pushUndoState();
-      updateAnnotList();
-      onObjectSelected({ target: wall });
-      setTool('select');
-    } else if (appState.tool === 'rect') {
+    if (appState.tool === 'rect') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       const rect = new fabric.Rect({
@@ -5225,7 +5244,7 @@ function setupEventListeners() {
     const hits = [];
     cw.getObjects().forEach(o => {
       if (o.annotLabelFor || !o.annotId || o.isBackground) return;
-      const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow');
+      const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition');
       if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
     });
     if (hits.length === 0) return null;
