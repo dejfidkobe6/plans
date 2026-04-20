@@ -3431,7 +3431,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <div id="annot-edit-body">
       <div class="ae-field">
-        <label>Profese</label>
+        <label>Firma / dodavatel</label>
         <select id="ae-profese"></select>
       </div>
       <div class="ae-field">
@@ -4562,6 +4562,12 @@ function getLabelFirma(obj) {
   return profObj && profObj.firma ? profObj.firma : (obj.profese || '');
 }
 
+// Returns firma name for a profese key, falls back to profese name
+function getFirmaDisplay(profeseName) {
+  const p = (appState.profese || []).find(x => x.name === profeseName);
+  return (p && p.firma) ? p.firma : (profeseName || '—');
+}
+
 function labelLineTop(obj) {
   return getLabelFirma(obj);
 }
@@ -4784,9 +4790,54 @@ function addAnnotationProperties(obj, type) {
     priorita: 'Střední',
     prirazeno: '',
     status: 'Nový úkol',
+    createdAt: new Date().toISOString(),
+    lockMovementX: true, lockMovementY: true,
+    lockScalingX: true,  lockScalingY: true,
+    lockRotation: true,
+    hasControls: false,
+    hasBorders: true,
+    perPixelTargetFind: true,
     createdAt: new Date().toISOString()
   });
   return obj;
+}
+
+// Apply lock properties to all existing annotations (called after loadFromJSON/undo/redo)
+function applyAnnotationLocks() {
+  fabricCanvas.getObjects().forEach(o => {
+    if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+    o.set({
+      lockMovementX: true, lockMovementY: true,
+      lockScalingX: true,  lockScalingY: true,
+      lockRotation: true,
+      hasControls: false,
+      hasBorders: true,
+      perPixelTargetFind: true,
+    });
+  });
+}
+
+// Distance from point (px,py) to line segment (ax,ay)-(bx,by)
+function _distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+// Check whether canvas-space pointer hits any segment of a Fabric Polyline
+function _hitsPolylineSegments(obj, pointer, tolerance) {
+  if (!obj.points || obj.points.length < 2) return false;
+  const matrix = obj.calcTransformMatrix();
+  const offset = obj.pathOffset || { x: 0, y: 0 };
+  const pts = obj.points.map(p =>
+    fabric.util.transformPoint({ x: p.x - offset.x, y: p.y - offset.y }, matrix)
+  );
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (_distToSegment(pointer.x, pointer.y, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y) <= tolerance) return true;
+  }
+  return false;
 }
 
 // ============================================================
@@ -4794,6 +4845,34 @@ function addAnnotationProperties(obj, type) {
 // ============================================================
 function setupEventListeners() {
   const cw = fabricCanvas;
+
+  // Per-pixel hit tolerance for thin lines (px in canvas element coords)
+  cw.targetFindTolerance = 5;
+
+  // Override findTarget: pixel-accurate hit detection + smallest-annotation priority.
+  // Uses Fabric's isTargetTransparent() so ellipses, polygons and lines are all
+  // constrained to their actual painted pixels, not their bounding boxes.
+  const _origFindTarget = cw.findTarget.bind(cw);
+  cw.findTarget = function(e, skipGroup) {
+    if (appState.tool !== 'select') return _origFindTarget(e, skipGroup);
+    try {
+      // getPointer(e, true) = absolute canvas-element pixel coords (what isTargetTransparent expects)
+      const abs = this.getPointer(e, true);
+      const hits = [];
+      this.getObjects().forEach(o => {
+        if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+        if (!this.isTargetTransparent(o, abs.x, abs.y)) hits.push(o);
+      });
+      if (hits.length === 0) return _origFindTarget(e, skipGroup);
+      if (hits.length === 1) return hits[0];
+      // Multiple hits: prefer the annotation with the smallest bounding area
+      hits.sort((a, b) => {
+        const ra = a.getBoundingRect(), rb = b.getBoundingRect();
+        return (ra.width * ra.height) - (rb.width * rb.height);
+      });
+      return hits[0];
+    } catch(_) { return _origFindTarget(e, skipGroup); }
+  };
 
   // Mouse down
   cw.on('mouse:down', (opt) => {
@@ -5152,6 +5231,20 @@ function setupEventListeners() {
     // Build a minimal event-like object that getPointer understands
     const fakeE = { clientX, clientY, target: canvasEl,
                     touches: [{ clientX, clientY }] };
+    // getPointer(e, true) = absolute canvas-element pixel coords for isTargetTransparent
+    const abs = cw.getPointer(fakeE, true);
+    const hits = [];
+    cw.getObjects().forEach(o => {
+      if (o.annotLabelFor || !o.annotId || o.isBackground) return;
+      if (!cw.isTargetTransparent(o, abs.x, abs.y)) hits.push(o);
+    });
+    if (hits.length === 0) return null;
+    if (hits.length === 1) return hits[0];
+    hits.sort((a, b) => {
+      const ra = a.getBoundingRect(), rb = b.getBoundingRect();
+      return (ra.width * ra.height) - (rb.width * rb.height);
+    });
+    return hits[0];
     const pointer = cw.getPointer(fakeE);
     const objs = cw.getObjects();
     for (let i = objs.length - 1; i >= 0; i--) {
@@ -5783,7 +5876,7 @@ function updateAnnotList() {
         <div class="annot-info">
           <div class="annot-label">${escHtml(obj.popisek || getAnnotTypeName(obj.annotType || obj.type))}</div>
           <div class="annot-meta">
-            <span>${escHtml(obj.profese || '—')}</span>
+            <span>${escHtml(getFirmaDisplay(obj.profese))}</span>
             <span><span class="status-dot ${statusClass}"></span>${escHtml(obj.status || 'Nový úkol')}</span>
           </div>
         </div>
@@ -5828,7 +5921,7 @@ function updateProfBadges(objects) {
     badge.style.color = color;
     badge.style.borderColor = color + '66';
     badge.style.background = color + '11';
-    badge.innerHTML = `<span>${escHtml(prof)}</span><span class="badge-count">${cnt}</span>`;
+    badge.innerHTML = `<span>${escHtml(getFirmaDisplay(prof))}</span><span class="badge-count">${cnt}</span>`;
     container.appendChild(badge);
   });
 }
@@ -7273,9 +7366,10 @@ function openAnnotEditModal(annotId, levelIdx) {
 
   // Naplň dropdown profese
   const profSel = document.getElementById('ae-profese');
-  const profese = appState.profese || [];
+  const profese = [...(appState.profese || [])].sort((a, b) =>
+    (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
   profSel.innerHTML = profese.map(p =>
-    `<option value="${escHtml(p.name)}"${p.name === ann.profese ? ' selected' : ''}>${escHtml(p.name)}</option>`
+    `<option value="${escHtml(p.name)}"${p.name === ann.profese ? ' selected' : ''}>${escHtml(p.firma || p.name)}</option>`
   ).join('');
 
   document.getElementById('ae-popisek').value   = ann.popisek   || '';
@@ -8900,6 +8994,13 @@ async function renderProjectGrid() {
   const projects = (ok && data.projects) ? data.projects : [];
 
   grid.innerHTML = '';
+
+  if (!ok) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#EF4444;font-size:12px;padding:8px 4px;grid-column:1/-1;word-break:break-all;';
+    errEl.textContent = 'Chyba načítání projektů: ' + (data.error || JSON.stringify(data));
+    grid.appendChild(errEl);
+  }
 
   // New project card
   const newCard = document.createElement('div');
