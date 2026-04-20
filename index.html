@@ -2780,8 +2780,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="tb-btn tool-btn" id="tool-polygon" data-tool="polygon" title="Víceuhelník – klik přidá bod, dvojklik ukončí (L)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L8 5 L19 9 L16 19 Z"/><circle cx="4" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.8" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1.8" fill="currentColor" stroke="none"/></svg>
     </button>
-    <button class="tb-btn tool-btn" id="tool-partition" data-tool="partition" title="Příčka – klikni 1. bod, klikni 2. bod">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+    <button class="tb-btn tool-btn" id="tool-partition" data-tool="partition" title="Příčka – tažením nakreslit zeď/příčku">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
     </button>
     <button class="tb-btn tool-btn" id="tool-pin" data-tool="pin" title="Špendlík (P)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 10.5 7 7a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/></svg>
@@ -3032,7 +3032,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
           </summary>
           <div class="prop-section-body">
             <div class="field-group">
-              <label class="field-label">Firma / dodavatel</label>
+              <label class="field-label">Profese</label>
               <select class="field-select" id="prop-profese">
                 <option>Elektro</option>
                 <option>Voda</option>
@@ -3646,8 +3646,6 @@ let polyPoints = [];
 let polyTempObjects = [];
 let polyPointSnap = [];
 let polyPreviewLine = null;
-// Partition (line) tool state
-let partitionStartPt = null;
 let panStartX = 0, panStartY = 0;
 let lastViewportX = 0, lastViewportY = 0;
 let spacePressed = false;
@@ -3767,7 +3765,6 @@ function switchLevel(idx) {
         _isProjectLoading = false; // no background – loading done
         fitToWindow();
       }
-      applyAnnotationLocks();
       rebuildAllLabels();
       fabricCanvas.renderAll();
       updateAnnotList();
@@ -4389,10 +4386,6 @@ function setTool(tool) {
   if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool && polyPoints.length > 0) {
     cancelPolygon();
   }
-  if (appState.tool === 'partition' && tool !== 'partition' && partitionStartPt) {
-    partitionStartPt = null;
-    if (tempShape) { fabricCanvas.remove(tempShape); tempShape = null; fabricCanvas.renderAll(); }
-  }
   appState.tool = tool;
   // Update UI
   document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -4410,7 +4403,7 @@ function setTool(tool) {
   if (tool === 'select') {
     fabricCanvas.selection = true;
     fabricCanvas.defaultCursor = 'default';
-    fabricCanvas.hoverCursor = 'pointer';
+    fabricCanvas.hoverCursor = 'move';
   } else if (tool === 'pan') {
     fabricCanvas.selection = false;
     fabricCanvas.defaultCursor = 'grab';
@@ -4524,8 +4517,7 @@ function finishPolyline() {
   const poly = new fabric.Polyline(pts, {
     fill: 'transparent', stroke: color,
     strokeWidth: 2, strokeUniform: true,
-    strokeLineJoin: 'round', strokeLineCap: 'round',
-    perPixelTargetFind: true,
+    strokeLineJoin: 'round', strokeLineCap: 'round'
   });
   addAnnotationProperties(poly, 'polyline');
   cw.add(poly);
@@ -4805,6 +4797,7 @@ function addAnnotationProperties(obj, type) {
     hasControls: false,
     hasBorders: true,
     perPixelTargetFind: true,
+    createdAt: new Date().toISOString()
   });
   return obj;
 }
@@ -4911,44 +4904,6 @@ function setupEventListeners() {
       return;
     }
 
-    // Partition: two-click line tool (click start, click end)
-    if (appState.tool === 'partition') {
-      const color = getActiveProfeseColor();
-      if (!partitionStartPt) {
-        partitionStartPt = { x: pointer.x, y: pointer.y };
-        tempShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
-          stroke: color, strokeWidth: 6,
-          strokeLineCap: 'round',
-          selectable: false, evented: false,
-        });
-        cw.add(tempShape);
-      } else {
-        const x1 = partitionStartPt.x, y1 = partitionStartPt.y;
-        const x2 = pointer.x, y2 = pointer.y;
-        partitionStartPt = null;
-        if (tempShape) { cw.remove(tempShape); tempShape = null; }
-        if (Math.hypot(x2 - x1, y2 - y1) < 3) { cw.renderAll(); return; }
-        const wall = new fabric.Polyline([{ x: x1, y: y1 }, { x: x2, y: y2 }], {
-          stroke: color, strokeWidth: 6,
-          fill: 'transparent',
-          strokeLineCap: 'round',
-          strokeUniform: true,
-          perPixelTargetFind: true,
-        });
-        addAnnotationProperties(wall, 'partition');
-        cw.add(wall);
-        createAnnotLabel(wall);
-        cw.setActiveObject(wall);
-        pushUndoState();
-        updateAnnotList();
-        onObjectSelected({ target: wall });
-        setTool('select');
-        saveCurrentLevel();
-        cw.renderAll();
-      }
-      return;
-    }
-
     if (appState.tool === 'select' || appState.tool === 'freehand') return;
 
     isDrawing = true;
@@ -4964,6 +4919,18 @@ function setupEventListeners() {
     } else if (appState.tool === 'text') {
       isDrawing = false;
       placeTextAt(pointer.x, pointer.y);
+    } else if (appState.tool === 'partition') {
+      tempShape = new fabric.Rect({
+        left: pointer.x, top: pointer.y,
+        width: 1, height: 1,
+        fill: color + '66',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true,
+        selectable: false, evented: false,
+        originX: 'left', originY: 'top'
+      });
+      cw.add(tempShape);
     } else if (appState.tool === 'rect') {
       tempShape = new fabric.Rect({
         left: pointer.x, top: pointer.y,
@@ -5025,18 +4992,12 @@ function setupEventListeners() {
       return;
     }
 
-    if (appState.tool === 'partition' && partitionStartPt && tempShape) {
-      tempShape.set({ x2: pointer.x, y2: pointer.y });
-      cw.renderAll();
-      return;
-    }
-
     if (!isDrawing || !tempShape) return;
 
     const dx = pointer.x - drawStartX;
     const dy = pointer.y - drawStartY;
 
-    if (appState.tool === 'rect') {
+    if (appState.tool === 'rect' || appState.tool === 'partition') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       tempShape.set({ left, top, width: Math.abs(dx), height: Math.abs(dy) });
@@ -5082,7 +5043,26 @@ function setupEventListeners() {
 
     const color = getActiveProfeseColor();
 
-    if (appState.tool === 'rect') {
+    if (appState.tool === 'partition') {
+      const left = dx < 0 ? pointer.x : drawStartX;
+      const top = dy < 0 ? pointer.y : drawStartY;
+      const wall = new fabric.Rect({
+        left, top,
+        width: Math.abs(dx), height: Math.abs(dy),
+        fill: color + '66',
+        stroke: color,
+        strokeWidth: 2,
+        strokeUniform: true
+      });
+      addAnnotationProperties(wall, 'partition');
+      cw.add(wall);
+      createAnnotLabel(wall);
+      cw.setActiveObject(wall);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: wall });
+      setTool('select');
+    } else if (appState.tool === 'rect') {
       const left = dx < 0 ? pointer.x : drawStartX;
       const top = dy < 0 ? pointer.y : drawStartY;
       const rect = new fabric.Rect({
@@ -5247,6 +5227,8 @@ function setupEventListeners() {
   // Helper: find annotation object at canvas point (for tap-select)
   function _findAnnotAtPointer(clientX, clientY) {
     const canvasEl = cw.upperCanvasEl || cw.getElement();
+    const rect = canvasEl.getBoundingClientRect();
+    // Build a minimal event-like object that getPointer understands
     const fakeE = { clientX, clientY, target: canvasEl,
                     touches: [{ clientX, clientY }] };
     // getPointer(e, true) = absolute canvas-element pixel coords for isTargetTransparent
@@ -5263,6 +5245,20 @@ function setupEventListeners() {
       return (ra.width * ra.height) - (rb.width * rb.height);
     });
     return hits[0];
+    const pointer = cw.getPointer(fakeE);
+    const objs = cw.getObjects();
+    for (let i = objs.length - 1; i >= 0; i--) {
+      const o = objs[i];
+      // Labels have annotLabelFor – resolve to their parent annotation
+      if (o.annotLabelFor) {
+        const parent = objs.find(p => p.annotId === o.annotLabelFor);
+        if (parent && parent.containsPoint(pointer)) return parent;
+        continue;
+      }
+      if (!o.annotId || o.isBackground) continue;
+      if (o.containsPoint(pointer)) return o;
+    }
+    return null;
   }
 
   wrapper.addEventListener('touchstart', (e) => {
@@ -5732,8 +5728,7 @@ function createArrow(x1, y1, x2, y2, color) {
     fill: 'transparent',
     selectable: true,
     strokeLineJoin: 'round',
-    strokeLineCap: 'round',
-    perPixelTargetFind: true,
+    strokeLineCap: 'round'
   });
   return line;
 }
@@ -6030,7 +6025,6 @@ function undo() {
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
-    applyAnnotationLocks();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -6043,7 +6037,6 @@ function redo() {
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
-    applyAnnotationLocks();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -8390,14 +8383,11 @@ function rebuildProfeseSelects() {
     } else {
       sel.innerHTML = '';
     }
-    // prop-profese: sort alphabetically by display name (firma or name)
-    const list = id === 'prop-profese'
-      ? [...profese].sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'))
-      : profese;
-    list.forEach(p => {
+    profese.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      opt.textContent = (id === 'prop-profese') ? (p.firma || p.name) : p.name;
+      // prop-profese shows the company name (firma); filter shows profession name
+      opt.textContent = (id === 'prop-profese' && p.firma) ? p.firma : p.name;
       sel.appendChild(opt);
     });
     // Restore previous value if still valid

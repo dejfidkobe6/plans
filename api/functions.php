@@ -14,13 +14,6 @@ function getDB(): PDO {
          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
          PDO::ATTR_EMULATE_PREPARES   => false]
     );
-    // Automatické migrace – spustí se pouze jednou za životnost $pdo
-    try {
-        require_once __DIR__ . '/migrations.php';
-        runMigrations($pdo);
-    } catch (\Throwable $e) {
-        error_log('runMigrations failed: ' . $e->getMessage());
-    }
     return $pdo;
 }
 
@@ -44,10 +37,26 @@ function jsonError(string $msg, int $code = 400): void {
 define('REMEMBER_COOKIE', 'BESIX_REM');
 define('REMEMBER_DAYS',   30);
 
+/** Ensure remember_tokens table exists (idempotent). */
+function _ensureRememberTable(): void {
+    static $done = false;
+    if ($done) return;
+    getDB()->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        user_id    INT NOT NULL,
+        token_hash CHAR(64) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        INDEX idx_tok (token_hash),
+        INDEX idx_uid (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $done = true;
+}
+
 /** Issue a new remember-me cookie and store its hash in DB.
- *  Silently skips on any DB error (login still succeeds). */
+ *  Silently skips if DB table is missing or user has no CREATE rights. */
 function setRememberCookie(int $userId): void {
     try {
+        _ensureRememberTable();
         $db    = getDB();
         $token = bin2hex(random_bytes(32));   // 64 hex chars
         $hash  = hash('sha256', $token);
@@ -88,6 +97,7 @@ function checkRememberCookie(): ?array {
     if (!ctype_digit($userId) || strlen($token) !== 64) return null;
 
     try {
+        _ensureRememberTable();
         $hash = hash('sha256', $token);
         $stmt = getDB()->prepare(
             'SELECT rt.user_id, u.name, u.email, u.avatar_color
@@ -116,6 +126,7 @@ function clearRememberCookie(): void {
         $parts = explode(':', $raw, 2);
         if (count($parts) === 2 && ctype_digit($parts[0]) && strlen($parts[1]) === 64) {
             try {
+                _ensureRememberTable();
                 $hash = hash('sha256', $parts[1]);
                 getDB()->prepare("DELETE FROM remember_tokens WHERE token_hash = ?")
                        ->execute([$hash]);
