@@ -3032,7 +3032,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
           </summary>
           <div class="prop-section-body">
             <div class="field-group">
-              <label class="field-label">Profese</label>
+              <label class="field-label">Firma / dodavatel</label>
               <select class="field-select" id="prop-profese">
                 <option>Elektro</option>
                 <option>Voda</option>
@@ -8369,7 +8369,7 @@ function rebuildProfeseSelects() {
     list.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      opt.textContent = (id === 'prop-profese' && p.firma) ? p.firma : p.name;
+      opt.textContent = (id === 'prop-profese') ? (p.firma || p.name) : p.name;
       sel.appendChild(opt);
     });
     // Restore previous value if still valid
