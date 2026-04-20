@@ -15,8 +15,12 @@ function getDB(): PDO {
          PDO::ATTR_EMULATE_PREPARES   => false]
     );
     // Automatické migrace – spustí se pouze jednou za životnost $pdo
-    require_once __DIR__ . '/migrations.php';
-    runMigrations($pdo);
+    try {
+        require_once __DIR__ . '/migrations.php';
+        runMigrations($pdo);
+    } catch (\Throwable $e) {
+        error_log('runMigrations failed: ' . $e->getMessage());
+    }
     return $pdo;
 }
 

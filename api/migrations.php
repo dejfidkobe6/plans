@@ -50,16 +50,25 @@ $MIGRATIONS = [
 function runMigrations(PDO $db): void {
     global $MIGRATIONS;
 
-    // Vytvoř tabulku migrací pokud neexistuje
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS _migrations (
-            name       VARCHAR(128) NOT NULL PRIMARY KEY,
-            applied_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    // Vytvoř tabulku migrací pokud neexistuje (nekritické – bez ní přeskočíme)
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS _migrations (
+                name       VARCHAR(128) NOT NULL PRIMARY KEY,
+                applied_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (\Throwable $e) {
+        error_log('Cannot create _migrations table: ' . $e->getMessage());
+        return; // Bez tracking tabulky migrace přeskočíme
+    }
 
     // Načti již aplikované migrace
-    $done = $db->query("SELECT name FROM _migrations")->fetchAll(PDO::FETCH_COLUMN);
+    try {
+        $done = $db->query("SELECT name FROM _migrations")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Throwable $e) {
+        return;
+    }
     $done = array_flip($done);
 
     foreach ($MIGRATIONS as $name => $sql) {
