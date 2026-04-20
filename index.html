@@ -8996,6 +8996,13 @@ async function renderProjectGrid() {
 
   grid.innerHTML = '';
 
+  if (!ok) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#EF4444;font-size:12px;padding:8px 4px;grid-column:1/-1;word-break:break-all;';
+    errEl.textContent = 'Chyba načítání projektů: ' + (data.error || JSON.stringify(data));
+    grid.appendChild(errEl);
+  }
+
   // New project card
   const newCard = document.createElement('div');
   newCard.className = 'project-card new-project-card';
