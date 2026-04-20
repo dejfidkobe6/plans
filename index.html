@@ -3431,7 +3431,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <div id="annot-edit-body">
       <div class="ae-field">
-        <label>Profese</label>
+        <label>Firma / dodavatel</label>
         <select id="ae-profese"></select>
       </div>
       <div class="ae-field">
@@ -4570,6 +4570,12 @@ function getLabelFirma(obj) {
   return profObj && profObj.firma ? profObj.firma : (obj.profese || '');
 }
 
+// Returns firma name for a profese key, falls back to profese name
+function getFirmaDisplay(profeseName) {
+  const p = (appState.profese || []).find(x => x.name === profeseName);
+  return (p && p.firma) ? p.firma : (profeseName || '—');
+}
+
 function labelLineTop(obj) {
   return getLabelFirma(obj);
 }
@@ -4798,7 +4804,7 @@ function addAnnotationProperties(obj, type) {
     lockRotation: true,
     hasControls: false,
     hasBorders: true,
-    perPixelTargetFind: (type === 'polyline' || type === 'arrow' || type === 'partition'),
+    perPixelTargetFind: true,
   });
   return obj;
 }
@@ -4813,7 +4819,7 @@ function applyAnnotationLocks() {
       lockRotation: true,
       hasControls: false,
       hasBorders: true,
-      perPixelTargetFind: (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition'),
+      perPixelTargetFind: true,
     });
   });
 }
@@ -4847,22 +4853,26 @@ function _hitsPolylineSegments(obj, pointer, tolerance) {
 function setupEventListeners() {
   const cw = fabricCanvas;
 
-  // Override findTarget: prefer smallest annotation at click point;
-  // use segment distance for line/polyline shapes instead of bounding-box containsPoint.
+  // Per-pixel hit tolerance for thin lines (px in canvas element coords)
+  cw.targetFindTolerance = 5;
+
+  // Override findTarget: pixel-accurate hit detection + smallest-annotation priority.
+  // Uses Fabric's isTargetTransparent() so ellipses, polygons and lines are all
+  // constrained to their actual painted pixels, not their bounding boxes.
   const _origFindTarget = cw.findTarget.bind(cw);
   cw.findTarget = function(e, skipGroup) {
     if (appState.tool !== 'select') return _origFindTarget(e, skipGroup);
     try {
-      const pointer = this.getPointer(e);
-      const tol = Math.max(6, 10 / this.getZoom()); // screen-pixel tolerance
+      // getPointer(e, true) = absolute canvas-element pixel coords (what isTargetTransparent expects)
+      const abs = this.getPointer(e, true);
       const hits = [];
       this.getObjects().forEach(o => {
         if (!o.annotId || o.isBackground || o.annotLabelFor) return;
-        const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition');
-        if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
+        if (!this.isTargetTransparent(o, abs.x, abs.y)) hits.push(o);
       });
       if (hits.length === 0) return _origFindTarget(e, skipGroup);
       if (hits.length === 1) return hits[0];
+      // Multiple hits: prefer the annotation with the smallest bounding area
       hits.sort((a, b) => {
         const ra = a.getBoundingRect(), rb = b.getBoundingRect();
         return (ra.width * ra.height) - (rb.width * rb.height);
@@ -5239,17 +5249,15 @@ function setupEventListeners() {
     const canvasEl = cw.upperCanvasEl || cw.getElement();
     const fakeE = { clientX, clientY, target: canvasEl,
                     touches: [{ clientX, clientY }] };
-    const pointer = cw.getPointer(fakeE);
-    const tol = Math.max(6, 10 / cw.getZoom());
+    // getPointer(e, true) = absolute canvas-element pixel coords for isTargetTransparent
+    const abs = cw.getPointer(fakeE, true);
     const hits = [];
     cw.getObjects().forEach(o => {
       if (o.annotLabelFor || !o.annotId || o.isBackground) return;
-      const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow' || o.annotType === 'partition');
-      if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
+      if (!cw.isTargetTransparent(o, abs.x, abs.y)) hits.push(o);
     });
     if (hits.length === 0) return null;
     if (hits.length === 1) return hits[0];
-    // Prefer smallest bounding area
     hits.sort((a, b) => {
       const ra = a.getBoundingRect(), rb = b.getBoundingRect();
       return (ra.width * ra.height) - (rb.width * rb.height);
@@ -5873,7 +5881,7 @@ function updateAnnotList() {
         <div class="annot-info">
           <div class="annot-label">${escHtml(obj.popisek || getAnnotTypeName(obj.annotType || obj.type))}</div>
           <div class="annot-meta">
-            <span>${escHtml(obj.profese || '—')}</span>
+            <span>${escHtml(getFirmaDisplay(obj.profese))}</span>
             <span><span class="status-dot ${statusClass}"></span>${escHtml(obj.status || 'Nový úkol')}</span>
           </div>
         </div>
@@ -5918,7 +5926,7 @@ function updateProfBadges(objects) {
     badge.style.color = color;
     badge.style.borderColor = color + '66';
     badge.style.background = color + '11';
-    badge.innerHTML = `<span>${escHtml(prof)}</span><span class="badge-count">${cnt}</span>`;
+    badge.innerHTML = `<span>${escHtml(getFirmaDisplay(prof))}</span><span class="badge-count">${cnt}</span>`;
     container.appendChild(badge);
   });
 }
@@ -7365,9 +7373,10 @@ function openAnnotEditModal(annotId, levelIdx) {
 
   // Naplň dropdown profese
   const profSel = document.getElementById('ae-profese');
-  const profese = appState.profese || [];
+  const profese = [...(appState.profese || [])].sort((a, b) =>
+    (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
   profSel.innerHTML = profese.map(p =>
-    `<option value="${escHtml(p.name)}"${p.name === ann.profese ? ' selected' : ''}>${escHtml(p.name)}</option>`
+    `<option value="${escHtml(p.name)}"${p.name === ann.profese ? ' selected' : ''}>${escHtml(p.firma || p.name)}</option>`
   ).join('');
 
   document.getElementById('ae-popisek').value   = ann.popisek   || '';
