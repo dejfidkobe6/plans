@@ -4420,6 +4420,15 @@ function setTool(tool) {
   }
 
   document.getElementById('status-tool-info').textContent = 'Nástroj: ' + (TOOL_NAMES[tool] || tool);
+
+  // Freeze existing annotations while any drawing tool is active
+  const isDrawing = (tool !== 'select' && tool !== 'pan');
+  fabricCanvas.getObjects().forEach(o => {
+    if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+    o.selectable = !isDrawing;
+    o.evented = !isDrawing;
+  });
+
   fabricCanvas.renderAll();
 }
 
