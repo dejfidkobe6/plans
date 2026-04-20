@@ -3746,8 +3746,7 @@ function switchLevel(idx) {
   // If idx === appState.activeLevel (e.g. during openProject after server load), the
   // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
   if (fabricCanvas && appState.activeLevel !== idx && appState.levels[appState.activeLevel]) {
-    const _j = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-    _j.objects = (_j.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
+    const _j = _canvasJSON();
     appState.levels[appState.activeLevel].fabricJSON = _j;
     appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   }
@@ -3761,6 +3760,8 @@ function switchLevel(idx) {
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
+      cleanupOrphanedHelpers();
+      applyAnnotationLocks();
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
       } else {
@@ -4385,7 +4386,7 @@ function setupDrawingEditor() {
 // DRAWING TOOLS
 // ============================================================
 function setTool(tool) {
-  if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool && polyPoints.length > 0) {
+  if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool) {
     cancelPolygon();
   }
   appState.tool = tool;
@@ -4543,10 +4544,7 @@ function finishPolyline() {
 }
 
 function cancelPolygon() {
-  polyTempObjects.forEach(o => fabricCanvas.remove(o));
-  polyTempObjects = []; polyPointSnap = [];
-  if (polyPreviewLine) { fabricCanvas.remove(polyPreviewLine); polyPreviewLine = null; }
-  polyPoints = [];
+  cleanupOrphanedHelpers();
   fabricCanvas.renderAll();
 }
 
@@ -4603,6 +4601,7 @@ function labelLineDates(obj) {
 }
 
 function findLabel(annotId) {
+  if (!annotId) return null;
   return fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
 }
 
@@ -4811,6 +4810,17 @@ function addAnnotationProperties(obj, type) {
     createdAt: new Date().toISOString()
   });
   return obj;
+}
+
+// Remove any orphaned poly helper objects (dots/segments that weren't cleaned up)
+function cleanupOrphanedHelpers() {
+  const orphans = fabricCanvas.getObjects().filter(o =>
+    o.isPolyHelper || (!o.annotId && !o.isBackground && !o.annotLabelFor && o !== tempShape)
+  );
+  orphans.forEach(o => fabricCanvas.remove(o));
+  polyTempObjects = []; polyPointSnap = [];
+  if (polyPreviewLine) { fabricCanvas.remove(polyPreviewLine); polyPreviewLine = null; }
+  polyPoints = [];
 }
 
 // Apply lock properties to all existing annotations (called after loadFromJSON/undo/redo)
@@ -5655,7 +5665,7 @@ function onKeyDown(e) {
   if (e.key === 'Escape') {
     if (moveModeActive) { exitMoveMode(); return; }
     if (cropState) { exitCropMode(); return; }
-    if (appState.tool === 'polygon' && polyPoints.length > 0) {
+    if ((appState.tool === 'polygon' || appState.tool === 'polyline') && polyPoints.length > 0) {
       cancelPolygon();
       return;
     }
@@ -6023,19 +6033,28 @@ function drawGrid() {
 // ============================================================
 // UNDO / REDO
 // ============================================================
+const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground','isPolyHelper'];
+
+function _canvasJSON() {
+  const json = fabricCanvas.toJSON(_JSON_FIELDS);
+  json.objects = (json.objects || []).filter(o => !o.isPolyHelper && !o.isBackground && !o.annotLabelFor);
+  return json;
+}
+
 function pushUndoState() {
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-  undoStack.push(JSON.stringify(json));
+  undoStack.push(JSON.stringify(_canvasJSON()));
   if (undoStack.length > 50) undoStack.shift();
   redoStack = [];
 }
 
 function undo() {
   if (undoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-  redoStack.push(JSON.stringify(current));
+  redoStack.push(JSON.stringify(_canvasJSON()));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
+    cleanupOrphanedHelpers();
+    applyAnnotationLocks();
+    rebuildAllLabels();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -6044,10 +6063,12 @@ function undo() {
 
 function redo() {
   if (redoStack.length === 0) return;
-  const current = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-  undoStack.push(JSON.stringify(current));
+  undoStack.push(JSON.stringify(_canvasJSON()));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
+    cleanupOrphanedHelpers();
+    applyAnnotationLocks();
+    rebuildAllLabels();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -8018,9 +8039,7 @@ function setupAnotacePage() {
 // ============================================================
 function saveCurrentLevel() {
   if (!fabricCanvas || !appState.levels[appState.activeLevel]) return;
-  const json = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
-  // Strip background image and label overlay objects — labels are rebuilt on load
-  json.objects = (json.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
+  const json = _canvasJSON();
   appState.levels[appState.activeLevel].fabricJSON = json;
   appState.levels[appState.activeLevel].viewportTransform = fabricCanvas.viewportTransform.slice();
   // Save background images to IndexedDB + server
