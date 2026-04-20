@@ -3765,6 +3765,7 @@ function switchLevel(idx) {
         _isProjectLoading = false; // no background – loading done
         fitToWindow();
       }
+      applyAnnotationLocks();
       rebuildAllLabels();
       fabricCanvas.renderAll();
       updateAnnotList();
@@ -4403,7 +4404,7 @@ function setTool(tool) {
   if (tool === 'select') {
     fabricCanvas.selection = true;
     fabricCanvas.defaultCursor = 'default';
-    fabricCanvas.hoverCursor = 'move';
+    fabricCanvas.hoverCursor = 'pointer';
   } else if (tool === 'pan') {
     fabricCanvas.selection = false;
     fabricCanvas.defaultCursor = 'grab';
@@ -4517,7 +4518,8 @@ function finishPolyline() {
   const poly = new fabric.Polyline(pts, {
     fill: 'transparent', stroke: color,
     strokeWidth: 2, strokeUniform: true,
-    strokeLineJoin: 'round', strokeLineCap: 'round'
+    strokeLineJoin: 'round', strokeLineCap: 'round',
+    perPixelTargetFind: true,
   });
   addAnnotationProperties(poly, 'polyline');
   cw.add(poly);
@@ -4784,9 +4786,53 @@ function addAnnotationProperties(obj, type) {
     priorita: 'Střední',
     prirazeno: '',
     status: 'Nový úkol',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    lockMovementX: true, lockMovementY: true,
+    lockScalingX: true,  lockScalingY: true,
+    lockRotation: true,
+    hasControls: false,
+    hasBorders: true,
+    perPixelTargetFind: (type === 'polyline' || type === 'arrow'),
   });
   return obj;
+}
+
+// Apply lock properties to all existing annotations (called after loadFromJSON/undo/redo)
+function applyAnnotationLocks() {
+  fabricCanvas.getObjects().forEach(o => {
+    if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+    o.set({
+      lockMovementX: true, lockMovementY: true,
+      lockScalingX: true,  lockScalingY: true,
+      lockRotation: true,
+      hasControls: false,
+      hasBorders: true,
+      perPixelTargetFind: (o.annotType === 'polyline' || o.annotType === 'arrow'),
+    });
+  });
+}
+
+// Distance from point (px,py) to line segment (ax,ay)-(bx,by)
+function _distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+// Check whether canvas-space pointer hits any segment of a Fabric Polyline
+function _hitsPolylineSegments(obj, pointer, tolerance) {
+  if (!obj.points || obj.points.length < 2) return false;
+  const matrix = obj.calcTransformMatrix();
+  const offset = obj.pathOffset || { x: 0, y: 0 };
+  const pts = obj.points.map(p =>
+    fabric.util.transformPoint({ x: p.x - offset.x, y: p.y - offset.y }, matrix)
+  );
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (_distToSegment(pointer.x, pointer.y, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y) <= tolerance) return true;
+  }
+  return false;
 }
 
 // ============================================================
@@ -4794,6 +4840,30 @@ function addAnnotationProperties(obj, type) {
 // ============================================================
 function setupEventListeners() {
   const cw = fabricCanvas;
+
+  // Override findTarget: prefer smallest annotation at click point;
+  // use segment distance for line/polyline shapes instead of bounding-box containsPoint.
+  const _origFindTarget = cw.findTarget.bind(cw);
+  cw.findTarget = function(e, skipGroup) {
+    if (appState.tool !== 'select') return _origFindTarget(e, skipGroup);
+    try {
+      const pointer = this.getPointer(e);
+      const tol = Math.max(6, 10 / this.getZoom()); // screen-pixel tolerance
+      const hits = [];
+      this.getObjects().forEach(o => {
+        if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+        const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow');
+        if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
+      });
+      if (hits.length === 0) return _origFindTarget(e, skipGroup);
+      if (hits.length === 1) return hits[0];
+      hits.sort((a, b) => {
+        const ra = a.getBoundingRect(), rb = b.getBoundingRect();
+        return (ra.width * ra.height) - (rb.width * rb.height);
+      });
+      return hits[0];
+    } catch(_) { return _origFindTarget(e, skipGroup); }
+  };
 
   // Mouse down
   cw.on('mouse:down', (opt) => {
@@ -5148,24 +5218,24 @@ function setupEventListeners() {
   // Helper: find annotation object at canvas point (for tap-select)
   function _findAnnotAtPointer(clientX, clientY) {
     const canvasEl = cw.upperCanvasEl || cw.getElement();
-    const rect = canvasEl.getBoundingClientRect();
-    // Build a minimal event-like object that getPointer understands
     const fakeE = { clientX, clientY, target: canvasEl,
                     touches: [{ clientX, clientY }] };
     const pointer = cw.getPointer(fakeE);
-    const objs = cw.getObjects();
-    for (let i = objs.length - 1; i >= 0; i--) {
-      const o = objs[i];
-      // Labels have annotLabelFor – resolve to their parent annotation
-      if (o.annotLabelFor) {
-        const parent = objs.find(p => p.annotId === o.annotLabelFor);
-        if (parent && parent.containsPoint(pointer)) return parent;
-        continue;
-      }
-      if (!o.annotId || o.isBackground) continue;
-      if (o.containsPoint(pointer)) return o;
-    }
-    return null;
+    const tol = Math.max(6, 10 / cw.getZoom());
+    const hits = [];
+    cw.getObjects().forEach(o => {
+      if (o.annotLabelFor || !o.annotId || o.isBackground) return;
+      const isLine = (o.annotType === 'polyline' || o.annotType === 'arrow');
+      if (isLine ? _hitsPolylineSegments(o, pointer, tol) : o.containsPoint(pointer)) hits.push(o);
+    });
+    if (hits.length === 0) return null;
+    if (hits.length === 1) return hits[0];
+    // Prefer smallest bounding area
+    hits.sort((a, b) => {
+      const ra = a.getBoundingRect(), rb = b.getBoundingRect();
+      return (ra.width * ra.height) - (rb.width * rb.height);
+    });
+    return hits[0];
   }
 
   wrapper.addEventListener('touchstart', (e) => {
@@ -5635,7 +5705,8 @@ function createArrow(x1, y1, x2, y2, color) {
     fill: 'transparent',
     selectable: true,
     strokeLineJoin: 'round',
-    strokeLineCap: 'round'
+    strokeLineCap: 'round',
+    perPixelTargetFind: true,
   });
   return line;
 }
@@ -5932,6 +6003,7 @@ function undo() {
   redoStack.push(JSON.stringify(current));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
+    applyAnnotationLocks();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -5944,6 +6016,7 @@ function redo() {
   undoStack.push(JSON.stringify(current));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
+    applyAnnotationLocks();
     fabricCanvas.renderAll();
     updateAnnotList();
     deselectAnnot();
@@ -8289,10 +8362,13 @@ function rebuildProfeseSelects() {
     } else {
       sel.innerHTML = '';
     }
-    profese.forEach(p => {
+    // prop-profese: sort alphabetically by display name (firma or name)
+    const list = id === 'prop-profese'
+      ? [...profese].sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'))
+      : profese;
+    list.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      // prop-profese shows the company name (firma); filter shows profession name
       opt.textContent = (id === 'prop-profese' && p.firma) ? p.firma : p.name;
       sel.appendChild(opt);
     });
