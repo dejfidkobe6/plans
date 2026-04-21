@@ -3659,7 +3659,11 @@ let animFrameId = null;
 let filterProfese = '', filterStatus = '';
 let contextMenuTarget = null;
 let pendingModalResolve = null;
-let _isProjectLoading = false; // prevents saves during async canvas/image load
+let _isProjectLoading = false;
+// Move-mode: annotation temporarily unlocked for drag after double-click
+let _moveAnnot = null;
+let _lastMoveClickTarget = null;
+let _lastMoveClickTime = 0;
 
 // ============================================================
 // INIT
@@ -4386,6 +4390,7 @@ function setupDrawingEditor() {
 // DRAWING TOOLS
 // ============================================================
 function setTool(tool) {
+  _exitMoveMode();
   if ((appState.tool === 'polygon' || appState.tool === 'polyline') && tool !== appState.tool) {
     cancelPolygon();
   }
@@ -4823,8 +4828,25 @@ function cleanupOrphanedHelpers() {
   polyPoints = [];
 }
 
+function _enterMoveMode(obj) {
+  if (_moveAnnot && _moveAnnot !== obj) _exitMoveMode();
+  _moveAnnot = obj;
+  obj.set({ lockMovementX: false, lockMovementY: false });
+  fabricCanvas.hoverCursor = 'move';
+}
+
+function _exitMoveMode() {
+  if (!_moveAnnot) return;
+  _moveAnnot.set({ lockMovementX: true, lockMovementY: true });
+  _moveAnnot = null;
+  if (appState.tool === 'select') fabricCanvas.hoverCursor = 'pointer';
+  _lastMoveClickTarget = null;
+  _lastMoveClickTime = 0;
+}
+
 // Apply lock properties to all existing annotations (called after loadFromJSON/undo/redo)
 function applyAnnotationLocks() {
+  _moveAnnot = null; _lastMoveClickTarget = null; _lastMoveClickTime = 0;
   fabricCanvas.getObjects().forEach(o => {
     if (!o.annotId || o.isBackground || o.annotLabelFor) return;
     o.set({
@@ -4925,7 +4947,26 @@ function setupEventListeners() {
       return;
     }
 
-    if (appState.tool === 'select' || appState.tool === 'freehand') return;
+    // Double-click move detection: fires before Fabric's _setupCurrentTransform
+    // so unlocking lockMovementX/Y here takes effect for the current drag gesture.
+    if (appState.tool === 'select') {
+      const hitObj = opt.target;
+      const now = Date.now();
+      if (hitObj && hitObj.annotId && !hitObj.isBackground) {
+        if (_lastMoveClickTarget === hitObj && now - _lastMoveClickTime < 450) {
+          _enterMoveMode(hitObj);
+          _lastMoveClickTime = 0;
+        } else {
+          _lastMoveClickTime = now;
+          _lastMoveClickTarget = hitObj;
+        }
+      } else {
+        _exitMoveMode();
+      }
+      return;
+    }
+
+    if (appState.tool === 'freehand') return;
 
     isDrawing = true;
     drawStartX = pointer.x;
@@ -5178,7 +5219,10 @@ function setupEventListeners() {
   // Object modified
   cw.on('object:modified', (opt) => {
     const obj = opt && opt.target;
-    if (obj && obj.annotId) positionLabel(findLabel(obj.annotId), obj);
+    if (obj && obj.annotId) {
+      positionLabel(findLabel(obj.annotId), obj);
+      if (obj === _moveAnnot) _exitMoveMode();
+    }
     pushUndoState();
     saveCurrentLevel();
   });
@@ -5669,6 +5713,7 @@ function onKeyDown(e) {
       cancelPolygon();
       return;
     }
+    _exitMoveMode();
     fabricCanvas.discardActiveObject();
     fabricCanvas.renderAll();
   }
@@ -5830,6 +5875,7 @@ function onObjectSelected(opt) {
 }
 
 function onSelectionCleared() {
+  _exitMoveMode();
   deselectAnnot();
   updateAnnotList();
 }
