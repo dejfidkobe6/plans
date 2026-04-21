@@ -4620,11 +4620,40 @@ function findLabel(annotId) {
 const LABEL_COMPACT_ZOOM = 2.0; // below this threshold show only contractor name
 let _labelsCompact = null;       // tracks current label mode to detect threshold crossing
 
+// Returns canvas-space midpoint along the arc of a Fabric Polyline/Polygon.
+function _polylineMidpoint(obj) {
+  const pts = obj.points;
+  if (!pts || pts.length === 0) return obj.getCenterPoint();
+  const matrix = obj.calcTransformMatrix();
+  const off = obj.pathOffset || { x: 0, y: 0 };
+  const cp = pts.map(p =>
+    fabric.util.transformPoint({ x: p.x - off.x, y: p.y - off.y }, matrix)
+  );
+  let total = 0;
+  for (let i = 1; i < cp.length; i++) {
+    total += Math.hypot(cp[i].x - cp[i-1].x, cp[i].y - cp[i-1].y);
+  }
+  let rem = total / 2;
+  for (let i = 1; i < cp.length; i++) {
+    const dx = cp[i].x - cp[i-1].x, dy = cp[i].y - cp[i-1].y;
+    const seg = Math.hypot(dx, dy);
+    if (rem <= seg) {
+      const t = seg > 0 ? rem / seg : 0;
+      return { x: cp[i-1].x + t * dx, y: cp[i-1].y + t * dy };
+    }
+    rem -= seg;
+  }
+  return cp[cp.length - 1];
+}
+
 function positionLabel(label, obj) {
   if (!label || !obj) return;
   const zoom = fabricCanvas.getZoom();
   const s = 1 / zoom;
-  const c = obj.getCenterPoint();
+  const type = obj.annotType || obj.type;
+  const c = (type === 'polyline' || type === 'partition') && obj.points
+    ? _polylineMidpoint(obj)
+    : obj.getCenterPoint();
   const lw = label.width  || 80;
   const lh = label.height || 34;
   label.set({
