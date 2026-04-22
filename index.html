@@ -1523,8 +1523,11 @@ option { background: var(--card); color: var(--text); }
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
 }
 #kd-cards-scroll {
-  flex: 1; overflow-x: auto; overflow-y: hidden;
-  display: flex; align-items: flex-start; gap: 12px; padding: 14px 14px 14px;
+  flex: 1; overflow-x: auto; overflow-y: auto;
+}
+#kd-cards-inner {
+  display: inline-flex; align-items: flex-start; gap: 12px;
+  padding: 14px; min-height: 100%;
 }
 #kd-empty-state {
   flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -1538,16 +1541,7 @@ option { background: var(--card); color: var(--text); }
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
   max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  position: relative;
 }
-.kd-card-resize-handle {
-  position: absolute; right: -3px; top: 0; width: 7px; height: 100%;
-  cursor: ew-resize; z-index: 10; border-radius: 0 4px 4px 0;
-  background: var(--olive); opacity: 0; transition: opacity 0.15s;
-}
-.kd-card:hover .kd-card-resize-handle { opacity: 0.3; }
-.kd-card-resize-handle:hover { opacity: 0.7 !important; }
-.kd-card-resize-handle.dragging { opacity: 1 !important; }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -9504,6 +9498,7 @@ const LS_KD_BACKUP_SCHED  = (pid) => `besix_kd_backup_sched_${pid}`;
 const LS_KD_BACKUPS       = (pid) => `besix_kd_backups_${pid}`;
 const LS_KD_LOCATIONS_KEY = (pid) => `besix_kd_locations_${pid}`;
 const LS_KD_CARD_W        = (pid) => `besix_kd_cardw_${pid}`;
+const LS_KD_ZOOM          = (pid) => `besix_kd_zoom_${pid}`;
 
 let kdRecords   = [];    // [{id,date,note,cards:[{id,title,tasks:[{id,text,sub,dateFrom,dateTo,locations:[],urgent,}]}]}]
 let kdLocations = [];    // legacy – kept for server compat; use kdGetLocations() instead
@@ -9513,7 +9508,8 @@ let _kdLocCloseHandler = null;
 let _kdBackupSchedule = { day: 0, time: '23:59' };
 let _kdLastBackupCheck = null;
 let _kdBackupTimer = null;
-let _kdCardWidth = 420; // px, adjustable via Ctrl+scroll
+let _kdCardWidth = 420; // px — per-card drag resize base
+let _kdZoom = 1.0;      // CSS zoom applied to entire cards area (Ctrl+scroll)
 let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -9622,7 +9618,7 @@ function kdLoadLocations() {
 function kdLoadCardWidth() {
   const pid = currentProject?.id; if (!pid) return;
   const v = parseInt(localStorage.getItem(LS_KD_CARD_W(pid)) || '420');
-  _kdCardWidth = isNaN(v) ? 420 : Math.max(280, Math.min(720, v));
+  _kdCardWidth = isNaN(v) ? 420 : Math.max(240, Math.min(900, v));
 }
 
 function kdSaveCardWidth() {
@@ -9630,16 +9626,30 @@ function kdSaveCardWidth() {
   try { localStorage.setItem(LS_KD_CARD_W(pid), String(_kdCardWidth)); } catch(e) {}
 }
 
+function kdLoadZoom() {
+  const pid = currentProject?.id; if (!pid) return;
+  const v = parseFloat(localStorage.getItem(LS_KD_ZOOM(pid)) || '1');
+  _kdZoom = isNaN(v) ? 1 : Math.max(0.4, Math.min(2.5, v));
+}
+
+function kdSaveZoom() {
+  const pid = currentProject?.id; if (!pid) return;
+  try { localStorage.setItem(LS_KD_ZOOM(pid), String(_kdZoom)); } catch(e) {}
+}
+
+function kdApplyZoom() {
+  const inner = document.getElementById('kd-cards-inner');
+  if (inner) inner.style.zoom = String(_kdZoom);
+}
+
 function kdApplyCardWidth() {
   const rec = kdRecords.find(r => r.id === kdActiveId);
   document.querySelectorAll('.kd-card').forEach(el => {
     const card = rec && (rec.cards||[]).find(c => c.id === el.dataset.cardId);
     if (!card || !card.width) {
-      el.style.width = _kdCardWidth + 'px'; el.style.minWidth = _kdCardWidth + 'px';
+      el.style.width = _kdCardWidth + 'px'; el.style.minWidth = '240px';
     }
   });
-  const addBtn = document.querySelector('.kd-add-card-btn');
-  if (addBtn) { addBtn.style.width = (_kdCardWidth - 20) + 'px'; addBtn.style.minWidth = '200px'; }
 }
 
 function kdLoadBackupSchedule() {
@@ -9706,7 +9716,7 @@ function toggleKDPage() {
     page.classList.remove('visible'); btn.classList.remove('active');
   } else {
     closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
-    kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth();
+    kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
@@ -9788,7 +9798,7 @@ function kdRenderContent() {
   meta.style.display  = 'flex';
   if (fbar) fbar.style.display = 'flex';
   empty.style.display = 'none';
-  scroll.style.display = 'flex';
+  scroll.style.display = 'block';
   document.getElementById('kd-date-input').value = rec.date || '';
   document.getElementById('kd-note-input').value = rec.note || '';
 
@@ -9830,14 +9840,17 @@ function kdRenderContent() {
   }
 
   scroll.innerHTML = '';
-  (rec.cards || []).forEach(card => scroll.appendChild(kdBuildCard(rec, card)));
+  const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
+  (rec.cards || []).forEach(card => inner.appendChild(kdBuildCard(rec, card)));
 
   const addBtn = document.createElement('button');
   addBtn.className = 'kd-add-card-btn';
   addBtn.style.width = (_kdCardWidth - 20) + 'px';
   addBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg> Přidat úsek';
   addBtn.onclick = () => kdAddCard(rec);
-  scroll.appendChild(addBtn);
+  inner.appendChild(addBtn);
+  scroll.appendChild(inner);
+  kdApplyZoom();
 }
 
 function kdAllTasks(rec) {
@@ -9850,8 +9863,7 @@ function kdAllTasks(rec) {
 function kdBuildCard(rec, card) {
   const el = document.createElement('div');
   el.className = 'kd-card'; el.dataset.cardId = card.id;
-  const w = card.width || _kdCardWidth;
-  el.style.width = w + 'px'; el.style.minWidth = '240px';
+  el.style.width = _kdCardWidth + 'px'; el.style.minWidth = '240px';
 
   const hdr = document.createElement('div'); hdr.className = 'kd-card-header';
   const inp = document.createElement('input');
@@ -9873,27 +9885,6 @@ function kdBuildCard(rec, card) {
   addBtn.textContent = '+ Přidat úkol';
   addBtn.onclick = () => { kdAddTask(rec, card); };
   el.appendChild(addBtn);
-
-  // Drag-to-resize handle on right edge
-  const rh = document.createElement('div'); rh.className = 'kd-card-resize-handle';
-  rh.addEventListener('mousedown', ev => {
-    ev.preventDefault(); ev.stopPropagation();
-    rh.classList.add('dragging');
-    const startX = ev.clientX, startW = parseInt(el.style.width) || w;
-    const onMove = mv => {
-      const nw = Math.max(240, Math.min(900, startW + (mv.clientX - startX)));
-      el.style.width = nw + 'px'; card.width = nw;
-    };
-    const onUp = () => {
-      rh.classList.remove('dragging');
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      kdSave();
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-  el.appendChild(rh);
   return el;
 }
 
@@ -10124,13 +10115,14 @@ function kdSetupPage() {
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
     kdRenderContent();
   });
-  // Ctrl+scroll to resize cards
+  // Ctrl+scroll to zoom the entire cards area (font size, spacing, everything)
   document.getElementById('kd-cards-scroll').addEventListener('wheel', e => {
     if (!e.ctrlKey) return;
     e.preventDefault();
-    _kdCardWidth = Math.max(280, Math.min(720, _kdCardWidth + (e.deltaY < 0 ? 30 : -30)));
-    kdSaveCardWidth();
-    kdApplyCardWidth();
+    const delta = e.deltaY < 0 ? 0.05 : -0.05;
+    _kdZoom = Math.round(Math.max(0.4, Math.min(2.5, _kdZoom + delta)) * 100) / 100;
+    kdSaveZoom();
+    kdApplyZoom();
   }, { passive: false });
   if (_kdBackupTimer) clearInterval(_kdBackupTimer);
   _kdBackupTimer = setInterval(kdRunAutoBackup, 60000);
