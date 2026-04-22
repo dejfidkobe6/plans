@@ -348,7 +348,7 @@ body {
   bottom: -28px;
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
+  background: var(--panel);
   color: var(--text-bright);
   font-family: var(--font-main);
   font-size: 11px;
@@ -358,6 +358,7 @@ body {
   pointer-events: none;
   z-index: 999;
   border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* MAIN LAYOUT */
@@ -1298,7 +1299,7 @@ option { background: var(--card); color: var(--text); }
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
+  background: var(--panel);
   color: var(--text-bright);
   font-family: var(--font-main);
   font-size: 11px;
@@ -1308,6 +1309,7 @@ option { background: var(--card); color: var(--text); }
   pointer-events: none;
   z-index: 9999;
   border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* Level type color lines */
@@ -4752,17 +4754,17 @@ function createAnnotLabel(obj) {
     W = txtTop.width + PAD_L * 2 + STRIPE;
     txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
     H = PAD_T + txtTop.height + PAD_T;
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop];
   } else {
     // ── Full: contractor + popis + dates ──
     const txtBot = new fabric.Text(labelLineBot(obj), {
-      fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd', left: 0, top: 0
+      fontFamily: fontOpts, fontSize: FONT2, fill: '#444444', left: 0, top: 0
     });
     const line3 = labelLineDates(obj);
     const txtDates = line3 ? new fabric.Text(line3, {
-      fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa', left: 0, top: 0
+      fontFamily: fontOpts, fontSize: FONT3, fill: '#777777', left: 0, top: 0
     }) : null;
 
     W = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0) + PAD_L * 2 + STRIPE;
@@ -4772,7 +4774,7 @@ function createAnnotLabel(obj) {
     if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
     H = curY - GAP + PAD_T;
 
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop, txtBot];
     if (txtDates) items.push(txtDates);
