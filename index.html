@@ -4793,6 +4793,7 @@ function createAnnotLabel(obj) {
 
   fabricCanvas.add(group);
   positionLabel(group, obj);
+  if (!showHotovo && obj.status === 'Hotovo') group.visible = false;
   return group;
 }
 
