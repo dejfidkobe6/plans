@@ -7780,16 +7780,15 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         o => o.annotId && !o.annotLabelFor && !o.isBackground &&
              (includeHotovo || o.status !== 'Hotovo')
       );
-      const BG_DARK = [26, 31, 20]; // #1a1f14 — used to blend fill at 13% opacity
-      const FILL_A  = 0.13;
+      const FILL_A  = 0.28; // blend profese color with white — light tint on blueprint
 
       annotObjs.forEach(o => {
         const [r,g,b] = hexToRgb((appState.profese||[]).find(p=>p.name===o.profese)?.color || o.stroke || '#4a8f3f');
         pdf.setDrawColor(r, g, b);
         pdf.setFillColor(
-          Math.round(r*FILL_A + BG_DARK[0]*(1-FILL_A)),
-          Math.round(g*FILL_A + BG_DARK[1]*(1-FILL_A)),
-          Math.round(b*FILL_A + BG_DARK[2]*(1-FILL_A))
+          Math.round(r*FILL_A + 255*(1-FILL_A)),
+          Math.round(g*FILL_A + 255*(1-FILL_A)),
+          Math.round(b*FILL_A + 255*(1-FILL_A))
         );
         pdf.setLineWidth(0.35);
 
@@ -7977,15 +7976,17 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
   const C_STAT = lx + 0.85  * lw;
 
   // ── Background ──
-  pdf.setFillColor(18, 22, 13);
+  pdf.setFillColor(255, 255, 255);
   pdf.rect(lx, ly, lw, lh, 'F');
+  pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.15);
+  pdf.rect(lx, ly, lw, lh, 'S');
 
   // ── Title bar ──
-  pdf.setFillColor(28, 34, 20);
+  pdf.setFillColor(242, 244, 240);
   pdf.rect(lx, ly, lw, TITLE_H, 'F');
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7);
-  pdf.setTextColor(160, 196, 100);
+  pdf.setTextColor(55, 80, 30);
   pdf.text('ANOTACE', lx + lw * 0.02, ly + TITLE_H * 0.70);
 
   // ── Status badges ──
@@ -7999,7 +8000,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     if (!counts[st]) continue;
     const label = csText(`${counts[st]} ${st}`);
     const bw = textW(label, BADGE_FS) + BPAD * 2;
-    pdf.setFillColor(Math.round(rgb[0]*0.18+18*0.82), Math.round(rgb[1]*0.18+22*0.82), Math.round(rgb[2]*0.18+13*0.82));
+    pdf.setFillColor(Math.round(rgb[0]*0.15+245*0.85), Math.round(rgb[1]*0.15+245*0.85), Math.round(rgb[2]*0.15+245*0.85));
     pdf.roundedRect(bx, bby, bw, BH, 0.8, 0.8, 'F');
     pdf.setDrawColor(...rgb); pdf.setLineWidth(0.15);
     pdf.roundedRect(bx, bby, bw, BH, 0.8, 0.8, 'S');
@@ -8010,13 +8011,13 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
 
   // ── Column headers ──
   const colBaseY = ly + TITLE_H + COLH_H - 0.8;
-  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(4); pdf.setTextColor(100, 120, 80);
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(4); pdf.setTextColor(100, 115, 80);
   pdf.text('ID',           C_ID,    colBaseY);
   pdf.text('Subdodavatel', C_PROF,  colBaseY);
   pdf.text('Popis',        C_POPIS, colBaseY);
   pdf.text('Term\xEDn',   C_TERM,  colBaseY);  // í = U+00ED ✓ WinAnsi
   pdf.text('Status',       C_STAT,  colBaseY);
-  pdf.setDrawColor(55, 64, 40); pdf.setLineWidth(0.2);
+  pdf.setDrawColor(195, 200, 188); pdf.setLineWidth(0.2);
   pdf.line(lx, ly + TITLE_H + COLH_H, lx + lw, ly + TITLE_H + COLH_H);
 
   // ── Two-pass row layout ──
@@ -8030,7 +8031,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     const LH = fspt / PT_MM * 1.55;
     const rows = anns.map(ann => {
       const wraps = !!(ann.popisek && textW(csText(ann.popisek), fspt) > popisMaxW);
-      return { ann, rowH: Math.min(ROW_MAX, wraps ? LH * 2 : LH), needsWrap: wraps };
+      return { ann, rowH: wraps ? LH * 2.2 : Math.min(ROW_MAX, LH), needsWrap: wraps };
     });
     return { rows, totalH: rows.reduce((s, r) => s + r.rowH, 0) };
   };
@@ -8050,7 +8051,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     const pRgb   = hexToRgb(profObj?.color || '#888888');
 
     if (isUrgent) {
-      pdf.setFillColor(Math.round(239*0.12+18*0.88), Math.round(68*0.12+22*0.88), Math.round(68*0.12+13*0.88));
+      pdf.setFillColor(255, 238, 238);
       pdf.rect(lx, curY, lw, rowH, 'F');
     }
 
@@ -8066,7 +8067,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.setFontSize(rowFS);
 
     // ID
-    pdf.setTextColor(isUrgent ? 239 : 138, isUrgent ? 136 : 152, isUrgent ? 136 : 112);
+    pdf.setTextColor(isUrgent ? 180 : 100, isUrgent ? 50 : 115, isUrgent ? 50 : 80);
     pdf.text(fitT(ann.annotId || '', rowFS, C_PROF - C_ID - 0.5), C_ID, tY1);
 
     // Firma (subdodavatel)
@@ -8074,7 +8075,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.text(fitT(profObj?.firma || '-', rowFS, C_POPIS - C_PROF - 0.5), C_PROF, tY1);
 
     // Popis
-    pdf.setTextColor(isUrgent ? 255 : 220, isUrgent ? 245 : 222, isUrgent ? 224 : 200);
+    pdf.setTextColor(isUrgent ? 140 : 50, isUrgent ? 30 : 55, isUrgent ? 30 : 45);
     if (needsWrap) {
       const words = csText(ann.popisek || '').split(' ');
       let l1 = '', l2 = '', onL2 = false;
@@ -8100,7 +8101,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     const ts = df && dt ? `${df}-${dt}` : dt ? `do ${dt}` : df ? `od ${df}` : '-';
     const termFS = Math.max(3, rowFS - 1);
     pdf.setFontSize(termFS);
-    pdf.setTextColor(isUrgent ? 224 : 144, isUrgent ? 200 : 152, isUrgent ? 120 : 112);
+    pdf.setTextColor(isUrgent ? 140 : 90, isUrgent ? 80 : 105, isUrgent ? 20 : 75);
     pdf.text(fitT(ts, termFS, C_STAT - C_TERM - 0.5), C_TERM, tY1);
 
     // Status
@@ -8109,10 +8110,8 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.text(fitT(csText(ann.status || ''), rowFS, lx + lw - C_STAT - 0.5), C_STAT, tY1);
 
     // Row separator
-    if (!isUrgent) {
-      pdf.setDrawColor(45, 52, 36); pdf.setLineWidth(0.1);
-      pdf.line(lx, curY + rowH, lx + lw, curY + rowH);
-    }
+    pdf.setDrawColor(210, 215, 205); pdf.setLineWidth(0.1);
+    pdf.line(lx, curY + rowH, lx + lw, curY + rowH);
     curY += rowH;
   }
 }
