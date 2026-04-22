@@ -14,18 +14,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #111111;
-  --panel: #1a1a1a;
-  --card: #2a2a2a;
-  --border: #333333;
-  --text: #e0e0e0;
-  --text-dim: #888888;
-  --text-bright: #ffffff;
+  --bg: #f0f2ec;
+  --panel: #ffffff;
+  --card: #f0f0ee;
+  --border: #d0d0d0;
+  --text: #333333;
+  --text-dim: #666666;
+  --text-bright: #111111;
   --olive: #4A5340;
   --olive-hover: #6B7A5A;
   --olive-light: #8A9A7A;
@@ -43,15 +42,15 @@
   display: none;
   position: fixed;
   z-index: 9000;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-left: 3px solid #666;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-left: 3px solid #bbb;
   border-radius: 6px;
   padding: 10px 14px 10px 12px;
   min-width: 200px;
   max-width: 320px;
   pointer-events: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   font-family: 'Barlow Condensed', sans-serif;
 }
 #annot-tooltip .tt-prof {
@@ -63,7 +62,7 @@
 }
 #annot-tooltip .tt-popisek {
   font-size: 13px;
-  color: #e0e0e0;
+  color: #333;
   line-height: 1.4;
   margin-bottom: 8px;
   word-break: break-word;
@@ -79,22 +78,22 @@
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 3px;
-  background: #2a2a2a;
-  color: #aaa;
-  border: 1px solid #444;
+  background: #f0f0f0;
+  color: #666;
+  border: 1px solid #ddd;
 }
 #annot-tooltip .tt-rows {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 3px 8px;
   font-size: 11px;
-  color: #ccc;
-  border-top: 1px solid #2e2e2e;
+  color: #444;
+  border-top: 1px solid #ddd;
   padding-top: 7px;
   margin-top: 2px;
 }
 #annot-tooltip .tt-rows .tt-label {
-  color: #666;
+  color: #888;
   white-space: nowrap;
   font-size: 10px;
   text-transform: uppercase;
@@ -102,7 +101,7 @@
   padding-top: 1px;
 }
 #annot-tooltip .tt-rows .tt-val {
-  color: #ccc;
+  color: #444;
   word-break: break-word;
 }
 html, body { height: 100%; overflow: hidden; }
@@ -185,7 +184,7 @@ body {
   box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   white-space: nowrap; opacity: 0.92;
 }
-.level-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.level-tab:hover { background: rgba(0,0,0,0.05); color: var(--text); }
 .level-tab.active { color: var(--text-bright); }
 .level-tab.active::after {
   content: '';
@@ -252,7 +251,7 @@ body {
   border-left: 1px solid var(--border);
   flex-shrink: 0;
 }
-#add-level-btn:hover { background: rgba(255,255,255,0.05); color: var(--olive-light); }
+#add-level-btn:hover { background: rgba(0,0,0,0.05); color: var(--olive-light); }
 
 /* TOPBAR ACTIONS GROUP */
 #topbar-actions {
@@ -273,7 +272,7 @@ body {
   transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
-#mobile-menu-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-bright); }
+#mobile-menu-btn:hover { background: rgba(0,0,0,0.06); color: var(--text-bright); }
 #mobile-menu-btn.active { color: var(--olive-light); background: rgba(74,83,64,0.2); }
 
 /* MOBILE DROPDOWN */
@@ -338,7 +337,7 @@ body {
   transition: background 0.15s, color 0.15s;
   position: relative;
 }
-.tb-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.tb-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
 .tb-btn.active { background: rgba(74,83,64,0.4); color: var(--olive-light); }
 .tb-btn.active:hover { background: rgba(74,83,64,0.6); }
 .tb-btn svg { width: 16px; height: 16px; }
@@ -480,7 +479,7 @@ option { background: var(--card); }
   border: 1px solid transparent;
   transition: background 0.12s, border-color 0.12s;
 }
-.annot-item:hover { background: rgba(255,255,255,0.05); }
+.annot-item:hover { background: rgba(0,0,0,0.05); }
 .annot-item.selected { background: rgba(74,83,64,0.25); border-color: var(--olive); }
 .annot-item .annot-color-dot {
   width: 8px; height: 8px;
@@ -576,8 +575,8 @@ option { background: var(--card); }
 .panel-resize-handle:hover .resize-grip::after,
 .panel-resize-handle.resizing .resize-grip::before,
 .panel-resize-handle.resizing .resize-grip::after {
-  background: #fff;
-  box-shadow: 0 5px 0 #fff, 0 10px 0 #fff;
+  background: #555;
+  box-shadow: 0 5px 0 #555, 0 10px 0 #555;
 }
 @media (max-width: 768px) {
   .panel-resize-handle { display: none; }
@@ -587,7 +586,7 @@ option { background: var(--card); }
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #0d0d0d;
+  background: #e8e8e4;
 }
 #canvas-wrapper {
   position: absolute;
@@ -744,7 +743,7 @@ canvas#fabric-canvas { display: block; }
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  background: rgba(26,26,26,0.8);
+  background: rgba(240,242,236,0.92);
   transition: border-color 0.2s, background 0.2s;
   cursor: pointer;
 }
@@ -1077,7 +1076,7 @@ option { background: var(--card); color: var(--text); }
   display: flex; align-items: center; gap: 8px;
   transition: background 0.12s;
 }
-.ctx-item:hover { background: rgba(255,255,255,0.08); }
+.ctx-item:hover { background: rgba(0,0,0,0.06); }
 .ctx-item.danger { color: #EF4444; }
 .ctx-item.danger:hover { background: rgba(239,68,68,0.15); }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
@@ -1239,7 +1238,7 @@ option { background: var(--card); color: var(--text); }
 .modal-btn-primary { background: var(--olive); color: white; }
 .modal-btn-primary:hover { background: var(--olive-hover); }
 .modal-btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-.modal-btn-secondary:hover { background: rgba(255,255,255,0.08); }
+.modal-btn-secondary:hover { background: rgba(0,0,0,0.06); }
 
 /* SCROLLBAR GLOBAL */
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
@@ -1599,7 +1598,7 @@ option { background: var(--card); color: var(--text); }
   transition: border-color 0.15s, transform 0.1s;
   cursor: default;
 }
-.prof-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+.prof-card:hover { border-color: rgba(0,0,0,0.2); transform: translateY(-1px); }
 .prof-card-header {
   height: 6px;
 }
@@ -1661,7 +1660,7 @@ option { background: var(--card); color: var(--text); }
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.prof-card-edit-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-bright); }
+.prof-card-edit-btn:hover { background: rgba(0,0,0,0.08); color: var(--text-bright); }
 .prof-card-add {
   background: var(--panel);
   border: 2px dashed var(--border);
@@ -1783,11 +1782,11 @@ option { background: var(--card); color: var(--text); }
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.profese-action-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.profese-action-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
 .profese-action-btn.danger:hover { background: rgba(239,68,68,0.15); color: #EF4444; border-color: rgba(239,68,68,0.4); }
 .profese-edit-form {
   padding: 12px 14px;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.04);
   border-top: 1px solid var(--border);
   display: none;
 }
@@ -1864,7 +1863,7 @@ option { background: var(--card); color: var(--text); }
   cursor: pointer;
   transition: background 0.15s;
 }
-.profese-cancel-btn:hover { background: rgba(255,255,255,0.08); }
+.profese-cancel-btn:hover { background: rgba(0,0,0,0.06); }
 #manage-profese-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -2002,7 +2001,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   padding: 3px 2px;
   border-radius: 4px;
 }
-.zmgr-row:hover { background: rgba(255,255,255,0.04); }
+.zmgr-row:hover { background: rgba(0,0,0,0.04); }
 .zmgr-swatch-wrap {
   position: relative;
   cursor: pointer;
@@ -2011,7 +2010,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .zmgr-swatch {
   width: 14px; height: 14px;
   border-radius: 3px;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(0,0,0,0.2);
 }
 .zmgr-swatch-wrap input[type=color] {
   position: absolute; opacity: 0;
@@ -2038,7 +2037,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   cursor: pointer; font-size: 12px; padding: 0 3px;
   border-radius: 3px; line-height: 1;
 }
-.zmgr-arr:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text-bright); }
+.zmgr-arr:hover:not(:disabled) { background: rgba(0,0,0,0.06); color: var(--text-bright); }
 .zmgr-arr:disabled { opacity: 0.25; cursor: default; }
 .zmgr-shape {
   background: var(--card); border: 1px solid var(--border);
@@ -2576,7 +2575,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 .mbb-btn:last-child { border-right: none; }
 .mbb-btn svg { flex-shrink: 0; }
-.mbb-btn:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
+.mbb-btn:hover { color: var(--text-bright); background: rgba(0,0,0,0.04); }
 .mbb-btn.active { color: var(--olive-light); background: rgba(74,83,64,0.18); }
 .mbb-btn.mbb-draw-open { color: var(--olive-light); }
 .mbb-badge {
@@ -2912,6 +2911,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <option value="Hotovo">Hotovo</option>
         <option value="Urgence">Urgence</option>
       </select>
+      <button id="toggle-hotovo-btn" title="Zobrazit/skrýt dokončené úkoly" style="font-size:11px;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);cursor:pointer;white-space:nowrap;">✓ Hotovo</button>
     </div>
     <div id="annot-list"></div>
     <div id="prof-badges"></div>
@@ -3498,6 +3498,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div class="pdf-section-title">Obsah exportu</div>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové úkoly</label>
       </div>
     </div>
     <div id="pdf-export-footer">
@@ -3657,6 +3658,7 @@ let threeHighlightMesh = null;
 let threeRaycaster = new THREE.Raycaster();
 let animFrameId = null;
 let filterProfese = '', filterStatus = '';
+let showHotovo = false;
 let contextMenuTarget = null;
 let pendingModalResolve = null;
 let _isProjectLoading = false;
@@ -3678,7 +3680,7 @@ function init() {
 
   fabricCanvas = new fabric.Canvas('fabric-canvas', {
     selection: true,
-    backgroundColor: '#181818',
+    backgroundColor: '#f0f0ec',
     preserveObjectStacking: true,
     stopContextMenu: true,
     fireRightClick: true
@@ -3762,12 +3764,13 @@ function switchLevel(idx) {
   if (!level) return;
 
   fabricCanvas.clear();
-  fabricCanvas.backgroundColor = '#181818';
+  fabricCanvas.backgroundColor = '#f0f0ec';
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
+      applyHotovoVisibility();
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
       } else {
@@ -4940,6 +4943,23 @@ function _exitMoveMode() {
   fabricCanvas.renderAll();
 }
 
+function applyHotovoVisibility() {
+  const btn = document.getElementById('toggle-hotovo-btn');
+  if (btn) {
+    btn.style.opacity = showHotovo ? '1' : '0.5';
+    btn.title = showHotovo ? 'Skrýt dokončené úkoly' : 'Zobrazit dokončené úkoly';
+  }
+  fabricCanvas.getObjects().forEach(o => {
+    if (!o.annotId || o.isBackground) return;
+    if (o.status === 'Hotovo') {
+      o.visible = showHotovo;
+      const lbl = findLabel(o.annotId);
+      if (lbl) lbl.visible = showHotovo;
+    }
+  });
+  fabricCanvas.renderAll();
+}
+
 // Apply lock properties to all existing annotations (called after loadFromJSON/undo/redo)
 function applyAnnotationLocks() {
   _moveAnnot = null; _lastMoveClickTarget = null; _lastMoveClickTime = 0;
@@ -5689,6 +5709,11 @@ function setupEventListeners() {
   // Filters
   document.getElementById('filter-profese').addEventListener('change', (e) => { filterProfese = e.target.value; updateAnnotList(); });
   document.getElementById('filter-status').addEventListener('change', (e) => { filterStatus = e.target.value; updateAnnotList(); });
+  document.getElementById('toggle-hotovo-btn').addEventListener('click', () => {
+    showHotovo = !showHotovo;
+    applyHotovoVisibility();
+    updateAnnotList();
+  });
 
   // Context menu
   document.getElementById('ctx-delete').addEventListener('click', () => { hideContextMenu(); deleteContextAnnot(); });
@@ -5939,6 +5964,7 @@ function updateActiveAnnotProp(prop, value) {
   // Update status buttons
   if (prop === 'status') {
     applyStatusButtons(value);
+    applyHotovoVisibility();
   }
 
   saveCurrentLevel();
@@ -6031,6 +6057,7 @@ function updateAnnotList() {
   const filtered = objects.filter(o => {
     if (filterProfese && o.profese !== filterProfese) return false;
     if (filterStatus && o.status !== filterStatus) return false;
+    if (!showHotovo && o.status === 'Hotovo') return false;
     return true;
   });
 
@@ -6163,7 +6190,7 @@ function drawGrid() {
   if (!appState.showGrid) return;
 
   const spacing = 40;
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
   ctx.lineWidth = 1;
 
   for (let x = 0; x < canvas.width; x += spacing) {
@@ -6322,7 +6349,7 @@ function showToast(message, type = 'info') {
   }
   const colors = { info: '#3B82F6', success: '#10B981', warn: '#F59E0B', error: '#EF4444' };
   const toast = document.createElement('div');
-  toast.style.cssText = `background:#2a2a2a;border:1px solid ${colors[type] || colors.info};border-left:3px solid ${colors[type] || colors.info};color:#e0e0e0;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.2s;max-width:280px;`;
+  toast.style.cssText = `background:#ffffff;border:1px solid ${colors[type] || colors.info};border-left:3px solid ${colors[type] || colors.info};color:#222222;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transition:opacity 0.2s;max-width:280px;`;
   toast.textContent = message;
   toastContainer.appendChild(toast);
   requestAnimationFrame(() => { toast.style.opacity = '1'; });
@@ -7680,7 +7707,7 @@ function csText(s) {
 // Draws the level's background image + annotation shapes + ID labels directly
 // into the PDF as vectors (shapes) and a compact JPEG (background only).
 // Returns a Promise that resolves when done.
-async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
+async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, includeHotovo = false) {
   const level = appState.levels[levelIdx];
   if (!level || !level.backgroundImage) return;
   if (levelIdx === appState.activeLevel) saveCurrentLevel();
@@ -7744,7 +7771,8 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
       if (!srcJSON || !srcJSON.objects) { resolve(); return; }
 
       const annotObjs = srcJSON.objects.filter(
-        o => o.annotId && !o.annotLabelFor && !o.isBackground
+        o => o.annotId && !o.annotLabelFor && !o.isBackground &&
+             (includeHotovo || o.status !== 'Hotovo')
       );
       const BG_DARK = [26, 31, 20]; // #1a1f14 — used to blend fill at 13% opacity
       const FILL_A  = 0.13;
@@ -7777,9 +7805,15 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
         } else if (type === 'polygon' || type === 'polyline') {
           const pts = o.points || [];
           if (pts.length >= 2) {
-            const fw = (o.width||0)*(o.scaleX||1), fh = (o.height||0)*(o.scaleY||1);
-            const cx = oCX ? o.left : o.left+fw/2, cy = oCY ? o.top : o.top+fh/2;
-            const pp = pts.map(p => [toX(cx+p.x*(o.scaleX||1)), toY(cy+p.y*(o.scaleY||1))]);
+            const sx = o.scaleX||1, sy = o.scaleY||1;
+            const minX = pts.reduce((m, p) => Math.min(m, p.x), Infinity);
+            const minY = pts.reduce((m, p) => Math.min(m, p.y), Infinity);
+            const bboxLeft = oCX ? o.left - (o.width||0)*sx/2 : o.left;
+            const bboxTop  = oCY ? o.top  - (o.height||0)*sy/2 : o.top;
+            const pp = pts.map(p => [
+              toX(bboxLeft + sx * (p.x - minX)),
+              toY(bboxTop  + sy * (p.y - minY))
+            ]);
             const lines = [];
             for (let i=1; i<pp.length; i++) lines.push([pp[i][0]-pp[i-1][0], pp[i][1]-pp[i-1][1]]);
             pdf.lines(lines, pp[0][0], pp[0][1], [1,1], type==='polygon'?'FD':'S', type==='polygon');
@@ -7793,21 +7827,30 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
         }
       });
 
-      // ── Annotation ID labels (vector rounded-rect + white text) ──────────
-      const PT_MM  = 72 / 25.4;
-      const LBL_FS = 5;                      // pt
-      const LBL_H  = LBL_FS / PT_MM * 1.4;  // mm — label height
-      const LBL_XP = 0.8;                    // mm — x-padding inside badge
+      // ── Annotation labels (dark bg + colored stripe + firma name) ──────────
+      const PT_MM     = 72 / 25.4;
+      const LBL_FS    = 3.5;                        // pt — 30% smaller than original 5pt
+      const LBL_PSF   = 2.8;                        // pt — popis sub-line
+      const LBL_LH    = LBL_FS  / PT_MM * 1.4;     // mm — line height for firma
+      const LBL_PLH   = LBL_PSF / PT_MM * 1.3;     // mm — line height for popis
+      const LBL_STR   = 1.2;                        // mm — colored left stripe width
+      const LBL_XP    = 0.7;                        // mm — x-padding after stripe
+      const LBL_TRUNC = 22;                         // max chars for popis in label
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(LBL_FS);
+      const fitLbl = t => {
+        const s = String(t || '').replace(/\n/g, ' ').trim();
+        return s.length > LBL_TRUNC ? s.slice(0, LBL_TRUNC - 1) + '…' : s;
+      };
 
       const lblOvlp = (a,b) => !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
       const lPlaced = [];
 
       annotObjs.forEach(o => {
-        const text = o.annotId || ''; if (!text) return;
-        const [r,g,b] = hexToRgb((appState.profese||[]).find(p=>p.name===o.profese)?.color || o.stroke || '#4a8f3f');
+        if (!o.annotId) return;
+        const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
+        const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
+        const firmaText = fitLbl(getFirmaDisplay(o.profese));
+        const popisRaw  = o.popisek ? fitLbl(o.popisek) : '';
 
         // Object bounding box in PDF mm
         const type = (o.type||'').toLowerCase();
@@ -7817,12 +7860,27 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
         if (type === 'ellipse') {
           const rx=(o.rx||20)*(o.scaleX||1), ry=(o.ry||20)*(o.scaleY||1);
           ox=toX(oCX?o.left-rx:o.left); oy=toY(oCY?o.top-ry:o.top); ow=toMX(rx*2); oh=toMY(ry*2);
+        } else if (type === 'polygon' || type === 'polyline') {
+          const pts2 = o.points || [];
+          const sx2=o.scaleX||1, sy2=o.scaleY||1;
+          const mnX=pts2.reduce((m,p)=>Math.min(m,p.x),Infinity), mxX=pts2.reduce((m,p)=>Math.max(m,p.x),-Infinity);
+          const mnY=pts2.reduce((m,p)=>Math.min(m,p.y),Infinity), mxY=pts2.reduce((m,p)=>Math.max(m,p.y),-Infinity);
+          const bl=oCX?o.left-(mxX-mnX)*sx2/2:o.left, bt=oCY?o.top-(mxY-mnY)*sy2/2:o.top;
+          ox=toX(bl); oy=toY(bt); ow=toMX((mxX-mnX)*sx2); oh=toMY((mxY-mnY)*sy2);
         } else {
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
           ox=toX(oCX?o.left-fw/2:o.left); oy=toY(oCY?o.top-fh/2:o.top); ow=toMX(fw); oh=toMY(fh);
         }
 
-        const lw = pdf.getStringUnitWidth(text) * LBL_FS / PT_MM + LBL_XP * 2;
+        const hasPopis = !!popisRaw;
+        const LBL_H = LBL_LH + (hasPopis ? LBL_PLH : 0) + 0.8;
+
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS);
+        const fw1 = pdf.getStringUnitWidth(firmaText) * LBL_FS / PT_MM;
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_PSF);
+        const fw2 = hasPopis ? pdf.getStringUnitWidth(popisRaw) * LBL_PSF / PT_MM : 0;
+        const lw  = Math.max(fw1, fw2) + LBL_STR + LBL_XP * 2 + 0.3;
+
         const cx2 = ox + ow/2;
         const cands = [
           {x:cx2-lw/2,        y:oy-LBL_H-0.4},
@@ -7842,10 +7900,25 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH) {
         }
         lPlaced.push({x:pos.x, y:pos.y, w:lw, h:LBL_H});
 
-        pdf.setFillColor(r, g, b);
+        // Dark background
+        pdf.setFillColor(18, 18, 18);
         pdf.roundedRect(pos.x, pos.y, lw, LBL_H, 0.3, 0.3, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.text(text, pos.x + LBL_XP, pos.y + LBL_H - 0.3);
+        // Colored left stripe
+        pdf.setFillColor(r, g, b);
+        pdf.rect(pos.x, pos.y, LBL_STR, LBL_H, 'F');
+        // Firma name
+        const tx = pos.x + LBL_STR + LBL_XP;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(LBL_FS);
+        pdf.setTextColor(r, g, b);
+        pdf.text(firmaText, tx, pos.y + 0.4 + LBL_LH * 0.75);
+        // Popis sub-line
+        if (hasPopis) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(LBL_PSF);
+          pdf.setTextColor(200, 200, 200);
+          pdf.text(popisRaw, tx, pos.y + 0.4 + LBL_LH + LBL_PLH * 0.85);
+        }
       });
 
       resolve();
@@ -8045,6 +8118,7 @@ async function doExportPDF() {
 
   const allProf = document.getElementById('pdf-all-profese').checked;
   const profeseFilter = allProf ? [] : [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
+  const inclHotovo = document.getElementById('pdf-opt-hotovo').checked;
 
   const btn = document.getElementById('pdf-export-do-btn');
   btn.textContent = 'Generuji…'; btn.disabled = true;
@@ -8061,6 +8135,7 @@ async function doExportPDF() {
       if (!lvl) return m;
       let anns = [...(lvl.annotations || [])];
       if (profeseFilter.length > 0) anns = anns.filter(a => profeseFilter.includes(a.profese));
+      if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
       return Math.max(m, anns.length);
     }, 0);
 
@@ -8070,6 +8145,7 @@ async function doExportPDF() {
 
       let anns = [...(level.annotations || [])];
       if (profeseFilter.length > 0) anns = anns.filter(a => profeseFilter.includes(a.profese));
+      if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
       // Urgence first
       anns.sort((a, b) => (b.status === 'Urgence') - (a.status === 'Urgence'));
 
@@ -8094,7 +8170,7 @@ async function doExportPDF() {
       if (includeDrawing && level.backgroundImage) {
         const drawW = includeList ? Math.round(PW * 0.60) : PW - 8;
         // drawLevelToPDF draws background JPEG + vector shapes + vector labels
-        await drawLevelToPDF(pdf, idx, 4, BY, drawW - 6, BH);
+        await drawLevelToPDF(pdf, idx, 4, BY, drawW - 6, BH, inclHotovo);
 
         if (includeList) {
           const listW = PW - drawW - 7;
@@ -9146,7 +9222,7 @@ async function doLogout() {
   currentProject = null;
   appState.levels = [];
   appState.activeLevel = 0;
-  if (fabricCanvas) { fabricCanvas.clear(); fabricCanvas.backgroundColor = '#181818'; fabricCanvas.renderAll(); }
+  if (fabricCanvas) { fabricCanvas.clear(); fabricCanvas.backgroundColor = '#f0f0ec'; fabricCanvas.renderAll(); }
   document.getElementById('level-tabs').innerHTML = '';
   document.getElementById('project-screen').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
@@ -9245,7 +9321,7 @@ async function openProject(proj) {
   applyViewerMode();
   if (fabricCanvas) {
     fabricCanvas.clear();
-    fabricCanvas.backgroundColor = '#181818';
+    fabricCanvas.backgroundColor = '#f0f0ec';
     fabricCanvas.renderAll();
   }
   appState.levels = [];
