@@ -8389,16 +8389,20 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     if (isUrgent) {
       pdf.setFillColor(255, 238, 238);
       pdf.rect(lx, curY, lw, rowH, 'F');
+      // thin red left accent stripe
+      pdf.setFillColor(239, 68, 68);
+      pdf.rect(lx, curY, 0.8, rowH, 'F');
     }
 
-    // Profese dot
-    pdf.setFillColor(...pRgb);
-    pdf.circle(C_DOT + DOT_R, curY + rowH / 2, DOT_R, 'F');
-
+    // Profese dot — centred on first text line
     const LH = rowFS / PT_MM * 1.55;
-    const tY1 = curY + LH * 0.8; // first line baseline
+    const tY1 = curY + LH * 0.8; // first line baseline (same for ALL rows)
+    pdf.setFillColor(...pRgb);
+    pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
 
-    pdf.setFont('helvetica', isUrgent ? 'bold' : 'normal');
+    // All rows: normal weight — bold was causing different text metrics
+    // and wrong word-wrap vs layout pass
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(rowFS);
 
     // ID
@@ -8409,8 +8413,8 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.setTextColor(...pRgb);
     pdf.text(fitT(profObj?.firma || '-', rowFS, C_POPIS - C_PROF - 0.5), C_PROF, tY1);
 
-    // Popis — all wrapped/newline lines
-    pdf.setTextColor(isUrgent ? 140 : 50, isUrgent ? 30 : 55, isUrgent ? 30 : 45);
+    // Popis — all wrapped/newline lines, identical logic for urgent and normal
+    pdf.setTextColor(isUrgent ? 160 : 50, isUrgent ? 40 : 55, isUrgent ? 40 : 45);
     for (let li = 0; li < lines.length; li++) {
       const ty = curY + LH * li + LH * 0.8;
       if (ty > curY + rowH - 0.1) break;
@@ -8426,7 +8430,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.text(fitT(ts, termFS, C_STAT - C_TERM - 0.5), C_TERM, tY1);
 
     // Status
-    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(rowFS);
+    pdf.setFontSize(rowFS);
     pdf.setTextColor(...sRgb);
     pdf.text(fitT(csText(ann.status || ''), rowFS, lx + lw - C_STAT - 0.5), C_STAT, tY1);
 
@@ -8477,8 +8481,14 @@ async function doExportPDF() {
       let anns = [...(level.annotations || [])];
       if (profeseFilter.length > 0) anns = anns.filter(a => profeseFilter.includes(a.profese));
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
-      // Urgence first
-      anns.sort((a, b) => (b.status === 'Urgence') - (a.status === 'Urgence'));
+      // Urgence first, then alphabetically by firma within each group
+      anns.sort((a, b) => {
+        const au = a.status === 'Urgence' ? 0 : 1, bu = b.status === 'Urgence' ? 0 : 1;
+        if (au !== bu) return au - bu;
+        const af = ((appState.profese||[]).find(p=>p.name===a.profese)?.firma || a.profese || '').toLowerCase();
+        const bf = ((appState.profese||[]).find(p=>p.name===b.profese)?.firma || b.profese || '').toLowerCase();
+        return af.localeCompare(bf, 'cs');
+      });
 
       if (!first) pdf.addPage();
       first = false;
