@@ -1681,11 +1681,8 @@ option { background: var(--card); color: var(--text); }
 .kd-task-loc-none { font-size: 10px; color: var(--text-dim); cursor: pointer; padding: 1px 3px; flex-shrink: 0; }
 .kd-task-loc-none:hover { color: var(--text); }
 
-/* Task urgent state */
-.kd-task.urgent {
-  border-left: 3px solid #EF4444;
-  background: rgba(239,68,68,0.05);
-}
+/* Task urgent state — only background, stripe is always supplier color */
+.kd-task.urgent { background: rgba(239,68,68,0.07); }
 .kd-task-urgent-btn {
   width: 18px; height: 18px; border-radius: 3px; border: none;
   background: transparent; color: var(--text-dim); cursor: pointer;
@@ -9907,8 +9904,17 @@ function kdBuildCardTasks(cardEl, rec, card, cntEl) {
 
 function kdBuildTask(rec, card, task) {
   if (!Array.isArray(task.locations)) task.locations = task.location ? [task.location] : [];
+  // Deduplicate locations silently
+  task.locations = [...new Set(task.locations)];
   const el = document.createElement('div');
   el.className = 'kd-task' + (task.urgent ? ' urgent' : ''); el.dataset.taskId = task.id;
+
+  // Supplier color stripe on left border (always, even when urgent)
+  const _prof = (appState.profese || []).find(p => p.name === task.sub);
+  if (_prof && _prof.color) {
+    el.style.borderLeft = `3px solid ${_prof.color}`;
+    el.style.paddingLeft = '6px';
+  }
 
   // Row 1: task name (full width)
   const nameRow = document.createElement('div'); nameRow.className = 'kd-task-name-row';
@@ -10013,25 +10019,26 @@ function kdOpenSubPop(e, rec, task) {
   openSearchPop(e.target, items, val => { task.sub = val; kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
 }
 
-// ── Location popover (multi-select, from floor names) ───────────
+// ── Location popover (only unselected locations shown) ──────────
 function kdOpenLocPop(e, task) {
   e.stopPropagation();
-  const locs = kdGetLocations();
+  if (!Array.isArray(task.locations)) task.locations = [];
+  task.locations = [...new Set(task.locations)]; // ensure no duplicates
+  const allLocs = kdGetLocations();
+  // Only show locations not yet assigned to this task
+  const available = allLocs.filter(l => !task.locations.includes(l));
   const pop = document.getElementById('kd-loc-pop'); pop.innerHTML = '';
-  if (!locs.length) {
+  if (!available.length) {
     const em = document.createElement('div'); em.style.cssText = 'padding:8px 10px;font-size:11px;color:var(--text-dim);font-style:italic';
-    em.textContent = 'Nejsou definována žádná podlaží'; pop.appendChild(em);
+    em.textContent = allLocs.length ? 'Všechny lokace přiřazeny' : 'Nejsou definována žádná podlaží';
+    pop.appendChild(em);
   }
-  locs.forEach(loc => {
+  available.forEach(loc => {
     const d = document.createElement('div'); d.className = 'kd-sub-opt';
-    const has = (task.locations||[]).includes(loc);
-    d.innerHTML = `<span style="font-size:11px;width:12px;color:${has?'var(--olive)':'var(--text-dim)'}">${has?'✓':''}</span> ${escHtml(loc)}`;
-    if (has) d.style.color = 'var(--olive)';
+    d.innerHTML = `${escHtml(loc)}`;
     d.onclick = e2 => {
       e2.stopPropagation();
-      if (!Array.isArray(task.locations)) task.locations = [];
-      if (has) task.locations = task.locations.filter(l => l !== loc);
-      else task.locations.push(loc);
+      if (!task.locations.includes(loc)) task.locations.push(loc);
       kdSave(); kdRenderContent();
       pop.classList.remove('open');
     };
