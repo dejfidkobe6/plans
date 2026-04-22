@@ -1735,6 +1735,9 @@ option { background: var(--card); color: var(--text); }
 .kd-sub-opt:hover { background: var(--card); }
 .kd-sub-opt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+/* Backdrop for closing KD popovers */
+#kd-pop-backdrop { display: none; position: fixed; inset: 0; z-index: 595; }
+
 /* Reusable searchable popover */
 #srch-pop {
   position: fixed; z-index: 700; display: none;
@@ -3793,6 +3796,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <div id="kd-loc-pop"></div>
 <!-- Reusable searchable popover -->
 <div id="srch-pop"><input id="srch-pop-input" type="text" placeholder="Hledat..."><div id="srch-pop-list"></div></div>
+<!-- Backdrop: closes all KD popovers when clicking outside -->
+<div id="kd-pop-backdrop"></div>
 
 <!-- MANAGE PROFESE MODAL -->
 <div id="manage-profese-overlay">
@@ -9522,6 +9527,7 @@ function kdCloseAllPops() {
   if (_srchPopClose) { document.removeEventListener('click', _srchPopClose, true); _srchPopClose = null; }
   if (_kdSubCloseHandler) { document.removeEventListener('click', _kdSubCloseHandler, true); _kdSubCloseHandler = null; }
   if (_kdLocCloseHandler) { document.removeEventListener('click', _kdLocCloseHandler, true); _kdLocCloseHandler = null; }
+  const bd = document.getElementById('kd-pop-backdrop'); if (bd) bd.style.display = 'none';
 }
 
 // Locations come from floor names, not a separate editable list
@@ -9577,8 +9583,7 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
       d.innerHTML = html;
       d.onclick = ev => {
         ev.stopPropagation();
-        pop.classList.remove('open');
-        if (_srchPopClose) { document.removeEventListener('click', _srchPopClose); _srchPopClose = null; }
+        kdCloseAllPops();
         onSelect(item.value, item);
       };
       lst.appendChild(d);
@@ -9589,13 +9594,7 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
   _positionPop(pop, anchor);
   pop.classList.add('open');
   setTimeout(() => inp.focus(), 0);
-  if (_srchPopClose) document.removeEventListener('click', _srchPopClose, true);
-  _srchPopClose = ev => {
-    if (pop.contains(ev.target)) return;
-    pop.classList.remove('open');
-    document.removeEventListener('click', _srchPopClose, true); _srchPopClose = null;
-  };
-  setTimeout(() => document.addEventListener('click', _srchPopClose, true), 0);
+  const _bd = document.getElementById('kd-pop-backdrop'); if (_bd) _bd.style.display = 'block';
 }
 
 function kdSave() {
@@ -10067,8 +10066,8 @@ function kdOpenLocPop(e, task) {
     d.onclick = e2 => {
       e2.stopPropagation();
       if (!task.locations.includes(loc)) task.locations.push(loc);
+      kdCloseAllPops();
       kdSave(); kdRenderContent();
-      pop.classList.remove('open');
     };
     pop.appendChild(d);
   });
@@ -10082,12 +10081,11 @@ function kdOpenLocPop(e, task) {
   if (left + pw > vW) left = vW - pw - 8;
   pop.style.top = Math.max(4, top) + 'px'; pop.style.left = Math.max(4, left) + 'px';
   pop.classList.add('open');
-  if (_kdLocCloseHandler) document.removeEventListener('click', _kdLocCloseHandler, true);
-  _kdLocCloseHandler = ev => { if (pop.contains(ev.target)) return; pop.classList.remove('open'); document.removeEventListener('click', _kdLocCloseHandler, true); _kdLocCloseHandler = null; };
-  setTimeout(() => document.addEventListener('click', _kdLocCloseHandler, true), 0);
+  const _bd2 = document.getElementById('kd-pop-backdrop'); if (_bd2) _bd2.style.display = 'block';
 }
 
 function kdSetupPage() {
+  document.getElementById('kd-pop-backdrop').onclick = kdCloseAllPops;
   document.getElementById('kd-btn').addEventListener('click', toggleKDPage);
   document.getElementById('kd-close-btn').addEventListener('click', toggleKDPage);
   document.getElementById('kd-new-record-btn').addEventListener('click', () => {
