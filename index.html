@@ -348,7 +348,7 @@ body {
   bottom: -28px;
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
+  background: var(--panel);
   color: var(--text-bright);
   font-family: var(--font-main);
   font-size: 11px;
@@ -358,6 +358,7 @@ body {
   pointer-events: none;
   z-index: 999;
   border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* MAIN LAYOUT */
@@ -1298,7 +1299,7 @@ option { background: var(--card); color: var(--text); }
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
+  background: var(--panel);
   color: var(--text-bright);
   font-family: var(--font-main);
   font-size: 11px;
@@ -1308,6 +1309,7 @@ option { background: var(--card); color: var(--text); }
   pointer-events: none;
   z-index: 9999;
   border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* Level type color lines */
@@ -3768,6 +3770,7 @@ function switchLevel(idx) {
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
+      fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
       applyHotovoVisibility();
@@ -4751,17 +4754,17 @@ function createAnnotLabel(obj) {
     W = txtTop.width + PAD_L * 2 + STRIPE;
     txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
     H = PAD_T + txtTop.height + PAD_T;
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop];
   } else {
     // ── Full: contractor + popis + dates ──
     const txtBot = new fabric.Text(labelLineBot(obj), {
-      fontFamily: fontOpts, fontSize: FONT2, fill: '#dddddd', left: 0, top: 0
+      fontFamily: fontOpts, fontSize: FONT2, fill: '#444444', left: 0, top: 0
     });
     const line3 = labelLineDates(obj);
     const txtDates = line3 ? new fabric.Text(line3, {
-      fontFamily: fontOpts, fontSize: FONT3, fill: '#aaaaaa', left: 0, top: 0
+      fontFamily: fontOpts, fontSize: FONT3, fill: '#777777', left: 0, top: 0
     }) : null;
 
     W = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0) + PAD_L * 2 + STRIPE;
@@ -4771,7 +4774,7 @@ function createAnnotLabel(obj) {
     if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
     H = curY - GAP + PAD_T;
 
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(18,18,18,0.92)', rx: 3, ry: 3, stroke: 'rgba(255,255,255,0.08)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop, txtBot];
     if (txtDates) items.push(txtDates);
@@ -6232,6 +6235,7 @@ function undo() {
   redoStack.push(JSON.stringify(_canvasJSON()));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
+    fabricCanvas.backgroundColor = '#f0f0ec';
     cleanupOrphanedHelpers();
     applyAnnotationLocks();
     rebuildAllLabels();
@@ -6246,6 +6250,7 @@ function redo() {
   undoStack.push(JSON.stringify(_canvasJSON()));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
+    fabricCanvas.backgroundColor = '#f0f0ec';
     cleanupOrphanedHelpers();
     applyAnnotationLocks();
     rebuildAllLabels();
@@ -7827,32 +7832,47 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         }
       });
 
-      // ── Annotation labels (dark bg + colored stripe + firma name) ──────────
-      const PT_MM     = 72 / 25.4;
-      const LBL_FS    = 3.5;                        // pt — 30% smaller than original 5pt
-      const LBL_PSF   = 2.8;                        // pt — popis sub-line
-      const LBL_LH    = LBL_FS  / PT_MM * 1.4;     // mm — line height for firma
-      const LBL_PLH   = LBL_PSF / PT_MM * 1.3;     // mm — line height for popis
-      const LBL_STR   = 1.2;                        // mm — colored left stripe width
-      const LBL_XP    = 0.7;                        // mm — x-padding after stripe
-      const LBL_TRUNC = 22;                         // max chars for popis in label
-
-      const fitLbl = t => {
-        const s = String(t || '').replace(/\n/g, ' ').trim();
-        return s.length > LBL_TRUNC ? s.slice(0, LBL_TRUNC - 1) + '…' : s;
-      };
+      // ── Annotation labels: annotId + firma, guaranteed non-overlap ──────────
+      const PT_MM  = 72 / 25.4;
+      const LBL_FS = 3.5;                        // pt
+      const LBL_H  = LBL_FS / PT_MM * 1.55;     // mm — single-line height
+      const LBL_STR = 1.0;                       // mm — colored left stripe
+      const LBL_XP  = 0.55;                      // mm — padding after stripe / right edge
 
       const lblOvlp = (a,b) => !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
       const lPlaced = [];
+
+      // Find a non-overlapping position using spiral search; returns {x,y} or null
+      function findLblPos(acx, acy, lw) {
+        const angles = [270, 0, 90, 180, 315, 45, 225, 135, 300, 60, 240, 120];
+        for (let rad = 1; rad <= 40; rad += 1.5) {
+          for (const deg of angles) {
+            const a = deg * Math.PI / 180;
+            const tx = acx + Math.cos(a) * rad - lw / 2;
+            const ty = acy + Math.sin(a) * rad - LBL_H / 2;
+            if (!lPlaced.some(p => lblOvlp({x:tx, y:ty, w:lw, h:LBL_H}, p))) {
+              return {x:tx, y:ty};
+            }
+          }
+        }
+        return null;
+      }
 
       annotObjs.forEach(o => {
         if (!o.annotId) return;
         const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
         const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
-        const firmaText = fitLbl(getFirmaDisplay(o.profese));
-        const popisRaw  = o.popisek ? fitLbl(o.popisek) : '';
+        const idText    = String(o.annotId);
+        const firmaText = getFirmaDisplay(o.profese);
 
-        // Object bounding box in PDF mm
+        // Measure text widths
+        pdf.setFont('helvetica', 'bold');   pdf.setFontSize(LBL_FS);
+        const wId    = pdf.getStringUnitWidth(idText)    * LBL_FS / PT_MM;
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS * 0.86);
+        const wFirma = pdf.getStringUnitWidth(' ' + firmaText) * (LBL_FS * 0.86) / PT_MM;
+        const lw = LBL_STR + LBL_XP + wId + wFirma + LBL_XP;
+
+        // Annotation center in PDF coords
         const type = (o.type||'').toLowerCase();
         const oCX  = (o.originX||'left') === 'center';
         const oCY  = (o.originY||'top')  === 'center';
@@ -7861,8 +7881,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           const rx=(o.rx||20)*(o.scaleX||1), ry=(o.ry||20)*(o.scaleY||1);
           ox=toX(oCX?o.left-rx:o.left); oy=toY(oCY?o.top-ry:o.top); ow=toMX(rx*2); oh=toMY(ry*2);
         } else if (type === 'polygon' || type === 'polyline') {
-          const pts2 = o.points || [];
-          const sx2=o.scaleX||1, sy2=o.scaleY||1;
+          const pts2=o.points||[], sx2=o.scaleX||1, sy2=o.scaleY||1;
           const mnX=pts2.reduce((m,p)=>Math.min(m,p.x),Infinity), mxX=pts2.reduce((m,p)=>Math.max(m,p.x),-Infinity);
           const mnY=pts2.reduce((m,p)=>Math.min(m,p.y),Infinity), mxY=pts2.reduce((m,p)=>Math.max(m,p.y),-Infinity);
           const bl=oCX?o.left-(mxX-mnX)*sx2/2:o.left, bt=oCY?o.top-(mxY-mnY)*sy2/2:o.top;
@@ -7871,54 +7890,45 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
           ox=toX(oCX?o.left-fw/2:o.left); oy=toY(oCY?o.top-fh/2:o.top); ow=toMX(fw); oh=toMY(fh);
         }
+        const acx = ox + ow / 2, acy = oy + oh / 2;
 
-        const hasPopis = !!popisRaw;
-        const LBL_H = LBL_LH + (hasPopis ? LBL_PLH : 0) + 0.8;
-
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS);
-        const fw1 = pdf.getStringUnitWidth(firmaText) * LBL_FS / PT_MM;
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_PSF);
-        const fw2 = hasPopis ? pdf.getStringUnitWidth(popisRaw) * LBL_PSF / PT_MM : 0;
-        const lw  = Math.max(fw1, fw2) + LBL_STR + LBL_XP * 2 + 0.3;
-
-        const cx2 = ox + ow/2;
-        const cands = [
-          {x:cx2-lw/2,        y:oy-LBL_H-0.4},
-          {x:ox+ow+0.4,       y:oy},
-          {x:ox-lw-0.4,       y:oy},
-          {x:cx2-lw/2,        y:oy+oh+0.4},
-          {x:ox+ow+0.4,       y:oy+oh-LBL_H},
-          {x:ox-lw-0.4,       y:oy+oh-LBL_H},
-          {x:cx2-lw/2-lw*0.7, y:oy-LBL_H-0.4},
-          {x:cx2-lw/2+lw*0.7, y:oy-LBL_H-0.4},
-          {x:cx2-lw/2,        y:oy-LBL_H*2-0.8},
-          {x:cx2-lw/2,        y:oy-LBL_H*3-1.2},
-        ];
-        let pos = cands[0];
-        for (const c of cands) {
-          if (!lPlaced.some(p => lblOvlp({x:c.x,y:c.y,w:lw,h:LBL_H}, p))) { pos=c; break; }
-        }
+        const pos = findLblPos(acx, acy, lw);
+        if (!pos) return; // no room — skip rather than overlap
         lPlaced.push({x:pos.x, y:pos.y, w:lw, h:LBL_H});
+
+        // Leader line when label is placed away from annotation
+        const lblCx = pos.x + lw / 2, lblCy = pos.y + LBL_H / 2;
+        const dist = Math.hypot(lblCx - acx, lblCy - acy);
+        if (dist > lw * 0.6 + 2) {
+          pdf.setDrawColor(r, g, b);
+          pdf.setLineWidth(0.12);
+          pdf.setLineDashPattern([0.4, 0.5], 0);
+          // Line from annotation center to nearest edge of label
+          const ex = Math.max(pos.x, Math.min(pos.x+lw, acx));
+          const ey = Math.max(pos.y, Math.min(pos.y+LBL_H, acy));
+          pdf.line(acx, acy, ex, ey);
+          pdf.setLineDashPattern([], 0);
+        }
 
         // Dark background
         pdf.setFillColor(18, 18, 18);
-        pdf.roundedRect(pos.x, pos.y, lw, LBL_H, 0.3, 0.3, 'F');
+        pdf.roundedRect(pos.x, pos.y, lw, LBL_H, 0.25, 0.25, 'F');
         // Colored left stripe
         pdf.setFillColor(r, g, b);
         pdf.rect(pos.x, pos.y, LBL_STR, LBL_H, 'F');
-        // Firma name
+
         const tx = pos.x + LBL_STR + LBL_XP;
+        const ty = pos.y + LBL_H * 0.72;
+        // annotId — bold, colored
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(LBL_FS);
         pdf.setTextColor(r, g, b);
-        pdf.text(firmaText, tx, pos.y + 0.4 + LBL_LH * 0.75);
-        // Popis sub-line
-        if (hasPopis) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(LBL_PSF);
-          pdf.setTextColor(200, 200, 200);
-          pdf.text(popisRaw, tx, pos.y + 0.4 + LBL_LH + LBL_PLH * 0.85);
-        }
+        pdf.text(idText, tx, ty);
+        // firma — normal, white
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(LBL_FS * 0.86);
+        pdf.setTextColor(210, 210, 210);
+        pdf.text(' ' + firmaText, tx + wId, ty);
       });
 
       resolve();
