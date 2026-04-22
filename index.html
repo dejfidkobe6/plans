@@ -1534,11 +1534,20 @@ option { background: var(--card); color: var(--text); }
 .kd-empty-title { font-size: 14px; font-weight: 600; color: var(--text); }
 .kd-empty-sub { font-size: 12px; }
 .kd-card {
-  width: 420px; min-width: 360px; background: var(--panel);
+  width: 420px; min-width: 240px; background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
   max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  position: relative;
 }
+.kd-card-resize-handle {
+  position: absolute; right: -3px; top: 0; width: 7px; height: 100%;
+  cursor: ew-resize; z-index: 10; border-radius: 0 4px 4px 0;
+  background: var(--olive); opacity: 0; transition: opacity 0.15s;
+}
+.kd-card:hover .kd-card-resize-handle { opacity: 0.3; }
+.kd-card-resize-handle:hover { opacity: 0.7 !important; }
+.kd-card-resize-handle.dragging { opacity: 1 !important; }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -1628,47 +1637,37 @@ option { background: var(--card); color: var(--text); }
 .kd-loc-item:hover { background: var(--card); }
 .kd-loc-name {
   flex: 1; font-size: 11px; color: var(--text);
-  background: transparent; border: none; outline: none;
-  font-family: var(--font-main); cursor: default;
-  padding: 1px 3px; border-radius: 2px;
+  font-family: var(--font-main); padding: 1px 3px;
 }
-.kd-loc-name:focus { background: var(--card); cursor: text; }
-.kd-loc-del {
-  width: 14px; height: 14px; border-radius: 2px; border: none;
-  background: transparent; color: transparent; cursor: pointer; font-size: 10px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.kd-loc-item:hover .kd-loc-del { color: var(--text-dim); }
-.kd-loc-del:hover { background: rgba(239,68,68,0.12) !important; color: #EF4444 !important; }
-#kd-add-location-btn {
-  width: 100%; padding: 4px; border-radius: 4px; font-size: 10px;
-  background: transparent; border: 1px dashed var(--border);
-  color: var(--text-dim); cursor: pointer; font-family: var(--font-main);
-}
-#kd-add-location-btn:hover { border-color: var(--olive); color: var(--olive); }
 
-/* Task single-row layout */
+/* Task two-row layout */
 .kd-task {
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 5px; padding: 5px 6px;
+  border-radius: 5px; padding: 5px 7px; display: flex; flex-direction: column; gap: 4px;
+}
+.kd-task-name-row { display: flex; align-items: flex-start; width: 100%; }
+.kd-task-controls-row {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0;
 }
 .kd-task-row {
   display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; min-width: 0;
 }
 .kd-task-text {
-  flex: 1; min-width: 60px; font-size: 12px; color: var(--text); line-height: 1.4;
-  background: transparent; border: none; outline: none; resize: none;
-  font-family: var(--font-main); padding: 0; overflow: hidden;
+  width: 100%; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-bright);
+  line-height: 1.35; background: transparent; border: none; outline: none;
+  resize: none; font-family: var(--font-main); padding: 0; overflow: hidden;
 }
-.kd-task-text:focus { background: rgba(0,0,0,0.03); border-radius: 2px; padding: 1px 3px; margin: -1px -3px; }
+.kd-task-text:focus { outline: none; }
 .kd-task-date-pair {
   display: flex; align-items: center; gap: 2px; flex-shrink: 0;
 }
-.kd-task-date-input {
-  width: 80px; padding: 1px 3px; border: 1px solid var(--border); border-radius: 3px;
+.kd-task-date-txt {
+  width: 34px; padding: 1px 3px; border: 1px solid var(--border); border-radius: 3px;
   background: var(--bg); color: var(--text); font-size: 10px; font-family: var(--font-mono);
+  text-align: center;
 }
-.kd-task-date-input:focus { outline: none; border-color: var(--olive); }
+.kd-task-date-txt:focus { outline: none; border-color: var(--olive); width: 42px; }
+.kd-task-date-txt::placeholder { color: var(--text-dim); }
 .kd-task-date-sep { font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
 .kd-task-loc-chip {
   display: inline-flex; align-items: center; gap: 2px;
@@ -1695,14 +1694,6 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-task-urgent-btn:hover { color: #EF4444; }
 .kd-task-urgent-btn.on { color: #EF4444; }
-/* Task name — bigger, more prominent */
-.kd-task-text {
-  flex: 1; min-width: 80px;
-  font-size: 13px; font-weight: 600; color: var(--text-bright); line-height: 1.35;
-  background: transparent; border: none; outline: none; resize: none;
-  font-family: var(--font-main); padding: 0; overflow: hidden;
-}
-.kd-task-text:focus { background: rgba(0,0,0,0.03); border-radius: 2px; padding: 1px 3px; margin: -1px -3px; }
 /* Multiple location chips on task */
 .kd-task-locs { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; flex-shrink: 0; }
 .kd-task-loc-chip {
@@ -1747,6 +1738,28 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-sub-opt:hover { background: var(--card); }
 .kd-sub-opt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Reusable searchable popover */
+#srch-pop {
+  position: fixed; z-index: 700; display: none;
+  flex-direction: column; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+  min-width: 190px; max-width: 290px; overflow: hidden;
+}
+#srch-pop.open { display: flex; }
+#srch-pop-input {
+  border: none; border-bottom: 1px solid var(--border); outline: none;
+  background: var(--card); color: var(--text);
+  padding: 7px 11px; font-size: 12px; font-family: var(--font-main);
+  width: 100%; box-sizing: border-box;
+}
+#srch-pop-list { overflow-y: auto; max-height: 230px; }
+.srch-pop-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; font-size: 12px; cursor: pointer; color: var(--text);
+}
+.srch-pop-opt:hover { background: var(--card); }
+.srch-pop-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 /* Global KD filter bar */
 #kd-filter-bar {
@@ -3727,7 +3740,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="kd-locations-section">
       <div class="kd-backup-title">Lokace</div>
       <div id="kd-location-list"></div>
-      <button id="kd-add-location-btn">+ Přidat lokaci</button>
     </div>
     <div id="kd-backup-section">
       <div class="kd-backup-title">Automatická záloha</div>
@@ -3783,6 +3795,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 <div id="kd-sub-pop"></div>
 <!-- Location popover (KD) -->
 <div id="kd-loc-pop"></div>
+<!-- Reusable searchable popover -->
+<div id="srch-pop"><input id="srch-pop-input" type="text" placeholder="Hledat..."><div id="srch-pop-list"></div></div>
 
 <!-- MANAGE PROFESE MODAL -->
 <div id="manage-profese-overlay">
@@ -7304,13 +7318,12 @@ function setupHomeTasksStrip() {
 }
 
 function populateHomeStripFilters() {
-  // Subdodavatele (firmy from profese)
+  // Subdodavatele (firmy from profese) — sorted alphabetically
   const subdodSel = document.getElementById('ht-subdod');
   if (!subdodSel) return;
   const curSub = subdodSel.value;
   subdodSel.innerHTML = '<option value="">Všichni dodavatelé</option>';
-  const firms = new Set();
-  (appState.profese || []).forEach(p => { if (p.firma) firms.add(p.firma); });
+  const firms = [...new Set((appState.profese || []).filter(p => p.firma).map(p => p.firma))].sort((a,b) => a.localeCompare(b,'cs'));
   firms.forEach(f => {
     const opt = document.createElement('option');
     opt.value = f; opt.textContent = f;
@@ -7318,14 +7331,14 @@ function populateHomeStripFilters() {
     subdodSel.appendChild(opt);
   });
 
-  // Profese
+  // Profese — sorted alphabetically
   const profSel = document.getElementById('ht-profese');
   const curProf = profSel ? profSel.value : '';
   if (profSel) {
     profSel.innerHTML = '<option value="">Všechny profese</option>';
-    (appState.profese || []).forEach(p => {
+    [...(appState.profese || [])].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs')).forEach(p => {
       const opt = document.createElement('option');
-      opt.value = p.name; opt.textContent = p.name;
+      opt.value = p.name; opt.textContent = p.firma || p.name;
       if (curProf === p.name) opt.selected = true;
       profSel.appendChild(opt);
     });
@@ -7956,9 +7969,9 @@ function populateAnotaceFilters() {
   const profSel = document.getElementById('afilter-profese');
   const curProf = profSel.value;
   profSel.innerHTML = '<option value="">Všechny profese</option>';
-  (appState.profese || []).forEach(p => {
+  [...(appState.profese || [])].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs')).forEach(p => {
     const opt = document.createElement('option');
-    opt.value = p.name; opt.textContent = p.name;
+    opt.value = p.name; opt.textContent = p.firma || p.name;
     if (curProf === p.name) opt.selected = true;
     profSel.appendChild(opt);
   });
@@ -9198,7 +9211,7 @@ function escHtml(str) {
 // PROFESE MANAGEMENT
 // ============================================================
 function rebuildProfeseSelects() {
-  const profese = appState.profese || DEFAULT_PROFESE;
+  const profese = [...(appState.profese || DEFAULT_PROFESE)].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'));
   ['prop-profese', 'filter-profese'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -9211,11 +9224,9 @@ function rebuildProfeseSelects() {
     profese.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      // prop-profese shows the company name (firma); filter shows profession name
-      opt.textContent = (id === 'prop-profese' && p.firma) ? p.firma : p.name;
+      opt.textContent = p.firma || p.name;
       sel.appendChild(opt);
     });
-    // Restore previous value if still valid
     if (profese.find(p => p.name === currentVal)) {
       sel.value = currentVal;
     }
@@ -9327,6 +9338,16 @@ function renderProfeseList() {
       const email = form.querySelector('.pf-email').value.trim();
       const oldName = appState.profese[idx].name; // capture before update
       appState.profese[idx] = { name, color, firma, kontakt, telefon, email };
+      // Cascade rename: update all annotations and KD tasks that reference oldName
+      if (oldName !== name) {
+        appState.levels.forEach(level => {
+          (level.annotations || []).forEach(a => { if (a.profese === oldName) a.profese = name; });
+        });
+        kdRecords.forEach(r => (r.cards||[]).forEach(c => (c.tasks||[]).forEach(t => {
+          if (t.sub === oldName) t.sub = name;
+        })));
+        kdSave();
+      }
       saveState();
       rebuildProfeseSelects();
       renderProfeseList();
@@ -9483,7 +9504,7 @@ const LS_KD_LOCATIONS_KEY = (pid) => `besix_kd_locations_${pid}`;
 const LS_KD_CARD_W        = (pid) => `besix_kd_cardw_${pid}`;
 
 let kdRecords   = [];    // [{id,date,note,cards:[{id,title,tasks:[{id,text,sub,dateFrom,dateTo,locations:[],urgent,}]}]}]
-let kdLocations = [];    // ['5NP', 'Záklop', …]
+let kdLocations = [];    // legacy – kept for server compat; use kdGetLocations() instead
 let kdActiveId  = null;
 let _kdSubCloseHandler = null;
 let _kdLocCloseHandler = null;
@@ -9494,6 +9515,80 @@ let _kdCardWidth = 420; // px, adjustable via Ctrl+scroll
 let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// Locations come from floor names, not a separate editable list
+function kdGetLocations() { return (appState.levels || []).map(l => l.name); }
+
+// Compact date helpers: ISO ↔ "d.m"
+function kdIsoToDM(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  return p.length === 3 ? `${parseInt(p[2])}.${parseInt(p[1])}` : '';
+}
+function kdDMToIso(dm, existing) {
+  if (!dm || !dm.trim()) return null;
+  const parts = dm.trim().split('.');
+  if (parts.length < 2) return existing || null;
+  const d = parseInt(parts[0]), m = parseInt(parts[1]);
+  const y = parts.length >= 3 ? parseInt(parts[2]) : (existing ? parseInt(existing.split('-')[0]) : new Date().getFullYear());
+  if (isNaN(d)||isNaN(m)||d<1||d>31||m<1||m>12) return existing || null;
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// Smart popover positioning: opens upward if off-screen
+let _srchPopClose = null;
+function _positionPop(pop, anchor) {
+  pop.style.cssText += ';top:-9999px;left:-9999px;display:flex;';
+  const ph = pop.offsetHeight, pw = pop.offsetWidth;
+  const r = anchor.getBoundingClientRect();
+  const vH = window.innerHeight, vW = window.innerWidth;
+  const top = (r.bottom + 4 + ph > vH && r.top - 4 - ph >= 0) ? (r.top - 4 - ph) : (r.bottom + 4);
+  let left = r.left;
+  if (left + pw > vW) left = vW - pw - 8;
+  pop.style.top = Math.max(4, top) + 'px';
+  pop.style.left = Math.max(4, left) + 'px';
+}
+
+function openSearchPop(anchor, items, onSelect, placeholder) {
+  const pop = document.getElementById('srch-pop');
+  const inp = document.getElementById('srch-pop-input');
+  const lst = document.getElementById('srch-pop-list');
+  inp.placeholder = placeholder || 'Hledat...'; inp.value = '';
+  const render = q => {
+    lst.innerHTML = '';
+    const filtered = q ? items.filter(it => (it.label||'').toLowerCase().includes(q)) : items;
+    if (!filtered.length) {
+      const em = document.createElement('div');
+      em.style.cssText = 'padding:8px 11px;font-size:11px;color:var(--text-dim);font-style:italic';
+      em.textContent = 'Žádné výsledky'; lst.appendChild(em); return;
+    }
+    filtered.forEach(item => {
+      const d = document.createElement('div'); d.className = 'srch-pop-opt';
+      let html = item.dot ? `<span class="srch-pop-dot" style="background:${item.dot}"></span>` : '';
+      html += item.em ? `<em>${item.label}</em>` : escHtml(item.label);
+      d.innerHTML = html;
+      d.onclick = ev => {
+        ev.stopPropagation();
+        pop.classList.remove('open');
+        if (_srchPopClose) { document.removeEventListener('click', _srchPopClose); _srchPopClose = null; }
+        onSelect(item.value, item);
+      };
+      lst.appendChild(d);
+    });
+  };
+  inp.oninput = () => render(inp.value.toLowerCase().trim());
+  render('');
+  _positionPop(pop, anchor);
+  pop.classList.add('open');
+  setTimeout(() => inp.focus(), 0);
+  if (_srchPopClose) document.removeEventListener('click', _srchPopClose);
+  _srchPopClose = ev => {
+    if (pop.contains(ev.target)) return;
+    pop.classList.remove('open');
+    document.removeEventListener('click', _srchPopClose); _srchPopClose = null;
+  };
+  setTimeout(() => document.addEventListener('click', _srchPopClose), 0);
+}
 
 function kdSave() {
   const pid = currentProject?.id; if (!pid) return;
@@ -9534,7 +9629,13 @@ function kdSaveCardWidth() {
 }
 
 function kdApplyCardWidth() {
-  document.querySelectorAll('.kd-card').forEach(el => { el.style.width = _kdCardWidth + 'px'; el.style.minWidth = _kdCardWidth + 'px'; });
+  const rec = kdRecords.find(r => r.id === kdActiveId);
+  document.querySelectorAll('.kd-card').forEach(el => {
+    const card = rec && (rec.cards||[]).find(c => c.id === el.dataset.cardId);
+    if (!card || !card.width) {
+      el.style.width = _kdCardWidth + 'px'; el.style.minWidth = _kdCardWidth + 'px';
+    }
+  });
   const addBtn = document.querySelector('.kd-add-card-btn');
   if (addBtn) { addBtn.style.width = (_kdCardWidth - 20) + 'px'; addBtn.style.minWidth = '200px'; }
 }
@@ -9603,7 +9704,7 @@ function toggleKDPage() {
     page.classList.remove('visible'); btn.classList.remove('active');
   } else {
     closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
-    kdLoad(); kdLoadLocations(); kdLoadBackupSchedule(); kdLoadCardWidth();
+    kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth();
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
@@ -9654,27 +9755,10 @@ function kdRenderSidebar() {
 
   const locList = document.getElementById('kd-location-list'); if (!locList) return;
   locList.innerHTML = '';
-  kdLocations.forEach((loc, i) => {
+  kdGetLocations().forEach(loc => {
     const row = document.createElement('div'); row.className = 'kd-loc-item';
-    const inp = document.createElement('input'); inp.className = 'kd-loc-name';
-    inp.value = loc; inp.title = 'Kliknutím upravit';
-    inp.onchange = () => {
-      const newName = inp.value.trim() || loc;
-      kdRecords.forEach(r => (r.cards||[]).forEach(c => (c.tasks||[]).forEach(t => {
-        if (t.locations) t.locations = t.locations.map(l => l === loc ? newName : l);
-      })));
-      kdLocations[i] = newName; kdSave(); kdSaveLocations(); kdRenderContent();
-    };
-    const del = document.createElement('button'); del.className = 'kd-loc-del'; del.textContent = '✕';
-    del.onclick = () => {
-      kdLocations.splice(i, 1);
-      kdRecords.forEach(r => (r.cards||[]).forEach(c => (c.tasks||[]).forEach(t => {
-        if (t.locations) t.locations = (t.locations).filter(l => l !== loc);
-      })));
-      kdSave(); kdSaveLocations(); kdRenderPage();
-    };
-    row.appendChild(inp); row.appendChild(del);
-    locList.appendChild(row);
+    const span = document.createElement('span'); span.className = 'kd-loc-name'; span.textContent = loc;
+    row.appendChild(span); locList.appendChild(row);
   });
 
   const dayEl = document.getElementById('kd-backup-day');
@@ -9709,18 +9793,17 @@ function kdRenderContent() {
   // Populate filter selects
   if (fbar) {
     const allTasks = (rec.cards || []).flatMap(c => c.tasks || []);
-    const subs = [...new Set(allTasks.map(t => t.sub).filter(Boolean))];
-    const locs = [...new Set(allTasks.flatMap(t => t.locations || []).filter(Boolean))];
+    const subsUsed = new Set(allTasks.map(t => t.sub).filter(Boolean));
+    const sortedSubs = [...(appState.profese||[])].filter(p => subsUsed.has(p.name)).sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'));
     const fSub = document.getElementById('kdf-sub');
     const fLoc = document.getElementById('kdf-loc');
     if (fSub) {
       const cur = _kdFilter.sub;
       fSub.innerHTML = '<option value="">Dodavatel: vše</option>';
-      subs.forEach(s => {
-        const p = (appState.profese||[]).find(pr => pr.name === s);
+      sortedSubs.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = s; opt.textContent = p ? (p.firma || p.name) : s;
-        if (s === cur) opt.selected = true;
+        opt.value = p.name; opt.textContent = p.firma || p.name;
+        if (p.name === cur) opt.selected = true;
         fSub.appendChild(opt);
       });
       fSub.classList.toggle('kdf-active', !!cur);
@@ -9728,7 +9811,7 @@ function kdRenderContent() {
     if (fLoc) {
       const cur = _kdFilter.location;
       fLoc.innerHTML = '<option value="">Lokace: vše</option>';
-      locs.forEach(l => {
+      kdGetLocations().forEach(l => {
         const opt = document.createElement('option');
         opt.value = l; opt.textContent = l;
         if (l === cur) opt.selected = true;
@@ -9765,15 +9848,15 @@ function kdAllTasks(rec) {
 function kdBuildCard(rec, card) {
   const el = document.createElement('div');
   el.className = 'kd-card'; el.dataset.cardId = card.id;
-  el.style.width = _kdCardWidth + 'px'; el.style.minWidth = _kdCardWidth + 'px';
+  const w = card.width || _kdCardWidth;
+  el.style.width = w + 'px'; el.style.minWidth = '240px';
 
   const hdr = document.createElement('div'); hdr.className = 'kd-card-header';
   const inp = document.createElement('input');
   inp.className = 'kd-card-title'; inp.value = card.title || '';
   inp.placeholder = 'Název úseku...';
   inp.onchange = () => { card.title = inp.value; kdSave(); kdRenderSidebar(); };
-  const cnt = document.createElement('span');
-  cnt.className = 'kd-card-count';
+  const cnt = document.createElement('span'); cnt.className = 'kd-card-count';
   const del = document.createElement('button'); del.className = 'kd-card-del-btn';
   del.innerHTML = '✕'; del.title = 'Smazat úsek';
   del.onclick = () => { if (confirm('Smazat úsek a všechny jeho úkoly?')) { rec.cards = rec.cards.filter(c => c.id !== card.id); kdSave(); kdRenderContent(); } };
@@ -9788,6 +9871,27 @@ function kdBuildCard(rec, card) {
   addBtn.textContent = '+ Přidat úkol';
   addBtn.onclick = () => { kdAddTask(rec, card); };
   el.appendChild(addBtn);
+
+  // Drag-to-resize handle on right edge
+  const rh = document.createElement('div'); rh.className = 'kd-card-resize-handle';
+  rh.addEventListener('mousedown', ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    rh.classList.add('dragging');
+    const startX = ev.clientX, startW = parseInt(el.style.width) || w;
+    const onMove = mv => {
+      const nw = Math.max(240, Math.min(900, startW + (mv.clientX - startX)));
+      el.style.width = nw + 'px'; card.width = nw;
+    };
+    const onUp = () => {
+      rh.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      kdSave();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  el.appendChild(rh);
   return el;
 }
 
@@ -9806,47 +9910,48 @@ function kdBuildTask(rec, card, task) {
   const el = document.createElement('div');
   el.className = 'kd-task' + (task.urgent ? ' urgent' : ''); el.dataset.taskId = task.id;
 
-  const row = document.createElement('div'); row.className = 'kd-task-row';
-
-  // Task name — central focus
+  // Row 1: task name (full width)
+  const nameRow = document.createElement('div'); nameRow.className = 'kd-task-name-row';
   const ta = document.createElement('textarea');
   ta.className = 'kd-task-text'; ta.value = task.text || '';
   ta.placeholder = 'Název úkolu...'; ta.rows = 1;
-  ta.oninput = () => {
-    ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
-    task.text = ta.value; kdSave();
-  };
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; task.text = ta.value; kdSave(); };
   setTimeout(() => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }, 0);
-  row.appendChild(ta);
+  nameRow.appendChild(ta);
+  el.appendChild(nameRow);
+
+  // Row 2: controls (supplier, dates, locations, urgent, delete)
+  const ctrl = document.createElement('div'); ctrl.className = 'kd-task-controls-row';
 
   // Supplier chip
   const prof = (appState.profese || []).find(p => p.name === task.sub);
   if (prof) {
-    const chip = document.createElement('span');
-    chip.className = 'kd-task-sub-chip';
-    chip.style.color = prof.color || '#888'; chip.style.borderColor = prof.color || '#888';
+    const chip = document.createElement('span'); chip.className = 'kd-task-sub-chip';
+    chip.style.color = prof.color||'#888'; chip.style.borderColor = prof.color||'#888';
     chip.title = 'Změnit dodavatele';
-    chip.innerHTML = `<span class="kd-task-sub-dot" style="background:${prof.color||'#888'}"></span>${(prof.firma||prof.name||'').slice(0,12)}`;
+    chip.innerHTML = `<span class="kd-task-sub-dot" style="background:${prof.color||'#888'}"></span>${(prof.firma||prof.name||'').slice(0,14)}`;
     chip.onclick = e => kdOpenSubPop(e, rec, task);
-    row.appendChild(chip);
+    ctrl.appendChild(chip);
   } else {
-    const none = document.createElement('span');
-    none.className = 'kd-task-sub-none'; none.textContent = '+ dod.';
-    none.onclick = e => kdOpenSubPop(e, rec, task);
-    row.appendChild(none);
+    const none = document.createElement('span'); none.className = 'kd-task-sub-none'; none.textContent = '+ dod.';
+    none.onclick = e => kdOpenSubPop(e, rec, task); ctrl.appendChild(none);
   }
 
-  // Date pair
+  // Compact date pair (dd.mm format)
   const dp = document.createElement('span'); dp.className = 'kd-task-date-pair';
-  const inpOd = document.createElement('input'); inpOd.type = 'date'; inpOd.className = 'kd-task-date-input';
-  inpOd.value = task.dateFrom || '';
-  inpOd.onchange = () => { task.dateFrom = inpOd.value || null; kdSave(); };
+  const mkDateTxt = (isoVal, onCommit) => {
+    const inp = document.createElement('input'); inp.type = 'text';
+    inp.className = 'kd-task-date-txt'; inp.value = kdIsoToDM(isoVal);
+    inp.placeholder = 'd.m'; inp.title = 'Formát: den.měsíc (např. 22.4)';
+    inp.onblur = () => { const iso = kdDMToIso(inp.value, isoVal); onCommit(iso); inp.value = kdIsoToDM(iso); };
+    inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); };
+    return inp;
+  };
+  const inpOd = mkDateTxt(task.dateFrom, v => { task.dateFrom = v; kdSave(); });
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
-  const inpDo = document.createElement('input'); inpDo.type = 'date'; inpDo.className = 'kd-task-date-input';
-  inpDo.value = task.dateTo || '';
-  inpDo.onchange = () => { task.dateTo = inpDo.value || null; kdSave(); };
+  const inpDo = mkDateTxt(task.dateTo, v => { task.dateTo = v; kdSave(); });
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
-  row.appendChild(dp);
+  ctrl.appendChild(dp);
 
   // Multiple location chips
   const locsEl = document.createElement('span'); locsEl.className = 'kd-task-locs';
@@ -9855,30 +9960,29 @@ function kdBuildTask(rec, card, task) {
     const txt = document.createElement('span'); txt.textContent = loc;
     const del = document.createElement('button'); del.className = 'kd-task-loc-del'; del.textContent = '×';
     del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); kdSave(); kdRenderContent(); };
-    chip.appendChild(txt); chip.appendChild(del);
-    locsEl.appendChild(chip);
+    chip.appendChild(txt); chip.appendChild(del); locsEl.appendChild(chip);
   });
   const addLoc = document.createElement('button'); addLoc.className = 'kd-task-loc-add';
   addLoc.title = 'Přidat lokaci'; addLoc.textContent = '+';
   addLoc.onclick = e => kdOpenLocPop(e, task);
   locsEl.appendChild(addLoc);
-  row.appendChild(locsEl);
+  ctrl.appendChild(locsEl);
 
   // Urgent toggle
   const urgBtn = document.createElement('button');
   urgBtn.className = 'kd-task-urgent-btn' + (task.urgent ? ' on' : '');
-  urgBtn.title = task.urgent ? 'Urgentní (kliknutím zrušit)' : 'Označit jako urgentní';
+  urgBtn.title = task.urgent ? 'Urgentní – kliknutím zrušit' : 'Označit jako urgentní';
   urgBtn.textContent = '!';
   urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
-  row.appendChild(urgBtn);
+  ctrl.appendChild(urgBtn);
 
   // Delete
   const delBtn = document.createElement('button');
   delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol'; delBtn.innerHTML = '✕';
   delBtn.onclick = () => { kdDeleteTask(rec, card.id, task.id); };
-  row.appendChild(delBtn);
+  ctrl.appendChild(delBtn);
 
-  el.appendChild(row);
+  el.appendChild(ctrl);
   return el;
 }
 
@@ -9900,39 +10004,28 @@ function kdDeleteTask(rec, cardId, taskId) {
   kdSave(); kdRenderContent();
 }
 
-// ── Sub popover ──────────────────────────────────────────────────
+// ── Sub popover (searchable) ─────────────────────────────────────
 function kdOpenSubPop(e, rec, task) {
   e.stopPropagation();
-  const pop = document.getElementById('kd-sub-pop'); pop.innerHTML = '';
-  const mkOpt = (dot, label, onClick) => {
-    const d = document.createElement('div'); d.className = 'kd-sub-opt';
-    d.innerHTML = `<span class="kd-sub-opt-dot" style="background:${dot}"></span>${label}`;
-    d.onclick = onClick; pop.appendChild(d);
-  };
-  mkOpt('#ccc', '<em>Žádný</em>', () => { task.sub = null; kdSave(); pop.classList.remove('open'); kdRenderContent(); });
-  (appState.profese || []).forEach(p => {
-    mkOpt(p.color||'#888', p.firma||p.name, () => { task.sub = p.name; kdSave(); pop.classList.remove('open'); kdRenderContent(); });
-  });
-  const r = e.target.getBoundingClientRect();
-  pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 4) + 'px';
-  pop.classList.add('open');
-  if (_kdSubCloseHandler) document.removeEventListener('click', _kdSubCloseHandler);
-  _kdSubCloseHandler = () => { pop.classList.remove('open'); document.removeEventListener('click', _kdSubCloseHandler); _kdSubCloseHandler = null; };
-  setTimeout(() => document.addEventListener('click', _kdSubCloseHandler), 0);
+  const items = [{ value: null, label: 'Žádný', dot: '#ccc', em: true }];
+  [...(appState.profese || [])].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'))
+    .forEach(p => items.push({ value: p.name, label: p.firma||p.name, dot: p.color||'#888' }));
+  openSearchPop(e.target, items, val => { task.sub = val; kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
 }
 
-// ── Location popover (multi-select) ─────────────────────────────
+// ── Location popover (multi-select, from floor names) ───────────
 function kdOpenLocPop(e, task) {
   e.stopPropagation();
+  const locs = kdGetLocations();
   const pop = document.getElementById('kd-loc-pop'); pop.innerHTML = '';
-  if (!kdLocations.length) {
+  if (!locs.length) {
     const em = document.createElement('div'); em.style.cssText = 'padding:8px 10px;font-size:11px;color:var(--text-dim);font-style:italic';
-    em.textContent = 'Přidejte lokace v levém panelu'; pop.appendChild(em);
+    em.textContent = 'Nejsou definována žádná podlaží'; pop.appendChild(em);
   }
-  kdLocations.forEach(loc => {
+  locs.forEach(loc => {
     const d = document.createElement('div'); d.className = 'kd-sub-opt';
     const has = (task.locations||[]).includes(loc);
-    d.innerHTML = `<span style="font-size:11px;color:${has?'var(--olive)':'var(--text-dim)'}">${has?'✓':' '}</span> ${loc}`;
+    d.innerHTML = `<span style="font-size:11px;width:12px;color:${has?'var(--olive)':'var(--text-dim)'}">${has?'✓':''}</span> ${escHtml(loc)}`;
     if (has) d.style.color = 'var(--olive)';
     d.onclick = e2 => {
       e2.stopPropagation();
@@ -9944,8 +10037,15 @@ function kdOpenLocPop(e, task) {
     };
     pop.appendChild(d);
   });
+  // Smart direction
+  pop.style.cssText += ';display:flex;top:-9999px;left:-9999px;';
+  const ph = pop.offsetHeight, pw = pop.offsetWidth;
   const r = e.target.getBoundingClientRect();
-  pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 4) + 'px';
+  const vH = window.innerHeight, vW = window.innerWidth;
+  const top = (r.bottom + 4 + ph > vH && r.top - 4 - ph >= 0) ? (r.top - 4 - ph) : (r.bottom + 4);
+  let left = r.left;
+  if (left + pw > vW) left = vW - pw - 8;
+  pop.style.top = Math.max(4, top) + 'px'; pop.style.left = Math.max(4, left) + 'px';
   pop.classList.add('open');
   if (_kdLocCloseHandler) document.removeEventListener('click', _kdLocCloseHandler);
   _kdLocCloseHandler = () => { pop.classList.remove('open'); document.removeEventListener('click', _kdLocCloseHandler); _kdLocCloseHandler = null; };
@@ -9974,13 +10074,7 @@ function kdSetupPage() {
     const rec = kdRecords.find(r => r.id === kdActiveId);
     if (rec) { rec.note = e.target.value; kdSave(); }
   });
-  document.getElementById('kd-add-location-btn').addEventListener('click', () => {
-    kdLocations.push('Nová lokace'); kdSaveLocations(); kdRenderSidebar();
-    setTimeout(() => {
-      const inputs = document.querySelectorAll('.kd-loc-name');
-      if (inputs.length) { const last = inputs[inputs.length-1]; last.focus(); last.select(); }
-    }, 50);
-  });
+  // Locations are auto-derived from project floors (appState.levels) — no add button
   document.getElementById('kd-backup-day').addEventListener('change', e => {
     _kdBackupSchedule.day = parseInt(e.target.value); kdSaveBackupSchedule(); kdUpdateBackupNextLabel();
   });
@@ -10418,7 +10512,7 @@ async function openProject(proj) {
   }
 
   currentProject = proj;
-  kdLoad(); kdLoadLocations(); kdActiveId = null;
+  kdLoad(); kdActiveId = null;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
   applyViewerMode();
