@@ -3768,6 +3768,7 @@ function switchLevel(idx) {
 
   if (level.fabricJSON && level.fabricJSON.objects && level.fabricJSON.objects.length > 0) {
     fabricCanvas.loadFromJSON(level.fabricJSON, () => {
+      fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
       applyHotovoVisibility();
@@ -6232,6 +6233,7 @@ function undo() {
   redoStack.push(JSON.stringify(_canvasJSON()));
   const prev = JSON.parse(undoStack.pop());
   fabricCanvas.loadFromJSON(prev, () => {
+    fabricCanvas.backgroundColor = '#f0f0ec';
     cleanupOrphanedHelpers();
     applyAnnotationLocks();
     rebuildAllLabels();
@@ -6246,6 +6248,7 @@ function redo() {
   undoStack.push(JSON.stringify(_canvasJSON()));
   const next = JSON.parse(redoStack.pop());
   fabricCanvas.loadFromJSON(next, () => {
+    fabricCanvas.backgroundColor = '#f0f0ec';
     cleanupOrphanedHelpers();
     applyAnnotationLocks();
     rebuildAllLabels();
