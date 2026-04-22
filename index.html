@@ -7939,6 +7939,7 @@ function openAnotacePage() {
 function closeAnotacePage() {
   document.getElementById('anotace-page').classList.remove('visible');
   document.getElementById('anotace-btn').classList.remove('active');
+  kdCloseAllPops();
 }
 
 function toggleAnotacePage() {
@@ -9518,9 +9519,9 @@ function kdCloseAllPops() {
   ['srch-pop','kd-sub-pop','kd-loc-pop'].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.remove('open');
   });
-  if (_srchPopClose) { document.removeEventListener('click', _srchPopClose); _srchPopClose = null; }
-  if (_kdSubCloseHandler) { document.removeEventListener('click', _kdSubCloseHandler); _kdSubCloseHandler = null; }
-  if (_kdLocCloseHandler) { document.removeEventListener('click', _kdLocCloseHandler); _kdLocCloseHandler = null; }
+  if (_srchPopClose) { document.removeEventListener('click', _srchPopClose, true); _srchPopClose = null; }
+  if (_kdSubCloseHandler) { document.removeEventListener('click', _kdSubCloseHandler, true); _kdSubCloseHandler = null; }
+  if (_kdLocCloseHandler) { document.removeEventListener('click', _kdLocCloseHandler, true); _kdLocCloseHandler = null; }
 }
 
 // Locations come from floor names, not a separate editable list
@@ -9588,13 +9589,13 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
   _positionPop(pop, anchor);
   pop.classList.add('open');
   setTimeout(() => inp.focus(), 0);
-  if (_srchPopClose) document.removeEventListener('click', _srchPopClose);
+  if (_srchPopClose) document.removeEventListener('click', _srchPopClose, true);
   _srchPopClose = ev => {
     if (pop.contains(ev.target)) return;
     pop.classList.remove('open');
-    document.removeEventListener('click', _srchPopClose); _srchPopClose = null;
+    document.removeEventListener('click', _srchPopClose, true); _srchPopClose = null;
   };
-  setTimeout(() => document.addEventListener('click', _srchPopClose), 0);
+  setTimeout(() => document.addEventListener('click', _srchPopClose, true), 0);
 }
 
 function kdSave() {
@@ -10081,9 +10082,9 @@ function kdOpenLocPop(e, task) {
   if (left + pw > vW) left = vW - pw - 8;
   pop.style.top = Math.max(4, top) + 'px'; pop.style.left = Math.max(4, left) + 'px';
   pop.classList.add('open');
-  if (_kdLocCloseHandler) document.removeEventListener('click', _kdLocCloseHandler);
-  _kdLocCloseHandler = () => { pop.classList.remove('open'); document.removeEventListener('click', _kdLocCloseHandler); _kdLocCloseHandler = null; };
-  setTimeout(() => document.addEventListener('click', _kdLocCloseHandler), 0);
+  if (_kdLocCloseHandler) document.removeEventListener('click', _kdLocCloseHandler, true);
+  _kdLocCloseHandler = ev => { if (pop.contains(ev.target)) return; pop.classList.remove('open'); document.removeEventListener('click', _kdLocCloseHandler, true); _kdLocCloseHandler = null; };
+  setTimeout(() => document.addEventListener('click', _kdLocCloseHandler, true), 0);
 }
 
 function kdSetupPage() {
@@ -10142,7 +10143,7 @@ function toggleHomePage(forceState) {
   const hp = document.getElementById('home-page');
   const btn = document.getElementById('subddodavatele-btn');
   if (forceState === true) {
-    closeAnotacePage(); toggleUsersPage(false);
+    closeAnotacePage(); toggleUsersPage(false); kdCloseAllPops();
     hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
   } else if (forceState === false) {
     hp.classList.remove('visible'); btn.classList.remove('active');
@@ -10151,7 +10152,7 @@ function toggleHomePage(forceState) {
     if (isVisible) {
       hp.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      closeAnotacePage(); toggleUsersPage(false);
+      closeAnotacePage(); toggleUsersPage(false); kdCloseAllPops();
       hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
     }
   }
@@ -10161,7 +10162,7 @@ function toggleUsersPage(forceState) {
   const up = document.getElementById('users-page');
   const btn = document.getElementById('users-mgmt-btn');
   if (forceState === true) {
-    closeAnotacePage(); toggleHomePage(false);
+    closeAnotacePage(); toggleHomePage(false); kdCloseAllPops();
     up.classList.add('visible'); btn.classList.add('active'); loadMembers();
   } else if (forceState === false) {
     up.classList.remove('visible'); btn.classList.remove('active');
@@ -10170,7 +10171,7 @@ function toggleUsersPage(forceState) {
     if (isVisible) {
       up.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      closeAnotacePage(); toggleHomePage(false);
+      closeAnotacePage(); toggleHomePage(false); kdCloseAllPops();
       up.classList.add('visible'); btn.classList.add('active'); loadMembers();
     }
   }
