@@ -1391,7 +1391,237 @@ option { background: var(--card); color: var(--text); }
 #pdf-export-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
 #pdf-export-btn svg { width: 16px; height: 16px; }
 
-/* ANOTACE PAGE */
+/* KONTROLNÍ DEN BUTTON */
+#kd-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px; height: 100%;
+  border: none; background: rgba(74,83,64,0.25);
+  color: var(--olive-light);
+  font-family: var(--font-main); font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0; white-space: nowrap;
+}
+#kd-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
+#kd-btn.active { background: rgba(74,83,64,0.6); color: var(--text-bright); }
+#kd-btn svg { width: 16px; height: 16px; }
+
+/* KONTROLNÍ DEN PAGE */
+#kd-page {
+  display: none; position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 26px;
+  z-index: 50;
+  background: var(--bg); flex-direction: column; overflow: hidden;
+}
+#kd-page.visible { display: flex; }
+#kd-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px; height: 44px; flex-shrink: 0;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.kd-page-title {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--text-bright); white-space: nowrap; margin-right: 4px;
+}
+#kd-record-tabs {
+  display: flex; gap: 4px; overflow-x: auto; flex: 1; align-items: center;
+  scrollbar-width: none;
+}
+#kd-record-tabs::-webkit-scrollbar { display: none; }
+.kd-tab {
+  padding: 3px 10px; border-radius: 4px; font-size: 11px;
+  border: 1px solid var(--border); cursor: pointer; white-space: nowrap;
+  background: var(--card); color: var(--text); font-family: var(--font-mono);
+  transition: background 0.12s;
+}
+.kd-tab.active { background: var(--olive); color: #fff; border-color: var(--olive); }
+.kd-tab:not(.active):hover { border-color: var(--olive-light); }
+#kd-new-record-btn {
+  padding: 4px 10px; border-radius: 4px; font-size: 11px;
+  background: transparent; border: 1px dashed var(--border);
+  color: var(--text-dim); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  font-family: var(--font-main);
+}
+#kd-new-record-btn:hover { border-color: var(--olive); color: var(--olive); border-style: solid; }
+#kd-close-btn {
+  width: 26px; height: 26px; border-radius: 4px; flex-shrink: 0;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+}
+#kd-close-btn:hover { background: var(--card); color: var(--text-bright); }
+#kd-meta-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+}
+.kd-meta-label { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+#kd-date-input, #kd-note-input {
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--card); color: var(--text); font-size: 12px;
+  font-family: var(--font-mono);
+}
+#kd-date-input { width: 130px; }
+#kd-note-input { flex: 1; min-width: 180px; }
+#kd-delete-record-btn {
+  padding: 3px 9px; border-radius: 4px; font-size: 11px; flex-shrink: 0;
+  background: transparent; border: 1px solid rgba(239,68,68,0.35);
+  color: #EF4444; cursor: pointer; font-family: var(--font-main);
+  margin-left: auto;
+}
+#kd-delete-record-btn:hover { background: rgba(239,68,68,0.07); }
+#kd-body {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+#kd-cards-scroll {
+  flex: 1; overflow-x: auto; overflow-y: hidden;
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 14px 14px;
+}
+#kd-empty-state {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: var(--text-dim); gap: 10px;
+}
+.kd-empty-icon { font-size: 36px; }
+.kd-empty-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.kd-empty-sub { font-size: 12px; }
+.kd-card {
+  width: 280px; min-width: 280px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 8px;
+  display: flex; flex-direction: column; flex-shrink: 0;
+  max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.kd-card-header {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.kd-card-title {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--text-bright); padding: 1px 2px;
+}
+.kd-card-title:focus { background: var(--card); border-radius: 3px; padding: 1px 4px; }
+.kd-card-count {
+  font-size: 10px; color: var(--text-dim); font-family: var(--font-mono);
+  background: var(--card); border-radius: 8px; padding: 1px 5px;
+  flex-shrink: 0;
+}
+.kd-card-del-btn {
+  width: 20px; height: 20px; border-radius: 3px; border: none;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.kd-card-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
+.kd-tasks-list {
+  flex: 1; overflow-y: auto; padding: 5px 6px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.kd-task {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 5px; padding: 6px 7px; display: flex; flex-direction: column; gap: 3px;
+}
+.kd-task-row1 { display: flex; align-items: flex-start; gap: 4px; }
+.kd-task-text {
+  flex: 1; font-size: 12px; color: var(--text); line-height: 1.4;
+  background: transparent; border: none; outline: none; resize: none;
+  font-family: var(--font-main); padding: 0; min-height: 18px; overflow: hidden;
+}
+.kd-task-text:focus { background: rgba(0,0,0,0.03); border-radius: 2px; padding: 1px 3px; margin: -1px -3px; }
+.kd-task-actions { display: flex; gap: 2px; flex-shrink: 0; padding-top: 1px; }
+.kd-task-btn {
+  width: 18px; height: 18px; border-radius: 3px; border: none;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.kd-task-btn:hover { background: var(--panel); color: var(--text); }
+.kd-task-btn.kdel:hover { color: #EF4444; background: rgba(239,68,68,0.08); }
+.kd-task-row2 { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.kd-task-sub-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px 1px 4px; border-radius: 10px; font-size: 10px;
+  font-family: var(--font-mono); border: 1px solid; cursor: pointer;
+  transition: opacity 0.1s; opacity: 0.85;
+}
+.kd-task-sub-chip:hover { opacity: 1; }
+.kd-task-sub-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.kd-task-sub-none {
+  font-size: 10px; color: var(--text-dim); cursor: pointer; font-style: italic;
+  padding: 1px 4px; border-radius: 10px; border: 1px dashed transparent;
+}
+.kd-task-sub-none:hover { border-color: var(--border); color: var(--text); }
+.kd-task-link-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 5px; border-radius: 10px; font-size: 10px;
+  font-family: var(--font-mono); background: var(--panel);
+  border: 1px solid var(--border); color: var(--text-dim); cursor: pointer;
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kd-task-link-chip:hover { border-color: #EF4444; color: #EF4444; }
+.kd-task-link-chip svg { flex-shrink: 0; }
+.kd-add-task-btn {
+  margin: 4px 6px 6px; padding: 5px; border-radius: 5px; flex-shrink: 0;
+  border: 1px dashed var(--border); background: transparent;
+  color: var(--text-dim); cursor: pointer; font-size: 11px;
+  text-align: center; font-family: var(--font-main);
+}
+.kd-add-task-btn:hover { border-color: var(--olive); color: var(--olive); background: rgba(74,83,64,0.04); }
+.kd-add-card-btn {
+  width: 260px; min-width: 260px; height: 50px; flex-shrink: 0;
+  border: 2px dashed var(--border); border-radius: 8px;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  gap: 6px; font-family: var(--font-main); align-self: flex-start;
+}
+.kd-add-card-btn:hover { border-color: var(--olive); color: var(--olive); }
+
+/* Sub-selector popover */
+#kd-sub-pop {
+  position: fixed; z-index: 600; display: none;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  flex-direction: column; min-width: 175px; max-height: 260px; overflow-y: auto;
+}
+#kd-sub-pop.open { display: flex; }
+.kd-sub-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--text);
+}
+.kd-sub-opt:hover { background: var(--card); }
+.kd-sub-opt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Link modal */
+#kd-link-modal {
+  position: fixed; inset: 0; z-index: 600; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.28);
+}
+#kd-link-modal.open { display: flex; }
+#kd-link-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  width: 380px; max-height: 70vh; display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+}
+#kd-link-head {
+  padding: 11px 14px 9px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text-bright);
+}
+#kd-link-close { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 16px; }
+#kd-link-search {
+  margin: 8px 10px; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--card); color: var(--text); font-size: 12px;
+  width: calc(100% - 20px); box-sizing: border-box;
+}
+#kd-link-list { overflow-y: auto; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+.kd-link-item {
+  padding: 5px 8px; border-radius: 4px; cursor: pointer;
+  border: 1px solid transparent; font-size: 12px; color: var(--text);
+}
+.kd-link-item:hover { background: var(--card); border-color: var(--border); }
+.kd-link-item.sel { border-color: var(--olive); background: rgba(74,83,64,0.07); }
+.kd-link-card-name { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); margin-bottom: 1px; }
 #anotace-page {
   display: none; position: fixed;
   top: 48px; left: 0; right: 0; bottom: 26px;
@@ -2483,7 +2713,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #subddodavatele-btn span,
   #anotace-btn span,
   #users-mgmt-btn span,
-  #pdf-export-btn span { display: none; }
+  #pdf-export-btn span,
+  #kd-btn span { display: none; }
 }
 
 /* ============================================================
@@ -2757,6 +2988,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <button id="pdf-export-btn" title="Export do PDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
     Export
+  </button>
+  <button id="kd-btn" title="Záznamy z kontrolního dne">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+    Kontrolní den
   </button>
   </div>
   <div id="toolbar-right">
@@ -3336,6 +3571,46 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   </div>
 </div>
 
+<!-- KONTROLNÍ DEN PAGE -->
+<div id="kd-page">
+  <div id="kd-header">
+    <span class="kd-page-title">Kontrolní den</span>
+    <div id="kd-record-tabs"></div>
+    <button id="kd-new-record-btn">+ Nový záznam</button>
+    <button id="kd-close-btn">×</button>
+  </div>
+  <div id="kd-meta-bar" style="display:none">
+    <span class="kd-meta-label">Datum</span>
+    <input type="date" id="kd-date-input">
+    <span class="kd-meta-label">Poznámka</span>
+    <input type="text" id="kd-note-input" placeholder="Obecná poznámka k zápisu...">
+    <button id="kd-delete-record-btn">Smazat záznam</button>
+  </div>
+  <div id="kd-body">
+    <div id="kd-empty-state">
+      <div class="kd-empty-icon">📋</div>
+      <div class="kd-empty-title">Žádný záznam z kontrolního dne</div>
+      <div class="kd-empty-sub">Klikněte na „+ Nový záznam" pro vytvoření zápisu</div>
+    </div>
+    <div id="kd-cards-scroll" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Sub-selector popover (KD) -->
+<div id="kd-sub-pop"></div>
+
+<!-- Link task modal (KD) -->
+<div id="kd-link-modal">
+  <div id="kd-link-box">
+    <div id="kd-link-head">
+      <span>Propojit úkol</span>
+      <button id="kd-link-close">×</button>
+    </div>
+    <input type="text" id="kd-link-search" placeholder="Hledat úkol...">
+    <div id="kd-link-list"></div>
+  </div>
+</div>
+
 <!-- MANAGE PROFESE MODAL -->
 <div id="manage-profese-overlay">
   <div id="manage-profese-panel">
@@ -3708,6 +3983,7 @@ function init() {
   setupCropOverlay();
   setupAnnotEditModal();
   setupPDFExport();
+  kdSetupPage();
   requestAnimationFrame(autoSaveLoop);
 }
 
@@ -8300,6 +8576,9 @@ function setupAnotacePage() {
     if (e.key === 'Escape' && document.getElementById('anotace-page').classList.contains('visible')) {
       closeAnotacePage();
     }
+    if (e.key === 'Escape' && document.getElementById('kd-page').classList.contains('visible')) {
+      toggleKDPage();
+    }
   });
 }
 
@@ -8947,6 +9226,297 @@ function renderHomePage() {
   });
 }
 
+// ============================================================
+// KONTROLNÍ DEN
+// ============================================================
+const LS_KD_KEY = (pid) => `besix_plans_kd_${pid}`;
+let kdRecords   = [];    // [{id,date,note,cards:[{id,title,tasks:[{id,text,sub,links:[]}]}]}]
+let kdActiveId  = null;
+let _kdLinkRec  = null;
+let _kdLinkTaskId = null;
+let _kdSubCloseHandler = null;
+
+function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function kdSave() {
+  const pid = currentProject?.id;
+  if (!pid) return;
+  localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords));
+}
+
+function kdLoad() {
+  const pid = currentProject?.id;
+  if (!pid) { kdRecords = []; return; }
+  try { kdRecords = JSON.parse(localStorage.getItem(LS_KD_KEY(pid)) || '[]'); }
+  catch { kdRecords = []; }
+  if (!Array.isArray(kdRecords)) kdRecords = [];
+}
+
+function toggleKDPage() {
+  const page = document.getElementById('kd-page');
+  const btn  = document.getElementById('kd-btn');
+  if (page.classList.contains('visible')) {
+    page.classList.remove('visible'); btn.classList.remove('active');
+  } else {
+    closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
+    kdLoad();
+    if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
+    page.classList.add('visible'); btn.classList.add('active');
+    kdRenderPage();
+  }
+}
+
+function kdRenderPage() { kdRenderTabs(); kdRenderContent(); }
+
+function kdFmtDate(d) {
+  if (!d) return '–';
+  const p = d.split('-');
+  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0].slice(2)}` : d;
+}
+
+function kdRenderTabs() {
+  const tabs = document.getElementById('kd-record-tabs');
+  tabs.innerHTML = '';
+  kdRecords.forEach(rec => {
+    const t = document.createElement('button');
+    t.className = 'kd-tab' + (rec.id === kdActiveId ? ' active' : '');
+    t.textContent = kdFmtDate(rec.date);
+    t.onclick = () => { kdActiveId = rec.id; kdRenderPage(); };
+    tabs.appendChild(t);
+  });
+}
+
+function kdRenderContent() {
+  const meta   = document.getElementById('kd-meta-bar');
+  const empty  = document.getElementById('kd-empty-state');
+  const scroll = document.getElementById('kd-cards-scroll');
+
+  const rec = kdRecords.find(r => r.id === kdActiveId);
+  if (!rec) {
+    meta.style.display  = 'none';
+    empty.style.display = 'flex';
+    scroll.style.display = 'none';
+    return;
+  }
+
+  meta.style.display  = 'flex';
+  empty.style.display = 'none';
+  scroll.style.display = 'flex';
+  document.getElementById('kd-date-input').value = rec.date || '';
+  document.getElementById('kd-note-input').value = rec.note || '';
+
+  scroll.innerHTML = '';
+  (rec.cards || []).forEach(card => scroll.appendChild(kdBuildCard(rec, card)));
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'kd-add-card-btn';
+  addBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg> Přidat úsek';
+  addBtn.onclick = () => kdAddCard(rec);
+  scroll.appendChild(addBtn);
+}
+
+function kdAllTasks(rec) {
+  const out = [];
+  (rec.cards || []).forEach(card =>
+    (card.tasks || []).forEach(task => out.push({ task, card })));
+  return out;
+}
+
+function kdBuildCard(rec, card) {
+  const el = document.createElement('div');
+  el.className = 'kd-card'; el.dataset.cardId = card.id;
+
+  const hdr = document.createElement('div'); hdr.className = 'kd-card-header';
+  const inp = document.createElement('input');
+  inp.className = 'kd-card-title'; inp.value = card.title || '';
+  inp.placeholder = 'Název úseku...';
+  inp.onchange = () => { card.title = inp.value; kdSave(); kdRenderTabs(); };
+  const cnt = document.createElement('span');
+  cnt.className = 'kd-card-count'; cnt.textContent = (card.tasks || []).length;
+  const del = document.createElement('button'); del.className = 'kd-card-del-btn';
+  del.innerHTML = '✕'; del.title = 'Smazat úsek';
+  del.onclick = () => { if (confirm('Smazat úsek a všechny jeho úkoly?')) { rec.cards = rec.cards.filter(c => c.id !== card.id); kdSave(); kdRenderContent(); } };
+  hdr.appendChild(inp); hdr.appendChild(cnt); hdr.appendChild(del);
+  el.appendChild(hdr);
+
+  const list = document.createElement('div'); list.className = 'kd-tasks-list';
+  (card.tasks || []).forEach(task => list.appendChild(kdBuildTask(rec, card, task)));
+  el.appendChild(list);
+
+  const addBtn = document.createElement('button'); addBtn.className = 'kd-add-task-btn';
+  addBtn.textContent = '+ Přidat úkol';
+  addBtn.onclick = () => { kdAddTask(rec, card); };
+  el.appendChild(addBtn);
+  return el;
+}
+
+function kdBuildTask(rec, card, task) {
+  const el = document.createElement('div');
+  el.className = 'kd-task'; el.dataset.taskId = task.id;
+
+  // Row 1: textarea + action buttons
+  const r1 = document.createElement('div'); r1.className = 'kd-task-row1';
+  const ta = document.createElement('textarea');
+  ta.className = 'kd-task-text'; ta.value = task.text || '';
+  ta.placeholder = 'Popis úkolu...'; ta.rows = 1;
+  ta.oninput = () => {
+    ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
+    task.text = ta.value; kdSave();
+  };
+  setTimeout(() => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }, 0);
+
+  const acts = document.createElement('div'); acts.className = 'kd-task-actions';
+  const linkBtn = document.createElement('button');
+  linkBtn.className = 'kd-task-btn'; linkBtn.title = 'Propojit s úkolem';
+  linkBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 9.5L5 11a2 2 0 002.83 0l3-3A2 2 0 007 5l-.5.5"/><path d="M9.5 6.5L11 5a2 2 0 00-2.83 0l-3 3A2 2 0 009 11l.5-.5"/></svg>';
+  linkBtn.onclick = () => kdOpenLinkModal(rec, task.id);
+  const delBtn = document.createElement('button');
+  delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => { kdDeleteTask(rec, card.id, task.id); };
+  acts.appendChild(linkBtn); acts.appendChild(delBtn);
+  r1.appendChild(ta); r1.appendChild(acts);
+  el.appendChild(r1);
+
+  // Row 2: subdodavatel chip + link chips
+  const r2 = document.createElement('div'); r2.className = 'kd-task-row2';
+  const prof = (appState.profese || []).find(p => p.name === task.sub);
+  if (prof) {
+    const chip = document.createElement('span');
+    chip.className = 'kd-task-sub-chip';
+    chip.style.color = prof.color || '#888'; chip.style.borderColor = prof.color || '#888';
+    chip.title = 'Změnit subdodavatele';
+    chip.innerHTML = `<span class="kd-task-sub-dot" style="background:${prof.color||'#888'}"></span>${prof.firma || prof.name}`;
+    chip.onclick = e => kdOpenSubPop(e, rec, task);
+    r2.appendChild(chip);
+  } else {
+    const none = document.createElement('span');
+    none.className = 'kd-task-sub-none'; none.textContent = '+ subdodavatel';
+    none.onclick = e => kdOpenSubPop(e, rec, task);
+    r2.appendChild(none);
+  }
+  (task.links || []).forEach(lid => {
+    const found = kdAllTasks(rec).find(({task: t}) => t.id === lid);
+    if (!found) return;
+    const chip = document.createElement('span');
+    chip.className = 'kd-task-link-chip';
+    const label = (found.task.text || '(bez popisu)').slice(0, 22) + ((found.task.text || '').length > 22 ? '…' : '');
+    chip.title = `${found.card.title || ''}: ${found.task.text || ''}\nKliknutím odebrat vazbu`;
+    chip.innerHTML = `<svg viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 9.5L5 11a2 2 0 002.83 0l3-3A2 2 0 007 5l-.5.5"/><path d="M9.5 6.5L11 5a2 2 0 00-2.83 0l-3 3A2 2 0 009 11l.5-.5"/></svg>${label}`;
+    chip.onclick = () => { task.links = (task.links || []).filter(id => id !== lid); kdSave(); kdRenderContent(); };
+    r2.appendChild(chip);
+  });
+  el.appendChild(r2);
+  return el;
+}
+
+function kdAddCard(rec) {
+  const card = { id: kdGenId(), title: '', tasks: [] };
+  rec.cards.push(card); kdSave(); kdRenderContent();
+  setTimeout(() => { const t = document.querySelector(`.kd-card[data-card-id="${card.id}"] .kd-card-title`); if (t) t.focus(); }, 60);
+}
+
+function kdAddTask(rec, card) {
+  const task = { id: kdGenId(), text: '', sub: null, links: [] };
+  card.tasks.push(task); kdSave(); kdRenderContent();
+  setTimeout(() => { const t = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`); if (t) t.focus(); }, 60);
+}
+
+function kdDeleteTask(rec, cardId, taskId) {
+  const card = rec.cards.find(c => c.id === cardId); if (!card) return;
+  card.tasks = card.tasks.filter(t => t.id !== taskId);
+  rec.cards.forEach(c => c.tasks.forEach(t => { t.links = (t.links||[]).filter(id => id !== taskId); }));
+  kdSave(); kdRenderContent();
+}
+
+// ── Sub popover ──────────────────────────────────────────────────
+function kdOpenSubPop(e, rec, task) {
+  e.stopPropagation();
+  const pop = document.getElementById('kd-sub-pop');
+  pop.innerHTML = '';
+  const mkOpt = (dot, label, onClick) => {
+    const d = document.createElement('div'); d.className = 'kd-sub-opt';
+    d.innerHTML = `<span class="kd-sub-opt-dot" style="background:${dot}"></span>${label}`;
+    d.onclick = onClick; pop.appendChild(d);
+  };
+  mkOpt('#ccc', '<em>Žádný</em>', () => { task.sub = null; kdSave(); pop.classList.remove('open'); kdRenderContent(); });
+  (appState.profese || []).forEach(p => {
+    mkOpt(p.color || '#888', p.firma || p.name, () => { task.sub = p.name; kdSave(); pop.classList.remove('open'); kdRenderContent(); });
+  });
+  const r = e.target.getBoundingClientRect();
+  pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 4) + 'px';
+  pop.classList.add('open');
+  if (_kdSubCloseHandler) document.removeEventListener('click', _kdSubCloseHandler);
+  _kdSubCloseHandler = () => { pop.classList.remove('open'); document.removeEventListener('click', _kdSubCloseHandler); _kdSubCloseHandler = null; };
+  setTimeout(() => document.addEventListener('click', _kdSubCloseHandler), 0);
+}
+
+// ── Link modal ───────────────────────────────────────────────────
+function kdOpenLinkModal(rec, taskId) {
+  _kdLinkRec = rec; _kdLinkTaskId = taskId;
+  document.getElementById('kd-link-search').value = '';
+  kdRenderLinkList('');
+  document.getElementById('kd-link-modal').classList.add('open');
+}
+
+function kdRenderLinkList(q) {
+  const list = document.getElementById('kd-link-list');
+  list.innerHTML = '';
+  const src = kdAllTasks(_kdLinkRec).find(({task}) => task.id === _kdLinkTaskId);
+  if (!src) return;
+  const linked = new Set(src.task.links || []);
+  const items = kdAllTasks(_kdLinkRec)
+    .filter(({task}) => task.id !== _kdLinkTaskId)
+    .filter(({task}) => !q || (task.text || '').toLowerCase().includes(q.toLowerCase()) || (_kdLinkRec.cards.find(c=>c.id===task.id)?.title||'').toLowerCase().includes(q.toLowerCase()));
+  if (!items.length) {
+    list.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--text-dim)">Žádné jiné úkoly</div>';
+    return;
+  }
+  items.forEach(({task, card}) => {
+    const d = document.createElement('div');
+    d.className = 'kd-link-item' + (linked.has(task.id) ? ' sel' : '');
+    d.innerHTML = `<div class="kd-link-card-name">${card.title||'Bez názvu'}</div><div>${task.text||'(bez popisu)'}</div>`;
+    d.onclick = () => {
+      if (linked.has(task.id)) { src.task.links = (src.task.links||[]).filter(id=>id!==task.id); linked.delete(task.id); d.classList.remove('sel'); }
+      else { src.task.links = [...(src.task.links||[]), task.id]; linked.add(task.id); d.classList.add('sel'); }
+      kdSave();
+    };
+    list.appendChild(d);
+  });
+}
+
+function kdSetupPage() {
+  document.getElementById('kd-btn').addEventListener('click', toggleKDPage);
+  document.getElementById('kd-close-btn').addEventListener('click', toggleKDPage);
+  document.getElementById('kd-new-record-btn').addEventListener('click', () => {
+    const rec = { id: kdGenId(), date: new Date().toISOString().slice(0,10), note: '', cards: [] };
+    kdRecords.push(rec); kdActiveId = rec.id; kdSave(); kdRenderPage();
+  });
+  document.getElementById('kd-delete-record-btn').addEventListener('click', () => {
+    if (!kdActiveId) return;
+    if (!confirm('Opravdu smazat tento záznam z kontrolního dne?')) return;
+    kdRecords = kdRecords.filter(r => r.id !== kdActiveId);
+    kdActiveId = kdRecords.length ? kdRecords[kdRecords.length - 1].id : null;
+    kdSave(); kdRenderPage();
+  });
+  document.getElementById('kd-date-input').addEventListener('change', e => {
+    const rec = kdRecords.find(r => r.id === kdActiveId);
+    if (rec) { rec.date = e.target.value; kdSave(); kdRenderTabs(); }
+  });
+  document.getElementById('kd-note-input').addEventListener('input', e => {
+    const rec = kdRecords.find(r => r.id === kdActiveId);
+    if (rec) { rec.note = e.target.value; kdSave(); }
+  });
+  document.getElementById('kd-link-close').addEventListener('click', () => {
+    document.getElementById('kd-link-modal').classList.remove('open');
+    kdRenderContent();
+  });
+  document.getElementById('kd-link-modal').addEventListener('click', e => {
+    if (e.target.id === 'kd-link-modal') { document.getElementById('kd-link-modal').classList.remove('open'); kdRenderContent(); }
+  });
+  document.getElementById('kd-link-search').addEventListener('input', e => kdRenderLinkList(e.target.value));
+}
+
 function toggleHomePage(forceState) {
   const hp = document.getElementById('home-page');
   const btn = document.getElementById('subddodavatele-btn');
@@ -9356,6 +9926,7 @@ async function openProject(proj) {
   }
 
   currentProject = proj;
+  kdLoad(); kdActiveId = null;
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
   applyViewerMode();
