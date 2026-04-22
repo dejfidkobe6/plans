@@ -9514,6 +9514,15 @@ let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgen
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+function kdCloseAllPops() {
+  ['srch-pop','kd-sub-pop','kd-loc-pop'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.remove('open');
+  });
+  if (_srchPopClose) { document.removeEventListener('click', _srchPopClose); _srchPopClose = null; }
+  if (_kdSubCloseHandler) { document.removeEventListener('click', _kdSubCloseHandler); _kdSubCloseHandler = null; }
+  if (_kdLocCloseHandler) { document.removeEventListener('click', _kdLocCloseHandler); _kdLocCloseHandler = null; }
+}
+
 // Locations come from floor names, not a separate editable list
 function kdGetLocations() { return (appState.levels || []).map(l => l.name); }
 
@@ -9714,6 +9723,7 @@ function toggleKDPage() {
   const btn  = document.getElementById('kd-btn');
   if (page.classList.contains('visible')) {
     page.classList.remove('visible'); btn.classList.remove('active');
+    kdCloseAllPops();
   } else {
     closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
     kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
