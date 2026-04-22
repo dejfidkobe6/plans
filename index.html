@@ -1411,7 +1411,7 @@ option { background: var(--card); color: var(--text); }
 #kd-page {
   display: none; position: fixed;
   top: 48px; left: 0; right: 0; bottom: 26px;
-  z-index: 50;
+  z-index: 102;
   background: var(--bg); flex-direction: column; overflow: hidden;
 }
 #kd-page.visible { display: flex; }
@@ -2187,10 +2187,15 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .tcell-prio-mid  { background: rgba(245,158,11,0.12); color: #F59E0B; }
 .tcell-prio-high { background: rgba(239,68,68,0.15); color: #EF4444; }
 .tcell-status select {
-  background: var(--card); border: 1px solid var(--border);
-  color: var(--text); font-family: var(--font-main); font-size: 12px;
+  border: 1px solid var(--border); font-family: var(--font-main); font-size: 12px;
   padding: 2px 6px; border-radius: 4px; cursor: pointer; outline: none;
+  font-weight: 500; transition: filter 0.1s;
 }
+/* Column drag-and-drop */
+#anotace-table th[draggable="true"] { cursor: grab; user-select: none; }
+#anotace-table th[draggable="true"]:active { cursor: grabbing; }
+#anotace-table th.col-dragging { opacity: 0.4; }
+#anotace-table th.col-dragover { box-shadow: inset 3px 0 0 var(--olive); }
 .tcell-prirazeno { font-size: 12px; color: var(--text-dim); }
 .tcell-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
 .tcell-actions { white-space: nowrap; }
@@ -3550,21 +3555,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   </div>
   <div id="anotace-table-wrap">
     <table id="anotace-table">
-      <thead>
-        <tr>
-          <th class="th-sort" data-sort="annotId">ID <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="firma">Firma <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="profese">Profese <span class="sort-arrow"></span></th>
-          <th class="th-sort ac-popisek" data-sort="popisek">Popis <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="levelName">Podlaží <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="priorita">Priorita <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="status">Status <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="prirazeno">Přiřazeno <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="deadline">Termín <span class="sort-arrow"></span></th>
-          <th class="th-sort" data-sort="createdAt">Vytvořeno <span class="sort-arrow"></span></th>
-          <th>Akce</th>
-        </tr>
-      </thead>
+      <thead><tr id="anotace-thead-row"></tr></thead>
       <tbody id="anotace-tbody"></tbody>
     </table>
     <div id="anotace-empty">Žádné anotace neodpovídají filtrům.</div>
@@ -7677,6 +7668,72 @@ function goToAnnotation(levelIdx, annotId) {
 // ============================================================
 let anotaceSort = { col: 'createdAt', dir: 'desc' };
 
+// Annotation table column definitions + order
+const ATBL_MOVABLE = ['annotId','firma','profese','popisek','levelName','priorita','status','prirazeno','deadline','createdAt'];
+const ATBL_LABELS  = { annotId:'ID', firma:'Firma', profese:'Profese', popisek:'Popis', levelName:'Podlaží', priorita:'Priorita', status:'Status', prirazeno:'Přiřazeno', deadline:'Termín', createdAt:'Vytvořeno' };
+const ATBL_STATUS_COLORS = {
+  'Nový úkol': { bg: 'rgba(245,158,11,0.13)', border: '#F59E0B', color: '#7c5800' },
+  'Probíhá':   { bg: 'rgba(245,158,11,0.13)', border: '#F59E0B', color: '#7c5800' },
+  'Hotovo':    { bg: 'rgba(16,185,129,0.13)',  border: '#10B981', color: '#0a5c3a' },
+  'Urgence':   { bg: 'rgba(239,68,68,0.13)',   border: '#EF4444', color: '#7f1d1d' },
+};
+let atblOrder = [...ATBL_MOVABLE];
+(function() {
+  try {
+    const s = JSON.parse(localStorage.getItem('besix_atbl_order') || 'null');
+    if (Array.isArray(s) && s.length === ATBL_MOVABLE.length && s.every(k => ATBL_MOVABLE.includes(k))) atblOrder = s;
+  } catch {}
+})();
+function atblSaveOrder() { localStorage.setItem('besix_atbl_order', JSON.stringify(atblOrder)); }
+
+function atblCellHTML(key, r) {
+  switch (key) {
+    case 'annotId':   return `<td class="tcell-id">${escHtml(r.annotId)}</td>`;
+    case 'firma':     return `<td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${getProfColor(r.profese||'')}"></span>${escHtml(r.firma||'—')}</span></td>`;
+    case 'profese':   return `<td>${escHtml(r.profese||'—')}</td>`;
+    case 'popisek':   return `<td class="ac-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek||'(bez popisu)')}</td>`;
+    case 'levelName': return `<td><span class="tcell-level">${escHtml(r.levelName)}</span></td>`;
+    case 'priorita':  { const pc = r.priorita==='Vysoká'?'tcell-prio-high':r.priorita==='Nízká'?'tcell-prio-low':'tcell-prio-mid'; return `<td><span class="tcell-prio ${pc}">${escHtml(r.priorita||'Střední')}</span></td>`; }
+    case 'status': {
+      const sc = ATBL_STATUS_COLORS[r.status] || { bg: 'var(--card)', border: 'var(--border)', color: 'var(--text)' };
+      const opts = ['Nový úkol','Probíhá','Hotovo','Urgence'].map(s => `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`).join('');
+      return `<td class="tcell-status"><select style="background:${sc.bg};border-color:${sc.border};color:${sc.color}" onchange="updateAnnotStatusFromAnotacePage('${escHtml(r.annotId)}',${r.levelIdx},this.value)">${opts}</select></td>`;
+    }
+    case 'prirazeno': return `<td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>`;
+    case 'deadline':  return `<td class="tcell-date">${escHtml(r.deadline||'—')}</td>`;
+    case 'createdAt': return `<td class="tcell-date">${escHtml(r.createdAt ? r.createdAt.slice(0,10) : '—')}</td>`;
+    default: return '';
+  }
+}
+
+function atblRebuildThead() {
+  const tr = document.getElementById('anotace-thead-row');
+  if (!tr) return;
+  tr.innerHTML = atblOrder.map(key =>
+    `<th class="th-sort${anotaceSort.col===key?' '+(anotaceSort.dir==='asc'?'sort-asc':'sort-desc'):''}" data-sort="${key}" draggable="true">${ATBL_LABELS[key]} <span class="sort-arrow"></span></th>`
+  ).join('') + '<th>Akce</th>';
+  let dragFrom = null;
+  tr.querySelectorAll('th[data-sort]').forEach((th, vi) => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (anotaceSort.col === col) anotaceSort.dir = anotaceSort.dir === 'asc' ? 'desc' : 'asc';
+      else { anotaceSort.col = col; anotaceSort.dir = 'asc'; }
+      renderAnotacePage();
+    });
+    th.addEventListener('dragstart', () => { dragFrom = vi; th.classList.add('col-dragging'); });
+    th.addEventListener('dragend',   () => tr.querySelectorAll('th').forEach(t => t.classList.remove('col-dragging','col-dragover')));
+    th.addEventListener('dragover',  e => { e.preventDefault(); th.classList.add('col-dragover'); });
+    th.addEventListener('dragleave', () => th.classList.remove('col-dragover'));
+    th.addEventListener('drop', e => {
+      e.preventDefault(); th.classList.remove('col-dragover');
+      if (dragFrom === null || dragFrom === vi) return;
+      const moved = atblOrder.splice(dragFrom, 1)[0];
+      atblOrder.splice(vi, 0, moved);
+      atblSaveOrder(); renderAnotacePage();
+    });
+  });
+}
+
 function openAnotacePage() {
   saveCurrentLevel();
   populateAnotaceFilters();
@@ -7766,44 +7823,23 @@ function renderAnotacePage() {
     ${byStatus['Hotovo']   ? `<div class="tstat-pill" style="border-color:#10B981"><span class="tstat-num" style="color:#10B981">${byStatus['Hotovo']}</span>&nbsp;Hotovo</div>` : ''}
   `;
 
-  // Sort arrows
-  document.querySelectorAll('#anotace-table th.th-sort').forEach(th => {
-    th.classList.remove('sort-asc', 'sort-desc');
-    if (th.dataset.sort === anotaceSort.col) th.classList.add(anotaceSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
-  });
+  // Rebuild thead with current column order + drag handles
+  atblRebuildThead();
 
   const tbody = document.getElementById('anotace-tbody');
   const empty = document.getElementById('anotace-empty');
   if (sorted.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
 
-  tbody.innerHTML = sorted.map(r => {
-    const color    = getProfColor(r.profese || '');
-    const prioClass = r.priorita === 'Vysoká' ? 'tcell-prio-high' : r.priorita === 'Nízká' ? 'tcell-prio-low' : 'tcell-prio-mid';
-    const createdStr = r.createdAt ? r.createdAt.slice(0,10) : '—';
-    const deadlineStr = r.deadline || '—';
-    const statusOpts = ['Nový úkol','Probíhá','Hotovo','Urgence'].map(s =>
-      `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`
-    ).join('');
-    return `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
-      <td class="tcell-id">${escHtml(r.annotId)}</td>
-      <td><span class="tcell-prof"><span class="tcell-prof-dot" style="background:${color}"></span>${escHtml(r.firma||'—')}</span></td>
-      <td>${escHtml(r.profese||'—')}</td>
-      <td class="ac-popisek" title="${escHtml(r.popisek||'')}">${escHtml(r.popisek || '(bez popisu)')}</td>
-      <td><span class="tcell-level">${escHtml(r.levelName)}</span></td>
-      <td><span class="tcell-prio ${prioClass}">${escHtml(r.priorita||'Střední')}</span></td>
-      <td class="tcell-status">
-        <select onchange="updateAnnotStatusFromAnotacePage('${escHtml(r.annotId)}',${r.levelIdx},this.value)">${statusOpts}</select>
-      </td>
-      <td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>
-      <td class="tcell-date">${escHtml(deadlineStr)}</td>
-      <td class="tcell-date">${escHtml(createdStr)}</td>
+  tbody.innerHTML = sorted.map(r =>
+    `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
+      ${atblOrder.map(key => atblCellHTML(key, r)).join('')}
       <td class="tcell-actions">
         <button class="trow-edit-btn" onclick="openAnnotEditModal('${escHtml(r.annotId)}',${r.levelIdx})">✎ Upravit</button>
         <button class="trow-goto-btn" onclick="goToAnnotationFromAnotacePage(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
       </td>
-    </tr>`;
-  }).join('');
+    </tr>`
+  ).join('');
 }
 
 function goToAnnotationFromAnotacePage(levelIdx, annotId) {
@@ -8559,18 +8595,6 @@ function setupAnotacePage() {
       if (el) el.addEventListener('input', renderAnotacePage);
       if (el) el.addEventListener('change', renderAnotacePage);
     });
-  document.querySelectorAll('#anotace-table th.th-sort').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.sort;
-      if (anotaceSort.col === col) {
-        anotaceSort.dir = anotaceSort.dir === 'asc' ? 'desc' : 'asc';
-      } else {
-        anotaceSort.col = col;
-        anotaceSort.dir = 'asc';
-      }
-      renderAnotacePage();
-    });
-  });
   document.getElementById('anotace-export-csv-btn').addEventListener('click', exportAnotaceCSV);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.getElementById('anotace-page').classList.contains('visible')) {
