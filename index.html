@@ -137,6 +137,7 @@ body {
   height: 32px;
   width: auto;
   flex-shrink: 0;
+  filter: brightness(0);
 }
 #logo .logo-plans {
   font-family: var(--font-mono);
@@ -2178,6 +2179,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 .auth-logo-img img {
   width: 100%; height: auto;
+  filter: brightness(0);
 }
 .auth-logo-name {
   font-family: var(--font-mono); font-size: 18px; font-weight: 600;
@@ -2246,6 +2248,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 #project-screen-header .ps-logo { display: flex; align-items: center; gap: 12px; }
 #project-screen-header .ps-logo-icon {
   height: 32px; width: auto; display: block;
+  filter: brightness(0);
 }
 #project-screen-header .ps-logo-text { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--olive-light); letter-spacing: 0.03em; }
 #project-screen-header .ps-user-info {
@@ -8027,11 +8030,32 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
   const refCount   = Math.max(targetCount || 0, anns.length);
 
   pdf.setFont('helvetica', 'normal');  // ensure consistent metrics for layout
+
+  // Split popisek into display lines: respect \n, then word-wrap each segment
+  const getPopisLines = (popisek, fspt) => {
+    const segs = csText(popisek || '').split('\n');
+    const out = [];
+    for (const seg of segs) {
+      const trimmed = seg.trim();
+      if (!trimmed) continue;
+      const words = trimmed.split(' ');
+      let cur = '';
+      for (const w of words) {
+        const t = cur ? cur + ' ' + w : w;
+        if (textW(t, fspt) <= popisMaxW) { cur = t; }
+        else { if (cur) out.push(cur); cur = w; }
+      }
+      if (cur) out.push(cur);
+    }
+    return out.length ? out : [''];
+  };
+
   const computeLayout = fspt => {
     const LH = fspt / PT_MM * 1.55;
     const rows = anns.map(ann => {
-      const wraps = !!(ann.popisek && textW(csText(ann.popisek), fspt) > popisMaxW);
-      return { ann, rowH: wraps ? LH * 2.2 : Math.min(ROW_MAX, LH), needsWrap: wraps };
+      const lines = getPopisLines(ann.popisek, fspt);
+      const nLines = Math.max(1, lines.length);
+      return { ann, rowH: LH * nLines + LH * 0.4, lines };
     });
     return { rows, totalH: rows.reduce((s, r) => s + r.rowH, 0) };
   };
@@ -8042,7 +8066,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
 
   // ── Render rows ──
   let curY = ROWS_START;
-  for (const { ann, rowH, needsWrap } of layout.rows) {
+  for (const { ann, rowH, lines } of layout.rows) {
     if (curY + rowH > ly + lh - 0.5) break;
 
     const isUrgent = ann.status === 'Urgence';
@@ -8060,8 +8084,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.circle(C_DOT + DOT_R, curY + rowH / 2, DOT_R, 'F');
 
     const LH = rowFS / PT_MM * 1.55;
-    const tY1 = needsWrap ? curY + LH * 0.72 : curY + rowH * 0.68;
-    const tY2 = curY + LH + LH * 0.72;
+    const tY1 = curY + LH * 0.8; // first line baseline
 
     pdf.setFont('helvetica', isUrgent ? 'bold' : 'normal');
     pdf.setFontSize(rowFS);
@@ -8074,26 +8097,12 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.setTextColor(...pRgb);
     pdf.text(fitT(profObj?.firma || '-', rowFS, C_POPIS - C_PROF - 0.5), C_PROF, tY1);
 
-    // Popis
+    // Popis — all wrapped/newline lines
     pdf.setTextColor(isUrgent ? 140 : 50, isUrgent ? 30 : 55, isUrgent ? 30 : 45);
-    if (needsWrap) {
-      const words = csText(ann.popisek || '').split(' ');
-      let l1 = '', l2 = '', onL2 = false;
-      for (const w of words) {
-        if (!onL2) {
-          const t = l1 ? l1 + ' ' + w : w;
-          if (textW(t, rowFS) <= popisMaxW) l1 = t;
-          else { onL2 = true; l2 = w; }
-        } else {
-          const t = l2 ? l2 + ' ' + w : w;
-          if (textW(t, rowFS) <= popisMaxW) l2 = t;
-          else { l2 = fitT(l2, rowFS, popisMaxW); break; }
-        }
-      }
-      pdf.text(l1, C_POPIS, tY1);
-      if (l2 && tY2 < curY + rowH - 0.2) pdf.text(fitT(l2, rowFS, popisMaxW), C_POPIS, tY2);
-    } else {
-      pdf.text(fitT(csText(ann.popisek) || '(bez popisu)', rowFS, popisMaxW), C_POPIS, tY1);
+    for (let li = 0; li < lines.length; li++) {
+      const ty = curY + LH * li + LH * 0.8;
+      if (ty > curY + rowH - 0.1) break;
+      pdf.text(lines[li], C_POPIS, ty);
     }
 
     // Termín
@@ -8162,16 +8171,37 @@ async function doExportPDF() {
       if (!first) pdf.addPage();
       first = false;
 
-      // Header bar
-      pdf.setFillColor(28, 34, 20);
+      // Header bar — white, matching the app topbar
+      pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, PW, 11, 'F');
+      pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2);
+      pdf.line(0, 11, PW, 11);
+
+      // BESIX hexagon logo (flat-top, r=3.2mm, center 5,5.5)
+      const HEX_R = 3.2, HCX = 5.2, HCY = 5.5;
+      const hexPts = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (i * 60 + 30) * Math.PI / 180;
+        hexPts.push([HCX + HEX_R * Math.cos(a), HCY + HEX_R * Math.sin(a)]);
+      }
+      const hexSegs = [];
+      for (let i = 1; i < hexPts.length; i++)
+        hexSegs.push([hexPts[i][0] - hexPts[i-1][0], hexPts[i][1] - hexPts[i-1][1]]);
+      pdf.setFillColor(80, 120, 36);
+      pdf.lines(hexSegs, hexPts[0][0], hexPts[0][1], [1,1], 'F', true);
+      // "B" letter inside
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('B', HCX - 1.1, HCY + 1.8);
+
+      // "BeSix Plans" label
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9); pdf.setTextColor(160, 195, 100);
-      pdf.text('BeSix Plans', 5, 7.5);
+      pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
+      pdf.text('BeSix Plans', HCX + HEX_R + 1.5, 7.5);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(230, 230, 225);
-      pdf.text(currentProject?.name || '', 30, 7.5);
-      pdf.setTextColor(170, 175, 160);
+      pdf.setTextColor(50, 55, 45);
+      pdf.text(currentProject?.name || '', 38, 7.5);
+      pdf.setTextColor(120, 125, 115);
       pdf.text(level.name || `Podlaží ${idx + 1}`, PW - 65, 7.5);
       pdf.text(new Date().toLocaleDateString('cs-CZ'), PW - 22, 7.5);
 
