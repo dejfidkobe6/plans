@@ -55,7 +55,7 @@ if ($method === 'GET') {
 }
 
 // ============================================================
-// POST – vytvořit pozvánku + odeslat email
+// POST – přidat registrovaného uživatele do projektu + odeslat notifikaci
 // Body: { email, role }
 // ============================================================
 if ($method === 'POST') {
@@ -71,40 +71,44 @@ if ($method === 'POST') {
 
         $db = getDB();
 
-        // Zkontroluj zda uživatel není již členem
-        $check = $db->prepare('SELECT pm.id FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND LOWER(u.email) = ?');
-        $check->execute([$projectId, $email]);
-        if ($check->fetch()) jsonError('Uživatel je již členem projektu');
+        // Zkontroluj zda je uživatel registrován v databázi BeSix platformy
+        $userCheck = $db->prepare('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1');
+        $userCheck->execute([$email]);
+        $registeredUser = $userCheck->fetch();
 
-        // Vytvoř nebo obnov pozvánku (bez spoléhání na UNIQUE constraint)
-        $token     = bin2hex(random_bytes(32));
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
-
-        // Zkus nejdřív aktualizovat existující čekající pozvánku
-        $upd = $db->prepare(
-            'UPDATE invitations SET token=?, expires_at=?, invited_by=?, role=?, status="pending"
-             WHERE project_id=? AND invited_email=? AND status="pending" LIMIT 1'
-        );
-        $upd->execute([$token, $expiresAt, $userId, $role, $projectId, $email]);
-
-        if ($upd->rowCount() === 0) {
-            // Žádná existující – vlož novou
-            $db->prepare(
-                'INSERT INTO invitations (project_id, invited_email, invited_by, token, role, expires_at)
-                 VALUES (?,?,?,?,?,?)'
-            )->execute([$projectId, $email, $userId, $token, $role, $expiresAt]);
+        if (!$registeredUser) {
+            ob_clean();
+            http_response_code(422);
+            echo json_encode([
+                'ok'             => false,
+                'error'          => 'Uživatel s tímto emailem není registrován v BeSix platformě. Pozvěte ho nejdříve na besix.cz.',
+                'not_registered' => true,
+            ]);
+            exit;
         }
 
-        // Odešli email pokud je Brevo nakonfigurovaný
+        $invitedUserId = (int)$registeredUser['id'];
+
+        // Zkontroluj zda uživatel není již členem projektu
+        $check = $db->prepare('SELECT id FROM project_members WHERE project_id = ? AND user_id = ?');
+        $check->execute([$projectId, $invitedUserId]);
+        if ($check->fetch()) jsonError('Uživatel je již členem projektu');
+
+        // Přidej uživatele přímo do projektu
+        $db->prepare('INSERT INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,?,?)')
+           ->execute([$projectId, $invitedUserId, $role, $userId]);
+
+        // Odešli notifikační email pokud je Brevo nakonfigurovaný
         $mailSent = false;
         if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
             try {
                 $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
                 $proj->execute([$projectId]);
                 $projName  = htmlspecialchars($proj->fetch()['name'] ?? 'projekt', ENT_QUOTES, 'UTF-8');
-                $inviteUrl = htmlspecialchars('https://plans.besix.cz/api/invite.php?token=' . $token, ENT_QUOTES, 'UTF-8');
                 $roleLabel = htmlspecialchars(['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role, ENT_QUOTES, 'UTF-8');
-                $subject   = "Pozvanka do projektu {$projName} - BeSix Plans";
+                $appUrl    = 'https://plans.besix.cz';
+                $appUrlEsc = htmlspecialchars($appUrl, ENT_QUOTES, 'UTF-8');
+                $subject   = "Byl(a) jste přidán(a) do projektu {$projName} – BeSix Plans";
                 $html      = <<<HTML
 <!DOCTYPE html>
 <html lang="cs">
@@ -127,7 +131,7 @@ if ($method === 'POST') {
 
       <!-- Tělo -->
       <tr><td style="padding:32px 32px 8px;">
-        <p style="margin:0 0 6px;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;">Pozvánka do projektu</p>
+        <p style="margin:0 0 6px;color:#888888;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;">Přidání do projektu</p>
         <h2 style="margin:0 0 28px;color:#ffffff;font-size:22px;font-weight:700;">{$projName}</h2>
 
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
@@ -138,14 +142,14 @@ if ($method === 'POST') {
         </table>
 
         <p style="margin:0 0 28px;color:#777777;font-size:13px;line-height:1.7;">
-          Klikněte na tlačítko níže pro přijetí pozvánky a&nbsp;přístup do projektu.
+          Byl(a) jste přidán(a) do výše uvedeného projektu. Klikněte na tlačítko níže pro přístup do aplikace.
         </p>
 
         <!-- Tlačítko -->
-        <a href="{$inviteUrl}"
+        <a href="{$appUrlEsc}"
            style="display:block;text-align:center;background-color:#6b7c3a;color:#ffffff;text-decoration:none;
                   padding:15px 24px;border-radius:7px;font-size:15px;font-weight:700;letter-spacing:.4px;">
-          Přijmout pozvánku
+          Přejít do BeSix Plans
         </a>
       </td></tr>
 
@@ -153,8 +157,7 @@ if ($method === 'POST') {
       <tr><td style="padding:24px 32px 36px;">
         <div style="height:1px;background:#282828;margin-bottom:20px;"></div>
         <p style="margin:0;color:#444444;font-size:11px;text-align:center;line-height:1.8;">
-          Pokud tuto pozvánku neočekáváte, ignorujte tento email.<br>
-          Odkaz je platný 7&nbsp;dní.
+          Pokud tuto zprávu neočekáváte, ignorujte tento email.
         </p>
       </td></tr>
 
@@ -169,7 +172,7 @@ HTML;
             } catch (\Throwable $ex) { }
         }
 
-        jsonOk(['message' => $mailSent ? 'Pozvánka odeslána emailem' : 'Pozvánka vytvořena', 'invite_url' => 'https://plans.besix.cz/api/invite.php?token=' . $token]);
+        jsonOk(['message' => $mailSent ? 'Uživatel přidán a notifikace odeslána emailem' : 'Uživatel přidán do projektu']);
 
     } catch (\Throwable $e) {
         jsonError('Chyba: ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')', 500);
