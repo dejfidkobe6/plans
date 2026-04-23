@@ -10267,9 +10267,17 @@ async function sendInvitation() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, role }),
   });
-  if (!ok) { errEl.textContent = data.error || 'Chyba'; return; }
+  if (!ok) {
+    if (data && data.not_registered) {
+      window.open('https://besix.cz', '_blank');
+      errEl.textContent = 'Uživatel není registrován v BeSix platformě. Pro pozvání otevřete besix.cz.';
+    } else {
+      errEl.textContent = data.error || 'Chyba';
+    }
+    return;
+  }
   document.getElementById('invite-email').value = '';
-  showToast('Pozvánka odeslána na ' + email, 'success');
+  showToast('Uživatel ' + email + ' byl přidán do projektu', 'success');
   loadMembers();
 }
 
