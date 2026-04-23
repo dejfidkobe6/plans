@@ -9082,7 +9082,7 @@ async function _serverSaveNow() {
 async function _serverLoad(projectId) {
   try {
     const { ok, data } = await apiFetch(`api/canvas.php?project_id=${projectId}`);
-    if (ok && data.state && Array.isArray(data.state.levels) && data.state.levels.length > 0) {
+    if (ok && data.state && typeof data.state === 'object') {
       return data;
     }
   } catch(e) {}
@@ -9726,7 +9726,7 @@ function toggleKDPage() {
     kdCloseAllPops();
   } else {
     closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
-    kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
+    kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
@@ -10554,7 +10554,8 @@ async function openProject(proj) {
   }
 
   currentProject = proj;
-  kdLoad(); kdActiveId = null;
+  kdRecords = []; kdActiveId = null;  // reset – server data will populate below
+  _isProjectLoading = true;           // block any debounced saves during async server load
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
   applyViewerMode();
@@ -10579,14 +10580,11 @@ async function openProject(proj) {
     appState.tool         = s.tool         || 'select';
     appState.showGrid     = s.showGrid     || false;
     appState.zones3D      = s.zones3D      || [];
-    if (Array.isArray(s.kdRecords)) {
-      kdRecords = s.kdRecords;
-      try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
-    }
-    if (Array.isArray(s.kdLocations)) {
-      kdLocations = s.kdLocations;
-      try { localStorage.setItem(LS_KD_LOCATIONS_KEY(String(proj.id)), JSON.stringify(kdLocations)); } catch(e) {}
-    }
+    // Always set kdRecords from server (even if empty array) to prevent stale localStorage from winning
+    kdRecords = Array.isArray(s.kdRecords) ? s.kdRecords : [];
+    try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
+    kdLocations = Array.isArray(s.kdLocations) ? s.kdLocations : [];
+    try { localStorage.setItem(LS_KD_LOCATIONS_KEY(String(proj.id)), JSON.stringify(kdLocations)); } catch(e) {}
     annotIdCounter        = serverData.counter || 1;
     if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
       appState.profese = serverData.profese;
@@ -10595,7 +10593,9 @@ async function openProject(proj) {
     if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
     setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
   } else {
-    loadState(); // fallback na localStorage
+    loadState();  // fallback na localStorage (canvas data)
+    kdLoad();     // fallback na localStorage (KD data)
+    _isProjectLoading = false;
   }
 
   if (appState.levels.length === 0) {
@@ -10617,7 +10617,10 @@ async function openProject(proj) {
     // Safety fallback: clear loading flag after 8s even if async callbacks don't fire
     setTimeout(() => { _isProjectLoading = false; }, 8000);
     // Initial backup after project fully loads
-    setTimeout(() => saveBackup('Při otevření projektu'), 3000);
+    setTimeout(() => {
+      saveBackup('Při otevření projektu');
+      if (kdRecords.length) kdDoBackup('Při otevření projektu');
+    }, 3000);
   }
 }
 
