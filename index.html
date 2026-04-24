@@ -9600,7 +9600,32 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
 function kdSave() {
   const pid = currentProject?.id; if (!pid) return;
   localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords));
-  _serverSave();
+  _serverSave();    // keep canvas state in sync
+  _kdDirectSave();  // dedicated KD endpoint – not blocked by _isProjectLoading
+}
+
+let _kdSaveTimer = null;
+function _kdDirectSave() {
+  clearTimeout(_kdSaveTimer);
+  _kdSaveTimer = setTimeout(async () => {
+    if (!currentProject) return;
+    try {
+      const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
+      await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formBody,
+      });
+    } catch(e) { console.error('[kd] save error:', e); }
+  }, 1000);
+}
+
+async function _kdServerLoad(projectId) {
+  try {
+    const { ok, data } = await apiFetch(`api/kd.php?project_id=${projectId}`);
+    if (ok && Array.isArray(data.records)) return data.records;
+  } catch(e) {}
+  return null;
 }
 
 function kdSaveLocations() {
@@ -10570,8 +10595,13 @@ async function openProject(proj) {
   annotIdCounter = 1;
   undoStack = []; redoStack = [];
 
-  // Načti data ze serveru (primární) nebo z localStorage (záloha)
-  const serverData = await _serverLoad(proj.id);
+  // Načti canvas data ze serveru (primární) nebo z localStorage (záloha)
+  // Načti KD data z dedikovaného endpointu paralelně
+  const [serverData, kdServerRecords] = await Promise.all([
+    _serverLoad(proj.id),
+    _kdServerLoad(proj.id),
+  ]);
+
   if (serverData) {
     _lastKnownTs = serverData.updated_at || null;
     const s = serverData.state;
@@ -10580,11 +10610,6 @@ async function openProject(proj) {
     appState.tool         = s.tool         || 'select';
     appState.showGrid     = s.showGrid     || false;
     appState.zones3D      = s.zones3D      || [];
-    // Only overwrite from server when server actually has the data
-    if (Array.isArray(s.kdRecords)) {
-      kdRecords = s.kdRecords;
-      try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
-    }
     if (Array.isArray(s.kdLocations)) {
       kdLocations = s.kdLocations;
       try { localStorage.setItem(LS_KD_LOCATIONS_KEY(String(proj.id)), JSON.stringify(kdLocations)); } catch(e) {}
@@ -10599,6 +10624,18 @@ async function openProject(proj) {
   } else {
     loadState(); // fallback na localStorage
   }
+
+  // KD data: prefer dedicated endpoint > canvas state > localStorage
+  if (Array.isArray(kdServerRecords) && kdServerRecords.length > 0) {
+    kdRecords = kdServerRecords;
+    try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
+  } else if (serverData && Array.isArray(serverData.state?.kdRecords) && serverData.state.kdRecords.length > 0) {
+    // migrate: data was stored in canvas state – read it and save to dedicated endpoint
+    kdRecords = serverData.state.kdRecords;
+    try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
+    _kdDirectSave(); // persist to dedicated table
+  }
+  // else: kdLoad() at start already populated from localStorage
 
   if (appState.levels.length === 0) {
     addLevel('1.NP', '1.NP');
@@ -10967,6 +11004,16 @@ async function _pollLiveSync() {
     }
 
     if (changed) updateAnnotList();
+
+    // Sync KD records from dedicated endpoint (silent, no user prompt needed)
+    const remoteKd = await _kdServerLoad(currentProject.id);
+    if (Array.isArray(remoteKd) && remoteKd.length !== kdRecords.length) {
+      kdRecords = remoteKd;
+      try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
+      // Re-render KD panel if it's currently visible
+      const kdPage = document.getElementById('kd-page');
+      if (kdPage && kdPage.classList.contains('visible')) kdRenderPage();
+    }
 
   } catch(e) { /* network error – skip silently */ }
 }
