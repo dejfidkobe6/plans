@@ -1526,7 +1526,7 @@ option { background: var(--card); color: var(--text); }
   flex: 1; overflow-x: auto; overflow-y: auto;
 }
 #kd-cards-inner {
-  display: inline-flex; align-items: flex-start; gap: 12px;
+  display: flex; flex-direction: column; gap: 18px;
   padding: 14px; min-height: 100%;
 }
 #kd-empty-state {
@@ -1618,21 +1618,98 @@ option { background: var(--card); color: var(--text); }
 .kd-add-card-btn:hover { border-color: var(--olive); color: var(--olive); }
 
 /* Locations section */
-#kd-locations-section {
-  padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0;
+/* Chapter section in sidebar */
+#kd-chapters-section {
+  padding: 6px 10px 4px; border-top: 1px solid var(--border); flex-shrink: 0;
 }
-#kd-location-list {
-  display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px;
-}
-.kd-loc-item {
+#kd-chapter-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.kd-chapter-item {
   display: flex; align-items: center; gap: 4px;
-  padding: 3px 5px; border-radius: 3px;
+  padding: 2px 4px; border-radius: 4px; transition: background 0.1s;
 }
-.kd-loc-item:hover { background: var(--card); }
-.kd-loc-name {
-  flex: 1; font-size: 11px; color: var(--text);
-  font-family: var(--font-main); padding: 1px 3px;
+.kd-chapter-item:hover { background: var(--card); }
+.kd-chapter-sidebar-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 11px; color: var(--text); font-family: var(--font-main);
+  cursor: pointer; padding: 2px 3px;
 }
+.kd-chapter-sidebar-input:focus { background: var(--card); border-radius: 3px; cursor: text; }
+.kd-chapter-item-del {
+  width: 15px; height: 15px; border-radius: 2px; border: none;
+  background: transparent; color: transparent; cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.kd-chapter-item:hover .kd-chapter-item-del { color: var(--text-dim); }
+.kd-chapter-item-del:hover { color: #EF4444 !important; }
+#kd-add-chapter-btn {
+  width: 100%; padding: 4px 6px; border-radius: 4px; font-size: 10px;
+  background: transparent; border: 1px dashed var(--border);
+  color: var(--text-dim); cursor: pointer; text-align: left; margin-top: 2px;
+}
+#kd-add-chapter-btn:hover { border-color: var(--olive); color: var(--olive); }
+
+/* Backup list in sidebar */
+#kd-backup-list { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
+.kd-backup-item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 7px; border-radius: 4px; cursor: pointer;
+  font-size: 11px; font-family: var(--font-mono); color: var(--text-dim);
+  border: 1px solid transparent; transition: background 0.1s;
+}
+.kd-backup-item:hover { background: var(--card); border-color: var(--border); }
+.kd-backup-item.live { color: var(--olive-light); font-weight: 700; }
+.kd-backup-item.active { background: rgba(74,83,64,0.18); border-color: var(--olive); color: var(--text-bright); }
+.kd-backup-item-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim); }
+.kd-backup-item.live .kd-backup-item-dot { background: var(--olive); }
+.kd-backup-item.active .kd-backup-item-dot { background: var(--olive); }
+
+/* Chapter blocks in main content */
+.kd-chapter {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.kd-chapter-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
+  flex-shrink: 0;
+}
+.kd-chapter-title-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--olive-light); text-transform: uppercase; letter-spacing: 0.06em;
+  cursor: pointer; padding: 1px 3px;
+}
+.kd-chapter-title-input:focus { background: rgba(74,83,64,0.1); border-radius: 3px; cursor: text; }
+.kd-chapter-del-btn {
+  width: 22px; height: 22px; border-radius: 4px; border: none;
+  background: transparent; color: var(--text-dim); cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.kd-chapter-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
+.kd-chapter-cards {
+  display: flex; flex-direction: row; align-items: flex-start; gap: 12px;
+  overflow-x: auto; padding-bottom: 6px;
+}
+.kd-chapter-cards::-webkit-scrollbar { height: 4px; }
+.kd-chapter-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.kd-add-chapter-btn-main {
+  align-self: flex-start; padding: 8px 16px; border-radius: 6px; font-size: 12px;
+  background: transparent; border: 1px dashed var(--border);
+  color: var(--text-dim); cursor: pointer; font-family: var(--font-main);
+  transition: all 0.15s;
+}
+.kd-add-chapter-btn-main:hover { border-color: var(--olive); color: var(--olive); }
+/* Backup view banner */
+#kd-backup-banner {
+  display: none; padding: 6px 14px; background: rgba(245,158,11,0.08);
+  border-bottom: 1px solid rgba(245,158,11,0.3);
+  font-size: 11px; color: #b45309; align-items: center; gap: 8px; flex-shrink: 0;
+}
+#kd-backup-banner.visible { display: flex; }
+#kd-backup-banner button {
+  padding: 2px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;
+  background: transparent; border: 1px solid #b45309; color: #b45309;
+}
+#kd-backup-banner button:hover { background: rgba(180,83,9,0.1); }
 
 /* Task two-row layout */
 .kd-task {
@@ -3747,12 +3824,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <button id="kd-new-record-btn">+ Nový záznam</button>
     <div id="kd-record-list"></div>
-    <div id="kd-locations-section">
-      <div class="kd-backup-title">Lokace</div>
-      <div id="kd-location-list"></div>
+    <div id="kd-chapters-section">
+      <div class="kd-backup-title">Kapitoly</div>
+      <div id="kd-chapter-list"></div>
+      <button id="kd-add-chapter-btn">+ Přidat kapitolu</button>
     </div>
     <div id="kd-backup-section">
-      <div class="kd-backup-title">Automatická záloha</div>
+      <div class="kd-backup-title">Zálohy</div>
+      <div id="kd-backup-list"></div>
       <div class="kd-backup-row">
         <label class="kd-backup-label">Den</label>
         <select id="kd-backup-day">
@@ -3774,6 +3853,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   </div>
   <!-- Main content -->
   <div id="kd-main">
+    <div id="kd-backup-banner">
+      <span id="kd-backup-banner-label">Náhled zálohy</span>
+      <button onclick="kdLoadLive()">← Živá verze</button>
+    </div>
     <div id="kd-meta-bar" style="display:none">
       <span class="kd-meta-label">Datum</span>
       <input type="date" id="kd-date-input">
@@ -8708,7 +8791,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
 
   // Gather tasks
   const allTasks=[];
-  (rec.cards||[]).forEach(card=>(card.tasks||[]).forEach(task=>allTasks.push({...task,sectionTitle:card.title||''})));
+  (rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(card=>(card.tasks||[]).forEach(task=>allTasks.push({...task,sectionTitle:card.title||'',chapterTitle:ch.title||''}))));
   const visible = allTasks.filter(t=>inclDone||!t.done);
   const urgCnt = visible.filter(t=>t.urgent).length;
   const doneCnt = allTasks.filter(t=>t.done).length;
@@ -8981,7 +9064,7 @@ async function doExportPDF() {
       const sortedKdRecs = [...kdRecords]
         .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
       for (const rec of sortedKdRecs) {
-        const hasVisible = (rec.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done));
+        const hasVisible = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
         if (!hasVisible) continue;
         if (!first) pdf.addPage();
         first = false;
@@ -9562,9 +9645,9 @@ function renderProfeseList() {
         appState.levels.forEach(level => {
           (level.annotations || []).forEach(a => { if (a.profese === oldName) a.profese = name; });
         });
-        kdRecords.forEach(r => (r.cards||[]).forEach(c => (c.tasks||[]).forEach(t => {
+        kdRecords.forEach(r => (r.chapters||[]).forEach(ch => (ch.cards||[]).forEach(c => (c.tasks||[]).forEach(t => {
           if (t.sub === oldName) t.sub = name;
-        })));
+        }))));
         kdSave();
       }
       saveState();
@@ -9723,9 +9806,10 @@ const LS_KD_LOCATIONS_KEY = (pid) => `besix_kd_locations_${pid}`;
 const LS_KD_CARD_W        = (pid) => `besix_kd_cardw_${pid}`;
 const LS_KD_ZOOM          = (pid) => `besix_kd_zoom_${pid}`;
 
-let kdRecords   = [];    // [{id,date,note,cards:[{id,title,tasks:[{id,text,sub,dateFrom,dateTo,locations:[],urgent,}]}]}]
-let kdLocations = [];    // legacy – kept for server compat; use kdGetLocations() instead
+let kdRecords   = [];    // [{id,date,note,chapters:[{id,title,cards:[{id,title,tasks:[...]}]}]}]
+let kdLocations = [];    // legacy – kept for server compat
 let kdActiveId  = null;
+let _kdViewingBackup = null;  // { ts, label, data } — null means live view
 let _kdSubCloseHandler = null;
 let _kdLocCloseHandler = null;
 let _kdBackupSchedule = { day: 0, time: '23:59' };
@@ -9858,6 +9942,13 @@ function kdLoad() {
   try { kdRecords = JSON.parse(localStorage.getItem(LS_KD_KEY(pid)) || '[]'); }
   catch { kdRecords = []; }
   if (!Array.isArray(kdRecords)) kdRecords = [];
+  // Migrate old format: rec.cards → rec.chapters[0].cards
+  kdRecords.forEach(rec => {
+    if (!rec.chapters) {
+      rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards || [] }];
+      delete rec.cards;
+    }
+  });
 }
 
 function kdLoadLocations() {
@@ -9896,8 +9987,9 @@ function kdApplyZoom() {
 
 function kdApplyCardWidth() {
   const rec = kdRecords.find(r => r.id === kdActiveId);
+  const allCards = rec ? (rec.chapters||[]).flatMap(ch => ch.cards||[]) : [];
   document.querySelectorAll('.kd-card').forEach(el => {
-    const card = rec && (rec.cards||[]).find(c => c.id === el.dataset.cardId);
+    const card = allCards.find(c => c.id === el.dataset.cardId);
     if (!card || !card.width) {
       el.style.width = _kdCardWidth + 'px'; el.style.minWidth = '240px';
     }
@@ -9940,6 +10032,7 @@ function kdDoBackup(label) {
     if (backups.length > 12) backups = backups.slice(-12);
     localStorage.setItem(LS_KD_BACKUPS(pid), JSON.stringify(backups));
   } catch(e) {}
+  kdRenderBackupList();
 }
 
 function kdNextBackupDate() {
@@ -9973,6 +10066,8 @@ function toggleKDPage() {
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
+    _kdViewingBackup = null;
+    kdCheckMissedBackup();
     kdRenderPage();
   }
 }
@@ -10024,17 +10119,33 @@ function kdRenderSidebar() {
       kdSave(); kdRenderPage();
     };
     item.appendChild(dateSpan); item.appendChild(delBtn);
-    item.onclick = () => { kdActiveId = rec.id; kdRenderPage(); };
+    item.onclick = () => { kdActiveId = rec.id; _kdViewingBackup = null; kdRenderPage(); };
     list.appendChild(item);
   });
 
-  const locList = document.getElementById('kd-location-list'); if (!locList) return;
-  locList.innerHTML = '';
-  kdGetLocations().forEach(loc => {
-    const row = document.createElement('div'); row.className = 'kd-loc-item';
-    const span = document.createElement('span'); span.className = 'kd-loc-name'; span.textContent = loc;
-    row.appendChild(span); locList.appendChild(row);
-  });
+  // Chapter list for active record
+  const chList = document.getElementById('kd-chapter-list');
+  if (chList) {
+    chList.innerHTML = '';
+    const rec = kdRecords.find(r => r.id === kdActiveId);
+    (rec?.chapters || []).forEach(ch => {
+      const row = document.createElement('div'); row.className = 'kd-chapter-item';
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'kd-chapter-sidebar-input';
+      inp.value = ch.title || ''; inp.placeholder = 'Název kapitoly...';
+      inp.onchange = () => { ch.title = inp.value; kdSave(); kdRenderContent(); };
+      const del = document.createElement('button'); del.className = 'kd-chapter-item-del'; del.textContent = '✕';
+      del.onclick = e => {
+        e.stopPropagation();
+        if ((ch.cards||[]).flatMap(c=>c.tasks||[]).length > 0 && !confirm('Smazat kapitolu a všechny její úkoly?')) return;
+        rec.chapters = rec.chapters.filter(c => c.id !== ch.id);
+        kdSave(); kdRenderPage();
+      };
+      row.appendChild(inp); row.appendChild(del); chList.appendChild(row);
+    });
+  }
+
+  kdRenderBackupList();
 
   const dayEl = document.getElementById('kd-backup-day');
   const timeEl = document.getElementById('kd-backup-time');
@@ -10043,13 +10154,53 @@ function kdRenderSidebar() {
   kdUpdateBackupNextLabel();
 }
 
+function kdRenderBackupList() {
+  const bList = document.getElementById('kd-backup-list'); if (!bList) return;
+  bList.innerHTML = '';
+  const pid = currentProject?.id; if (!pid) return;
+  let backups = [];
+  try { backups = JSON.parse(localStorage.getItem(LS_KD_BACKUPS(pid)) || '[]'); } catch(e) {}
+
+  // Live version at top
+  const liveItem = document.createElement('div');
+  liveItem.className = 'kd-backup-item live' + (!_kdViewingBackup ? ' active' : '');
+  liveItem.innerHTML = '<span class="kd-backup-item-dot"></span><span>Živá verze</span>';
+  liveItem.onclick = () => kdLoadLive();
+  bList.appendChild(liveItem);
+
+  // Backups sorted newest first
+  [...backups].reverse().forEach(bk => {
+    const item = document.createElement('div');
+    item.className = 'kd-backup-item' + (_kdViewingBackup?.ts === bk.ts ? ' active' : '');
+    item.innerHTML = `<span class="kd-backup-item-dot"></span><span>${kdFmtBackupDate(new Date(bk.ts))}</span>`;
+    item.onclick = () => kdLoadBackupPreview(bk);
+    bList.appendChild(item);
+  });
+}
+
 function kdRenderContent() {
   const meta   = document.getElementById('kd-meta-bar');
   const fbar   = document.getElementById('kd-filter-bar');
   const empty  = document.getElementById('kd-empty-state');
   const scroll = document.getElementById('kd-cards-scroll');
+  const banner = document.getElementById('kd-backup-banner');
 
-  const rec = kdRecords.find(r => r.id === kdActiveId);
+  // Show/hide backup banner
+  if (banner) {
+    if (_kdViewingBackup) {
+      banner.classList.add('visible');
+      const lbl = document.getElementById('kd-backup-banner-label');
+      if (lbl) lbl.textContent = 'Náhled zálohy: ' + kdFmtBackupDate(new Date(_kdViewingBackup.ts));
+    } else {
+      banner.classList.remove('visible');
+    }
+  }
+
+  const displayRecords = _kdViewingBackup
+    ? (() => { try { return JSON.parse(_kdViewingBackup.data); } catch(e) { return []; } })()
+    : kdRecords;
+  const rec = displayRecords.find(r => r.id === kdActiveId);
+
   if (!rec) {
     meta.style.display  = 'none';
     if (fbar) fbar.style.display = 'none';
@@ -10067,7 +10218,7 @@ function kdRenderContent() {
 
   // Populate filter selects
   if (fbar) {
-    const allTasks = (rec.cards || []).flatMap(c => c.tasks || []);
+    const allTasks = (rec.chapters||[]).flatMap(ch => (ch.cards||[]).flatMap(c => c.tasks||[]));
     const subsUsed = new Set(allTasks.map(t => t.sub).filter(Boolean));
     const sortedSubs = [...(appState.profese||[])].filter(p => subsUsed.has(p.name)).sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'));
     const fSub = document.getElementById('kdf-sub');
@@ -10104,28 +10255,66 @@ function kdRenderContent() {
     if (fDone) fDone.checked = _kdFilter.showDone;
   }
 
+  const isLive = !_kdViewingBackup;
   scroll.innerHTML = '';
   const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
-  (rec.cards || []).forEach(card => inner.appendChild(kdBuildCard(rec, card)));
+  (rec.chapters || []).forEach(ch => inner.appendChild(kdBuildChapter(rec, ch, isLive)));
 
-  const addBtn = document.createElement('button');
-  addBtn.className = 'kd-add-card-btn';
-  addBtn.style.width = (_kdCardWidth - 20) + 'px';
-  addBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg> Přidat úsek';
-  addBtn.onclick = () => kdAddCard(rec);
-  inner.appendChild(addBtn);
+  if (isLive) {
+    const addChBtn = document.createElement('button');
+    addChBtn.className = 'kd-add-chapter-btn-main';
+    addChBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg> Přidat kapitolu';
+    addChBtn.onclick = () => kdAddChapter(rec);
+    inner.appendChild(addChBtn);
+  }
   scroll.appendChild(inner);
   kdApplyZoom();
 }
 
 function kdAllTasks(rec) {
   const out = [];
-  (rec.cards || []).forEach(card =>
-    (card.tasks || []).forEach(task => out.push({ task, card })));
+  (rec.chapters || []).forEach(ch =>
+    (ch.cards || []).forEach(card =>
+      (card.tasks || []).forEach(task => out.push({ task, card, chapter: ch }))));
   return out;
 }
 
-function kdBuildCard(rec, card) {
+function kdBuildChapter(rec, ch, isLive) {
+  const el = document.createElement('div'); el.className = 'kd-chapter'; el.dataset.chapterId = ch.id;
+
+  const hdr = document.createElement('div'); hdr.className = 'kd-chapter-header';
+  const titleInp = document.createElement('input');
+  titleInp.className = 'kd-chapter-title-input'; titleInp.value = ch.title || '';
+  titleInp.placeholder = 'Název kapitoly...'; titleInp.readOnly = !isLive;
+  titleInp.onchange = () => { ch.title = titleInp.value; kdSave(); kdRenderSidebar(); };
+  hdr.appendChild(titleInp);
+
+  if (isLive) {
+    const delBtn = document.createElement('button'); delBtn.className = 'kd-chapter-del-btn'; delBtn.title = 'Smazat kapitolu'; delBtn.textContent = '✕';
+    delBtn.onclick = () => {
+      if ((ch.cards||[]).flatMap(c=>c.tasks||[]).length > 0 && !confirm('Smazat kapitolu a všechny její úkoly?')) return;
+      rec.chapters = rec.chapters.filter(c => c.id !== ch.id);
+      kdSave(); kdRenderPage();
+    };
+    hdr.appendChild(delBtn);
+  }
+  el.appendChild(hdr);
+
+  const cardsRow = document.createElement('div'); cardsRow.className = 'kd-chapter-cards';
+  (ch.cards || []).forEach(card => cardsRow.appendChild(kdBuildCard(rec, ch, card, isLive)));
+
+  if (isLive) {
+    const addBtn = document.createElement('button'); addBtn.className = 'kd-add-card-btn';
+    addBtn.style.width = (_kdCardWidth - 20) + 'px';
+    addBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg> Přidat úsek';
+    addBtn.onclick = () => kdAddCard(rec, ch);
+    cardsRow.appendChild(addBtn);
+  }
+  el.appendChild(cardsRow);
+  return el;
+}
+
+function kdBuildCard(rec, ch, card, isLive) {
   const el = document.createElement('div');
   el.className = 'kd-card'; el.dataset.cardId = card.id;
   el.style.width = _kdCardWidth + 'px'; el.style.minWidth = '240px';
@@ -10133,39 +10322,44 @@ function kdBuildCard(rec, card) {
   const hdr = document.createElement('div'); hdr.className = 'kd-card-header';
   const inp = document.createElement('input');
   inp.className = 'kd-card-title'; inp.value = card.title || '';
-  inp.placeholder = 'Název úseku...';
+  inp.placeholder = 'Název úseku...'; inp.readOnly = !isLive;
   inp.onchange = () => { card.title = inp.value; kdSave(); kdRenderSidebar(); };
   const cnt = document.createElement('span'); cnt.className = 'kd-card-count';
-  const del = document.createElement('button'); del.className = 'kd-card-del-btn';
-  del.innerHTML = '✕'; del.title = 'Smazat úsek';
-  del.onclick = () => { if (confirm('Smazat úsek a všechny jeho úkoly?')) { rec.cards = rec.cards.filter(c => c.id !== card.id); kdSave(); kdRenderContent(); } };
-  hdr.appendChild(inp); hdr.appendChild(cnt); hdr.appendChild(del);
+  hdr.appendChild(inp); hdr.appendChild(cnt);
+  if (isLive) {
+    const del = document.createElement('button'); del.className = 'kd-card-del-btn';
+    del.innerHTML = '✕'; del.title = 'Smazat úsek';
+    del.onclick = () => { if (confirm('Smazat úsek a všechny jeho úkoly?')) { ch.cards = ch.cards.filter(c => c.id !== card.id); kdSave(); kdRenderContent(); } };
+    hdr.appendChild(del);
+  }
   el.appendChild(hdr);
 
   const list = document.createElement('div'); list.className = 'kd-tasks-list';
   el.appendChild(list);
-  kdBuildCardTasks(el, rec, card, cnt);
+  kdBuildCardTasks(el, rec, card, cnt, isLive);
 
-  const addBtn = document.createElement('button'); addBtn.className = 'kd-add-task-btn';
-  addBtn.textContent = '+ Přidat úkol';
-  addBtn.onclick = () => { kdAddTask(rec, card); };
-  el.appendChild(addBtn);
+  if (isLive) {
+    const addBtn = document.createElement('button'); addBtn.className = 'kd-add-task-btn';
+    addBtn.textContent = '+ Přidat úkol';
+    addBtn.onclick = () => { kdAddTask(rec, card); };
+    el.appendChild(addBtn);
+  }
   return el;
 }
 
-function kdBuildCardTasks(cardEl, rec, card, cntEl) {
+function kdBuildCardTasks(cardEl, rec, card, cntEl, isLive) {
   const list = cardEl.querySelector('.kd-tasks-list'); if (!list) return;
   list.innerHTML = '';
   const tasks = card.tasks || [];
   const visible = tasks.filter(t => kdTaskVisible(t));
-  visible.forEach(task => list.appendChild(kdBuildTask(rec, card, task)));
+  visible.forEach(task => list.appendChild(kdBuildTask(rec, card, task, isLive !== false)));
   const cnt = cntEl || cardEl.querySelector('.kd-card-count');
   if (cnt) cnt.textContent = visible.length < tasks.length ? `${visible.length}/${tasks.length}` : String(tasks.length);
 }
 
-function kdBuildTask(rec, card, task) {
+function kdBuildTask(rec, card, task, isLive) {
+  if (isLive === undefined) isLive = true;
   if (!Array.isArray(task.locations)) task.locations = task.location ? [task.location] : [];
-  // Deduplicate locations silently
   task.locations = [...new Set(task.locations)];
   const el = document.createElement('div');
   el.className = 'kd-task' + (task.urgent ? ' urgent' : '') + (task.done ? ' done-task' : ''); el.dataset.taskId = task.id;
@@ -10181,8 +10375,8 @@ function kdBuildTask(rec, card, task) {
   const nameRow = document.createElement('div'); nameRow.className = 'kd-task-name-row';
   const ta = document.createElement('textarea');
   ta.className = 'kd-task-text'; ta.value = task.text || '';
-  ta.placeholder = 'Název úkolu...'; ta.rows = 1;
-  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; task.text = ta.value; kdSave(); };
+  ta.placeholder = 'Název úkolu...'; ta.rows = 1; ta.readOnly = !isLive;
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; if (isLive) { task.text = ta.value; kdSave(); } };
   setTimeout(() => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }, 0);
   nameRow.appendChild(ta);
   el.appendChild(nameRow);
@@ -10195,11 +10389,11 @@ function kdBuildTask(rec, card, task) {
   if (prof) {
     const chip = document.createElement('span'); chip.className = 'kd-task-sub-chip';
     chip.style.color = prof.color||'#888'; chip.style.borderColor = prof.color||'#888';
-    chip.title = 'Změnit dodavatele';
+    chip.title = isLive ? 'Změnit dodavatele' : '';
     chip.innerHTML = `<span class="kd-task-sub-dot" style="background:${prof.color||'#888'}"></span>${(prof.firma||prof.name||'').slice(0,14)}`;
-    chip.onclick = e => kdOpenSubPop(e, rec, task);
+    if (isLive) chip.onclick = e => kdOpenSubPop(e, rec, task);
     ctrl.appendChild(chip);
-  } else {
+  } else if (isLive) {
     const none = document.createElement('span'); none.className = 'kd-task-sub-none'; none.textContent = '+ dod.';
     none.onclick = e => kdOpenSubPop(e, rec, task); ctrl.appendChild(none);
   }
@@ -10235,9 +10429,9 @@ function kdBuildTask(rec, card, task) {
     wrap.appendChild(txt); wrap.appendChild(picker);
     return wrap;
   };
-  const inpOd = mkDateWidget(task.dateFrom, v => { task.dateFrom = v; kdSave(); });
+  const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => { task.dateFrom = v; kdSave(); }) : () => {});
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
-  const inpDo = mkDateWidget(task.dateTo, v => { task.dateTo = v; kdSave(); });
+  const inpDo = mkDateWidget(task.dateTo, isLive ? (v => { task.dateTo = v; kdSave(); }) : () => {});
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
   ctrl.appendChild(dp);
 
@@ -10246,14 +10440,19 @@ function kdBuildTask(rec, card, task) {
   (task.locations || []).forEach(loc => {
     const chip = document.createElement('span'); chip.className = 'kd-task-loc-chip';
     const txt = document.createElement('span'); txt.textContent = loc;
-    const del = document.createElement('button'); del.className = 'kd-task-loc-del'; del.textContent = '×';
-    del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); kdSave(); kdRenderContent(); };
-    chip.appendChild(txt); chip.appendChild(del); locsEl.appendChild(chip);
+    if (isLive) {
+      const del = document.createElement('button'); del.className = 'kd-task-loc-del'; del.textContent = '×';
+      del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); kdSave(); kdRenderContent(); };
+      chip.appendChild(del);
+    }
+    chip.insertBefore(txt, chip.firstChild); locsEl.appendChild(chip);
   });
-  const addLoc = document.createElement('button'); addLoc.className = 'kd-task-loc-add';
-  addLoc.title = 'Přidat lokaci'; addLoc.textContent = '+';
-  addLoc.onclick = e => kdOpenLocPop(e, task);
-  locsEl.appendChild(addLoc);
+  if (isLive) {
+    const addLoc = document.createElement('button'); addLoc.className = 'kd-task-loc-add';
+    addLoc.title = 'Přidat lokaci'; addLoc.textContent = '+';
+    addLoc.onclick = e => kdOpenLocPop(e, task);
+    locsEl.appendChild(addLoc);
+  }
   ctrl.appendChild(locsEl);
 
   // Urgent toggle
@@ -10261,7 +10460,8 @@ function kdBuildTask(rec, card, task) {
   urgBtn.className = 'kd-task-urgent-btn' + (task.urgent ? ' on' : '');
   urgBtn.title = task.urgent ? 'Urgentní – kliknutím zrušit' : 'Označit jako urgentní';
   urgBtn.textContent = '!';
-  urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
+  if (isLive) urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
+  else urgBtn.disabled = true;
   ctrl.appendChild(urgBtn);
 
   // Done toggle
@@ -10269,22 +10469,24 @@ function kdBuildTask(rec, card, task) {
   doneBtn.className = 'kd-task-done-btn' + (task.done ? ' on' : '');
   doneBtn.title = task.done ? 'Splněno – kliknutím zrušit' : 'Označit jako splněno';
   doneBtn.textContent = '✓';
-  doneBtn.onclick = () => { task.done = !task.done; kdSave(); kdRenderContent(); };
+  if (isLive) doneBtn.onclick = () => { task.done = !task.done; kdSave(); kdRenderContent(); };
+  else doneBtn.disabled = true;
   ctrl.appendChild(doneBtn);
 
-  // Delete
-  const delBtn = document.createElement('button');
-  delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol'; delBtn.innerHTML = '✕';
-  delBtn.onclick = () => { kdDeleteTask(rec, card.id, task.id); };
-  ctrl.appendChild(delBtn);
+  if (isLive) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol'; delBtn.innerHTML = '✕';
+    delBtn.onclick = () => { kdDeleteTask(rec, card.id, task.id); };
+    ctrl.appendChild(delBtn);
+  }
 
   el.appendChild(ctrl);
   return el;
 }
 
-function kdAddCard(rec) {
+function kdAddCard(rec, ch) {
   const card = { id: kdGenId(), title: '', tasks: [] };
-  rec.cards.push(card); kdSave(); kdRenderContent();
+  ch.cards.push(card); kdSave(); kdRenderContent();
   setTimeout(() => { const t = document.querySelector(`.kd-card[data-card-id="${card.id}"] .kd-card-title`); if (t) t.focus(); }, 60);
 }
 
@@ -10295,9 +10497,73 @@ function kdAddTask(rec, card) {
 }
 
 function kdDeleteTask(rec, cardId, taskId) {
-  const card = rec.cards.find(c => c.id === cardId); if (!card) return;
+  let card = null;
+  for (const ch of (rec.chapters || [])) {
+    card = (ch.cards||[]).find(c => c.id === cardId);
+    if (card) break;
+  }
+  if (!card) return;
   card.tasks = card.tasks.filter(t => t.id !== taskId);
   kdSave(); kdRenderContent();
+}
+
+// ── Chapter helpers ──────────────────────────────────────────────
+function kdAddChapter(rec) {
+  const ch = { id: kdGenId(), title: '', cards: [] };
+  rec.chapters.push(ch); kdSave(); kdRenderPage();
+  setTimeout(() => {
+    const el = document.querySelector(`.kd-chapter[data-chapter-id="${ch.id}"] .kd-chapter-title-input`);
+    if (el) el.focus();
+  }, 60);
+}
+
+// ── Backup helpers ───────────────────────────────────────────────
+function kdFmtBackupDate(d) {
+  const days = ['Ne','Po','Út','St','Čt','Pá','So'];
+  return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth()+1}. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function kdLastScheduledBackupTime() {
+  const now = new Date();
+  const [hh, mm] = _kdBackupSchedule.time.split(':').map(Number);
+  const t = new Date(now);
+  t.setSeconds(0, 0);
+  t.setHours(hh, mm);
+  let diff = (now.getDay() - _kdBackupSchedule.day + 7) % 7;
+  if (diff === 0 && now < t) diff = 7;
+  t.setDate(t.getDate() - diff);
+  return t;
+}
+
+function kdCheckMissedBackup() {
+  const pid = currentProject?.id; if (!pid || !kdRecords.length) return;
+  let backups = [];
+  try { backups = JSON.parse(localStorage.getItem(LS_KD_BACKUPS(pid)) || '[]'); } catch(e) {}
+  const lastScheduled = kdLastScheduledBackupTime();
+  const lastBackupTs = backups.length ? backups[backups.length - 1].ts : 0;
+  if (lastScheduled.getTime() > lastBackupTs) {
+    _kdLastBackupCheck = `${lastScheduled.toISOString().slice(0,10)}_${_kdBackupSchedule.time}`;
+    kdDoBackup('Automatická záloha');
+  }
+}
+
+function kdLoadBackupPreview(bk) {
+  _kdViewingBackup = bk;
+  try {
+    const previewRecords = JSON.parse(bk.data);
+    const rec = previewRecords.find(r => r.id === kdActiveId);
+    if (!rec && previewRecords.length) {
+      // If active record not in backup, pick first
+    }
+  } catch(e) {}
+  kdRenderSidebar();
+  kdRenderContent();
+}
+
+function kdLoadLive() {
+  _kdViewingBackup = null;
+  kdRenderSidebar();
+  kdRenderContent();
 }
 
 // ── Sub popover (searchable) ─────────────────────────────────────
@@ -10352,25 +10618,31 @@ function kdSetupPage() {
   document.getElementById('kd-btn').addEventListener('click', toggleKDPage);
   document.getElementById('kd-close-btn').addEventListener('click', toggleKDPage);
   document.getElementById('kd-new-record-btn').addEventListener('click', () => {
-    const rec = { id: kdGenId(), date: new Date().toISOString().slice(0,10), note: '', cards: [] };
-    kdRecords.push(rec); kdActiveId = rec.id; kdSave(); kdRenderPage();
+    const rec = { id: kdGenId(), date: new Date().toISOString().slice(0,10), note: '', chapters: [] };
+    kdRecords.push(rec); kdActiveId = rec.id; _kdViewingBackup = null; kdSave(); kdRenderPage();
   });
   document.getElementById('kd-delete-record-btn').addEventListener('click', () => {
-    if (!kdActiveId) return;
+    if (!kdActiveId || _kdViewingBackup) return;
     if (!confirm('Opravdu smazat tento záznam z kontrolního dne?')) return;
     kdRecords = kdRecords.filter(r => r.id !== kdActiveId);
     kdActiveId = kdRecords.length ? kdRecords[kdRecords.length - 1].id : null;
     kdSave(); kdRenderPage();
   });
   document.getElementById('kd-date-input').addEventListener('change', e => {
+    if (_kdViewingBackup) return;
     const rec = kdRecords.find(r => r.id === kdActiveId);
     if (rec) { rec.date = e.target.value; kdSave(); kdRenderSidebar(); }
   });
   document.getElementById('kd-note-input').addEventListener('input', e => {
+    if (_kdViewingBackup) return;
     const rec = kdRecords.find(r => r.id === kdActiveId);
     if (rec) { rec.note = e.target.value; kdSave(); }
   });
-  // Locations are auto-derived from project floors (appState.levels) — no add button
+  document.getElementById('kd-add-chapter-btn').addEventListener('click', () => {
+    if (_kdViewingBackup) return;
+    const rec = kdRecords.find(r => r.id === kdActiveId); if (!rec) return;
+    kdAddChapter(rec);
+  });
   document.getElementById('kd-backup-day').addEventListener('change', e => {
     _kdBackupSchedule.day = parseInt(e.target.value); kdSaveBackupSchedule(); kdUpdateBackupNextLabel();
   });
@@ -10868,12 +11140,21 @@ async function openProject(proj) {
   }
 
   // KD data: prefer dedicated endpoint > canvas state > localStorage
+  const _kdMigrate = recs => {
+    recs.forEach(rec => {
+      if (!rec.chapters) {
+        rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards || [] }];
+        delete rec.cards;
+      }
+    });
+    return recs;
+  };
   if (Array.isArray(kdServerRecords) && kdServerRecords.length > 0) {
-    kdRecords = kdServerRecords;
+    kdRecords = _kdMigrate(kdServerRecords);
     try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
   } else if (serverData && Array.isArray(serverData.state?.kdRecords) && serverData.state.kdRecords.length > 0) {
     // migrate: data was stored in canvas state – read it and save to dedicated endpoint
-    kdRecords = serverData.state.kdRecords;
+    kdRecords = _kdMigrate(serverData.state.kdRecords);
     try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
     _kdDirectSave(); // persist to dedicated table
   }
@@ -11250,6 +11531,9 @@ async function _pollLiveSync() {
     // Sync KD records from dedicated endpoint (silent, no user prompt needed)
     const remoteKd = await _kdServerLoad(currentProject.id);
     if (Array.isArray(remoteKd) && remoteKd.length !== kdRecords.length) {
+      remoteKd.forEach(rec => {
+        if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
+      });
       kdRecords = remoteKd;
       try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
       // Re-render KD panel if it's currently visible
