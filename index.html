@@ -8414,8 +8414,21 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           const pts2=o.points||[], sx2=o.scaleX||1, sy2=o.scaleY||1;
           const mnX=pts2.reduce((m,p)=>Math.min(m,p.x),Infinity), mxX=pts2.reduce((m,p)=>Math.max(m,p.x),-Infinity);
           const mnY=pts2.reduce((m,p)=>Math.min(m,p.y),Infinity), mxY=pts2.reduce((m,p)=>Math.max(m,p.y),-Infinity);
-          const bl=oCX?o.left-(mxX-mnX)*sx2/2:o.left, bt=oCY?o.top-(mxY-mnY)*sy2/2:o.top;
-          ox=toX(bl); oy=toY(bt); ow=toMX((mxX-mnX)*sx2); oh=toMY((mxY-mnY)*sy2);
+          const bbl=oCX?o.left-(o.width||mxX-mnX)*sx2/2:o.left, bbt=oCY?o.top-(o.height||mxY-mnY)*sy2/2:o.top;
+          if (type === 'polyline' && pts2.length >= 2) {
+            // Midpoint along path (mirrors _polylineMidpoint in the canvas)
+            const cp = pts2.map(p=>({x: bbl+sx2*(p.x-mnX), y: bbt+sy2*(p.y-mnY)}));
+            let tot=0; for(let i=1;i<cp.length;i++) tot+=Math.hypot(cp[i].x-cp[i-1].x,cp[i].y-cp[i-1].y);
+            let rem=tot/2, mx=cp[cp.length-1].x, my=cp[cp.length-1].y;
+            for(let i=1;i<cp.length;i++){
+              const ddx=cp[i].x-cp[i-1].x,ddy=cp[i].y-cp[i-1].y,seg=Math.hypot(ddx,ddy);
+              if(rem<=seg){const t=seg>0?rem/seg:0;mx=cp[i-1].x+t*ddx;my=cp[i-1].y+t*ddy;break;}
+              rem-=seg;
+            }
+            ox=toX(mx); oy=toY(my); ow=0; oh=0;
+          } else {
+            ox=toX(bbl); oy=toY(bbt); ow=toMX((mxX-mnX)*sx2); oh=toMY((mxY-mnY)*sy2);
+          }
         } else {
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
           ox=toX(oCX?o.left-fw/2:o.left); oy=toY(oCY?o.top-fh/2:o.top); ow=toMX(fw); oh=toMY(fh);
