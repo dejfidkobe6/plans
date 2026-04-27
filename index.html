@@ -5599,7 +5599,7 @@ function setupEventListeners() {
         if (tempShape) { cw.remove(tempShape); tempShape = null; }
         const line = new fabric.Polyline(
           [{ x: start.x, y: start.y }, { x: pointer.x, y: pointer.y }],
-          { stroke: color, strokeWidth: 5, fill: 'transparent',
+          { stroke: color, strokeWidth: 2, strokeUniform: true, fill: 'transparent',
             strokeLineCap: 'round', strokeLineJoin: 'round' }
         );
         addAnnotationProperties(line, 'partition');
@@ -5680,7 +5680,7 @@ function setupEventListeners() {
         fabricCanvas.remove(tempShape);
         tempShape = new fabric.Line(
           [partitionStartPt.x, partitionStartPt.y, pointer.x, pointer.y],
-          { stroke: color, strokeWidth: 5, strokeLineCap: 'round',
+          { stroke: color, strokeWidth: 2, strokeLineCap: 'round',
             selectable: false, evented: false }
         );
         fabricCanvas.add(tempShape);
