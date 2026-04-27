@@ -8563,6 +8563,38 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
   });
 }
 
+// Render a line of text, highlighting any http(s) URLs in blue with underline + clickable link.
+// defaultRgb: [r,g,b] for non-URL text. Returns final x position after rendering.
+function pdfTextWithLinks(pdf, text, x, y, fspt, defaultRgb) {
+  const PT_MM = 72 / 25.4;
+  const URL_RE = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(URL_RE);
+  let cx = x;
+  pdf.setFontSize(fspt);
+  parts.forEach(part => {
+    if (!part) return;
+    const isUrl = /^https?:\/\//.test(part);
+    const w = pdf.getStringUnitWidth(part) * fspt / PT_MM;
+    if (isUrl) {
+      pdf.setTextColor(30, 90, 200);
+      pdf.text(part, cx, y);
+      // Underline
+      pdf.setDrawColor(30, 90, 200); pdf.setLineWidth(0.15);
+      pdf.line(cx, y + 0.5, cx + w, y + 0.5);
+      // Clickable annotation
+      const lineH = fspt / PT_MM;
+      try { pdf.link(cx, y - lineH + 0.3, w, lineH + 0.4, { url: part }); } catch(e) {}
+    } else {
+      pdf.setTextColor(...defaultRgb);
+      pdf.text(part, cx, y);
+    }
+    cx += w;
+  });
+  // Restore color
+  pdf.setTextColor(...defaultRgb);
+  return cx;
+}
+
 // Pure-vector annotation list — draws directly into the PDF using jsPDF commands.
 // No canvas image; zero raster overhead → tiny file size, infinite zoom quality.
 function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
@@ -8725,11 +8757,12 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
     pdf.text(fitT(profObj?.firma || '-', rowFS, C_POPIS - C_PROF - 0.5), C_PROF, tY1);
 
     // Popis — all wrapped/newline lines, identical logic for urgent and normal
-    pdf.setTextColor(isUrgent ? 160 : 50, isUrgent ? 40 : 55, isUrgent ? 40 : 45);
+    const popisFg = [isUrgent ? 160 : 50, isUrgent ? 40 : 55, isUrgent ? 40 : 45];
+    pdf.setTextColor(...popisFg);
     for (let li = 0; li < lines.length; li++) {
       const ty = curY + LH * li + LH * 0.8;
       if (ty > curY + rowH - 0.1) break;
-      pdf.text(lines[li], C_POPIS, ty);
+      pdfTextWithLinks(pdf, lines[li], C_POPIS, ty, rowFS, popisFg);
     }
 
     // Termín
@@ -8938,8 +8971,9 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
     pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(...pRgb);
     pdf.text(fitT(csText(profObj?.firma||profObj?.name||task.sub||'–'),ROW_FS,C_TASK-C_SUB-0.5),C_SUB,tY1);
 
-    pdf.setTextColor(isUrgent?160:50,isUrgent?40:55,isUrgent?40:45);
-    (lines||['']).forEach((line,li)=>{ const ty=curY+LH*li+LH*0.8; if(ty>curY+rowH-0.1)return; pdf.text(line,C_TASK,ty); });
+    const taskFg=[isUrgent?160:50,isUrgent?40:55,isUrgent?40:45];
+    pdf.setTextColor(...taskFg);
+    (lines||['']).forEach((line,li)=>{ const ty=curY+LH*li+LH*0.8; if(ty>curY+rowH-0.1)return; pdfTextWithLinks(pdf,line,C_TASK,ty,ROW_FS,taskFg); });
 
     const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
     const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
@@ -9935,17 +9969,29 @@ function kdSave() {
 }
 
 let _kdSaveTimer = null;
+let _kdLastKdTs  = null;   // KD-specific updated_at from server
+
 function _kdDirectSave() {
   clearTimeout(_kdSaveTimer);
   _kdSaveTimer = setTimeout(async () => {
     if (!currentProject) return;
     try {
       const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
-      await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
+      const { ok, data } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formBody,
       });
+      // Server returns merged records (may include items added by concurrent users)
+      if (ok && Array.isArray(data.records)) {
+        const hadChange = _kdMergeFromServer(data.records);
+        if (hadChange) {
+          const pid = currentProject?.id;
+          try { if (pid) localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords)); } catch(e) {}
+          const kdPage = document.getElementById('kd-page');
+          if (kdPage && kdPage.classList.contains('visible')) kdRenderPage();
+        }
+      }
     } catch(e) { console.error('[kd] save error:', e); }
   }, 1000);
 }
@@ -9953,9 +9999,46 @@ function _kdDirectSave() {
 async function _kdServerLoad(projectId) {
   try {
     const { ok, data } = await apiFetch(`api/kd.php?project_id=${projectId}`);
-    if (ok && Array.isArray(data.records)) return data.records;
+    if (ok && Array.isArray(data.records)) return { records: data.records, updatedAt: data.updated_at || null };
   } catch(e) {}
   return null;
+}
+
+// Client-side merge: adds items from server missing locally (concurrent additions).
+// Returns true if anything was added (so caller can re-render).
+function _kdMergeFromServer(serverRecords) {
+  if (!Array.isArray(serverRecords)) return false;
+  serverRecords.forEach(rec => {
+    if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
+  });
+
+  let changed = false;
+  serverRecords.forEach(sRec => {
+    let localRec = kdRecords.find(r => r.id === sRec.id);
+    if (!localRec) { kdRecords.push(sRec); changed = true; return; }
+
+    (sRec.chapters || []).forEach(sCh => {
+      let localCh = (localRec.chapters || []).find(c => c.id === sCh.id);
+      if (!localCh) {
+        if (!localRec.chapters) localRec.chapters = [];
+        localRec.chapters.push(sCh); changed = true; return;
+      }
+      (sCh.cards || []).forEach(sCard => {
+        let localCard = (localCh.cards || []).find(c => c.id === sCard.id);
+        if (!localCard) {
+          if (!localCh.cards) localCh.cards = [];
+          localCh.cards.push(sCard); changed = true; return;
+        }
+        (sCard.tasks || []).forEach(sTask => {
+          if (!(localCard.tasks || []).some(t => t.id === sTask.id)) {
+            if (!localCard.tasks) localCard.tasks = [];
+            localCard.tasks.push(sTask); changed = true;
+          }
+        });
+      });
+    });
+  });
+  return changed;
 }
 
 function kdSaveLocations() {
@@ -11177,8 +11260,9 @@ async function openProject(proj) {
     });
     return recs;
   };
-  if (Array.isArray(kdServerRecords) && kdServerRecords.length > 0) {
-    kdRecords = _kdMigrate(kdServerRecords);
+  _kdLastKdTs = kdServerRecords?.updatedAt || null;
+  if (kdServerRecords?.records?.length > 0) {
+    kdRecords = _kdMigrate(kdServerRecords.records);
     try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
   } else if (serverData && Array.isArray(serverData.state?.kdRecords) && serverData.state.kdRecords.length > 0) {
     // migrate: data was stored in canvas state – read it and save to dedicated endpoint
@@ -11505,6 +11589,8 @@ let _syncPending   = false;  // new remote data waiting for user
 
 async function _pollLiveSync() {
   if (!currentProject || _isProjectLoading || _saving) return;
+  // KD sync runs every cycle independently of canvas changes
+  _pollKDSync();
   try {
     const { ok, data } = await apiFetch(
       `api/canvas.php?project_id=${currentProject.id}&ts_only=1`
@@ -11557,19 +11643,31 @@ async function _pollLiveSync() {
     if (changed) updateAnnotList();
 
     // Sync KD records from dedicated endpoint (silent, no user prompt needed)
-    const remoteKd = await _kdServerLoad(currentProject.id);
-    if (Array.isArray(remoteKd) && remoteKd.length !== kdRecords.length) {
-      remoteKd.forEach(rec => {
-        if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
-      });
-      kdRecords = remoteKd;
-      try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
-      // Re-render KD panel if it's currently visible
-      const kdPage = document.getElementById('kd-page');
-      if (kdPage && kdPage.classList.contains('visible')) kdRenderPage();
-    }
+    await _pollKDSync();
 
   } catch(e) { /* network error – skip silently */ }
+}
+
+async function _pollKDSync() {
+  if (!currentProject) return;
+  try {
+    // Lightweight timestamp check first
+    const { ok: tsOk, data: tsData } = await apiFetch(`api/kd.php?project_id=${currentProject.id}&ts_only=1`);
+    if (!tsOk || !tsData.updated_at) return;
+    if (tsData.updated_at === _kdLastKdTs) return; // nothing changed
+
+    // KD data changed — fetch and merge
+    const kdResult = await _kdServerLoad(currentProject.id);
+    if (!kdResult) return;
+
+    _kdLastKdTs = kdResult.updatedAt;
+    const mergeChanged = _kdMergeFromServer(kdResult.records);
+    if (mergeChanged) {
+      try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
+      const kdPage = document.getElementById('kd-page');
+      if (kdPage && kdPage.classList.contains('visible') && !_kdViewingBackup) kdRenderPage();
+    }
+  } catch(e) { /* network error – skip */ }
 }
 
 // Wire the "Nová data" badge click to reload active level
