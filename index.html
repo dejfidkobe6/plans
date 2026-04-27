@@ -1690,6 +1690,17 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-task-urgent-btn:hover { color: #EF4444; }
 .kd-task-urgent-btn.on { color: #EF4444; }
+.kd-task-done-btn { width: 18px; height: 18px; border-radius: 3px; border: none;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0;
+  font-size: 13px; }
+.kd-task-done-btn:hover { color: #22c55e; }
+.kd-task-done-btn.on { color: #22c55e; }
+.kd-task.done-task { opacity: 0.45; }
+.kdf-done-label { display: flex; align-items: center; gap: 4px; font-size: 11px;
+  color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.kdf-done-label input { accent-color: #22c55e; cursor: pointer; }
+.kdf-done-label:has(input:checked) { color: #22c55e; }
 /* Multiple location chips on task */
 .kd-task-locs { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; flex-shrink: 0; }
 .kd-task-loc-chip {
@@ -3778,6 +3789,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <span class="kdf-sep">–</span>
         <input type="date" id="kdf-to" title="Termín do">
         <label class="kdf-urgent-label"><input type="checkbox" id="kdf-urgent"> Urgentní</label>
+        <label class="kdf-done-label"><input type="checkbox" id="kdf-done"> Hotové</label>
         <button id="kdf-reset" title="Vymazat filtry">✕ Vymazat</button>
       </div>
       <div id="kd-empty-state">
@@ -9516,13 +9528,14 @@ let _kdLastBackupCheck = null;
 let _kdBackupTimer = null;
 let _kdCardWidth = 420; // px — per-card drag resize base
 let _kdZoom = 1.0;      // CSS zoom applied to entire cards area (Ctrl+scroll)
-let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
+let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function kdCloseAllPops() {
   ['srch-pop','kd-sub-pop','kd-loc-pop'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.classList.remove('open');
+    const el = document.getElementById(id);
+    if (el) { el.classList.remove('open'); el.style.display = ''; }
   });
   if (_srchPopClose) { document.removeEventListener('click', _srchPopClose, true); _srchPopClose = null; }
   if (_kdSubCloseHandler) { document.removeEventListener('click', _kdSubCloseHandler, true); _kdSubCloseHandler = null; }
@@ -9768,6 +9781,7 @@ function kdFmtDate(d) {
 }
 
 function kdTaskVisible(task) {
+  if (!_kdFilter.showDone && task.done) return false;
   if (_kdFilter.sub && task.sub !== _kdFilter.sub) return false;
   if (_kdFilter.location && !(task.locations || []).includes(_kdFilter.location)) return false;
   if (_kdFilter.urgent && !task.urgent) return false;
@@ -9872,6 +9886,8 @@ function kdRenderContent() {
     if (fTo) { fTo.value = _kdFilter.dateTo || ''; fTo.classList.toggle('kdf-active', !!_kdFilter.dateTo); }
     const fUrg = document.getElementById('kdf-urgent');
     if (fUrg) fUrg.checked = _kdFilter.urgent;
+    const fDone = document.getElementById('kdf-done');
+    if (fDone) fDone.checked = _kdFilter.showDone;
   }
 
   scroll.innerHTML = '';
@@ -9938,7 +9954,7 @@ function kdBuildTask(rec, card, task) {
   // Deduplicate locations silently
   task.locations = [...new Set(task.locations)];
   const el = document.createElement('div');
-  el.className = 'kd-task' + (task.urgent ? ' urgent' : ''); el.dataset.taskId = task.id;
+  el.className = 'kd-task' + (task.urgent ? ' urgent' : '') + (task.done ? ' done-task' : ''); el.dataset.taskId = task.id;
 
   // Supplier color stripe on left border (always, even when urgent)
   const _prof = (appState.profese || []).find(p => p.name === task.sub);
@@ -10034,6 +10050,14 @@ function kdBuildTask(rec, card, task) {
   urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
   ctrl.appendChild(urgBtn);
 
+  // Done toggle
+  const doneBtn = document.createElement('button');
+  doneBtn.className = 'kd-task-done-btn' + (task.done ? ' on' : '');
+  doneBtn.title = task.done ? 'Splněno – kliknutím zrušit' : 'Označit jako splněno';
+  doneBtn.textContent = '✓';
+  doneBtn.onclick = () => { task.done = !task.done; kdSave(); kdRenderContent(); };
+  ctrl.appendChild(doneBtn);
+
   // Delete
   const delBtn = document.createElement('button');
   delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol'; delBtn.innerHTML = '✕';
@@ -10051,7 +10075,7 @@ function kdAddCard(rec) {
 }
 
 function kdAddTask(rec, card) {
-  const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false };
+  const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false };
   card.tasks.push(task); kdSave(); kdRenderContent();
   setTimeout(() => { const t = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`); if (t) t.focus(); }, 60);
 }
@@ -10145,8 +10169,9 @@ function kdSetupPage() {
   document.getElementById('kdf-from').addEventListener('change', e => { _kdFilter.dateFrom = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-to').addEventListener('change', e => { _kdFilter.dateTo = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-urgent').addEventListener('change', e => { _kdFilter.urgent = e.target.checked; kdRenderContent(); });
+  document.getElementById('kdf-done').addEventListener('change', e => { _kdFilter.showDone = e.target.checked; kdRenderContent(); });
   document.getElementById('kdf-reset').addEventListener('click', () => {
-    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
+    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
     kdRenderContent();
   });
   // Ctrl+scroll to zoom the entire cards area (font size, spacing, everything)
@@ -10621,6 +10646,9 @@ async function openProject(proj) {
     rebuildProfeseSelects();
     if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
     setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
+    // Re-render KD if already open so supplier chips appear with fresh profese data
+    const _kdP = document.getElementById('kd-page');
+    if (_kdP && _kdP.classList.contains('visible')) kdRenderContent();
   } else {
     loadState(); // fallback na localStorage
   }
