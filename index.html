@@ -3978,7 +3978,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div class="pdf-section-title">Obsah exportu</div>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
-        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové úkoly</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd" checked> Zahrnout záznamy z kontrolního dne</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové/splněné úkoly</label>
       </div>
     </div>
     <div id="pdf-export-footer">
@@ -8655,15 +8656,191 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
   }
 }
 
+// ── KD record page (one page per record) ────────────────────────────────────
+function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
+  const PT_MM = 72 / 25.4;
+  const textW = (t, fspt) => pdf.getStringUnitWidth(csText(t)) * fspt / PT_MM;
+  const fitT  = (t, fspt, maxW) => {
+    let s = csText(String(t || ''));
+    if (textW(s, fspt) <= maxW) return s;
+    while (s.length > 1 && textW(s + '...', fspt) > maxW) s = s.slice(0, -1);
+    return s + '...';
+  };
+  const kdFmt = iso => { if (!iso) return null; const p = iso.split('-'); return p.length===3?`${parseInt(p[2])}.${parseInt(p[1])}`:null; };
+
+  // ── Page header ─────────────────────────────────────────────────────────────
+  pdf.setFillColor(255,255,255); pdf.rect(0,0,PW,11,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
+  const _logoH = 7.5, _logoW = _logoH * (943/840), _logoX = 1.5, _logoY = (11-_logoH)/2;
+  if (pdfLogo) pdf.addImage(pdfLogo,'PNG',_logoX,_logoY,_logoW,_logoH);
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+  pdf.text('BeSix Plans', _logoX+_logoW+1.5, 7.5);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+  pdf.text(csText(currentProject?.name||''), 38, 7.5);
+  const recDateFmt = rec.date ? rec.date.split('-').reverse().join('.') : '–';
+  pdf.setTextColor(120,125,115);
+  pdf.text(csText('Kontrolni den '+recDateFmt), PW-82, 7.5);
+  pdf.text(new Date().toLocaleDateString('cs-CZ'), PW-22, 7.5);
+
+  // ── Content box ─────────────────────────────────────────────────────────────
+  const lx=4, ly=13, lw=PW-8, lh=PH-ly-4;
+  pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.15); pdf.rect(lx,ly,lw,lh,'S');
+
+  // ── Title bar ───────────────────────────────────────────────────────────────
+  const TITLE_H=8;
+  pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TITLE_H,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(7); pdf.setTextColor(55,80,30);
+  pdf.text('KONTROLNI DEN', lx+lw*0.015, ly+TITLE_H*0.70);
+
+  // Gather tasks
+  const allTasks=[];
+  (rec.cards||[]).forEach(card=>(card.tasks||[]).forEach(task=>allTasks.push({...task,sectionTitle:card.title||''})));
+  const visible = allTasks.filter(t=>inclDone||!t.done);
+  const urgCnt = visible.filter(t=>t.urgent).length;
+  const doneCnt = allTasks.filter(t=>t.done).length;
+
+  // Badges
+  const BPAD=1, BH=4.5; let bx=lx+lw*0.22;
+  const bby=ly+(TITLE_H-BH)/2;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(5);
+  const drawBadge=(label,fillRgb,strokeRgb)=>{
+    const lb=csText(label), bw=textW(lb,5)+BPAD*2;
+    pdf.setFillColor(...fillRgb); pdf.roundedRect(bx,bby,bw,BH,0.8,0.8,'F');
+    pdf.setDrawColor(...strokeRgb); pdf.setLineWidth(0.15); pdf.roundedRect(bx,bby,bw,BH,0.8,0.8,'S');
+    pdf.setTextColor(...strokeRgb); pdf.text(lb,bx+BPAD,bby+BH*0.72);
+    bx+=bw+1.5;
+  };
+  if (urgCnt>0) drawBadge(urgCnt+' urgent.',[255,220,220],[239,68,68]);
+  drawBadge(visible.length+' ukolu',[238,242,230],[107,124,58]);
+  if (!inclDone && doneCnt>0) drawBadge(doneCnt+' hotovo',[220,242,230],[34,197,94]);
+
+  // Note (right side of title bar)
+  if (rec.note&&rec.note.trim()) {
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
+    const nw=lw*0.3; pdf.text(fitT(rec.note,5,nw), lx+lw-nw-1, ly+TITLE_H*0.70);
+  }
+
+  // ── Column headers ──────────────────────────────────────────────────────────
+  const COLH_H=5, colBaseY=ly+TITLE_H+COLH_H-0.8;
+  const DOT_X=lx+0.006*lw, DOT_R=0.7;
+  const C_SEC=lx+0.020*lw, C_SUB=lx+0.175*lw, C_TASK=lx+0.320*lw, C_DATE=lx+0.725*lw, C_LOC=lx+0.860*lw;
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
+  pdf.text('Sekce',C_SEC,colBaseY); pdf.text('Dodavatel',C_SUB,colBaseY);
+  pdf.text(csText('Úkol'),C_TASK,colBaseY); pdf.text(csText('Termín'),C_DATE,colBaseY); pdf.text('Lokace',C_LOC,colBaseY);
+  pdf.setDrawColor(195,200,188); pdf.setLineWidth(0.2);
+  pdf.line(lx,ly+TITLE_H+COLH_H,lx+lw,ly+TITLE_H+COLH_H);
+
+  // ── Sort tasks ──────────────────────────────────────────────────────────────
+  const getSupName=sub=>{if(!sub)return'';const p=(appState.profese||[]).find(x=>x.name===sub);return(p?.firma||p?.name||sub).toLowerCase();};
+  const urgentTasks=visible.filter(t=>t.urgent).sort((a,b)=>getSupName(a.sub).localeCompare(getSupName(b.sub),'cs'));
+  const normalTasks=visible.filter(t=>!t.urgent).sort((a,b)=>{
+    const sc=csText(a.sectionTitle||'').toLowerCase().localeCompare(csText(b.sectionTitle||'').toLowerCase(),'cs');
+    return sc!==0?sc:getSupName(a.sub).localeCompare(getSupName(b.sub),'cs');
+  });
+
+  // Build render item list
+  const items=[];
+  if (urgentTasks.length>0){items.push({type:'urgent-header'});urgentTasks.forEach(t=>items.push({type:'task',task:t}));}
+  let lastSec=null;
+  normalTasks.forEach(t=>{
+    if(t.sectionTitle!==lastSec){items.push({type:'section-header',title:t.sectionTitle});lastSec=t.sectionTitle;}
+    items.push({type:'task',task:t});
+  });
+
+  // ── Two-pass layout ─────────────────────────────────────────────────────────
+  const ROWS_START=ly+TITLE_H+COLH_H+0.5, availH=lh-(ROWS_START-ly)-1;
+  const taskTextMaxW=C_DATE-C_TASK-1, SHEADER_H=4.5;
+
+  const getTaskLines=(text,fspt)=>{
+    const segs=csText(text||'').split('\n'),out=[];
+    for(const seg of segs){const s=seg.trim();if(!s)continue;const words=s.split(' ');let cur='';
+      for(const w of words){const t=cur?cur+' '+w:w;if(textW(t,fspt)<=taskTextMaxW)cur=t;else{if(cur)out.push(cur);cur=w;}}if(cur)out.push(cur);}
+    return out.length?out:[''];
+  };
+  const computeLayout=fspt=>{const LH=fspt/PT_MM*1.55;return items.map(item=>{
+    if(item.type!=='task')return{item,rowH:SHEADER_H,lines:null};
+    const lines=getTaskLines(item.task.text,fspt);return{item,rowH:LH*lines.length+LH*0.4,lines};
+  });};
+
+  const sectionCount=items.filter(i=>i.type!=='task').length;
+  let rowFS=Math.max(3,Math.min(5,Math.round(availH/Math.max(1,visible.length+sectionCount)/1.7*PT_MM)));
+  let layout=computeLayout(rowFS);
+  if(layout.reduce((s,r)=>s+r.rowH,0)>availH&&rowFS>3){rowFS--;layout=computeLayout(rowFS);}
+
+  // ── Render rows ─────────────────────────────────────────────────────────────
+  let curY=ROWS_START;
+  for(const{item,rowH,lines}of layout){
+    if(curY+rowH>ly+lh-0.5)break;
+
+    if(item.type==='urgent-header'){
+      pdf.setFillColor(255,232,232);pdf.rect(lx,curY,lw,rowH,'F');
+      pdf.setFillColor(239,68,68);pdf.rect(lx,curY,1.5,rowH,'F');
+      pdf.setFont('helvetica','bold');pdf.setFontSize(4.5);pdf.setTextColor(180,40,40);
+      pdf.text(csText('URGENTNÍ'),C_SEC,curY+rowH*0.72);
+      pdf.setDrawColor(239,120,120);pdf.setLineWidth(0.15);pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
+      curY+=rowH;continue;
+    }
+    if(item.type==='section-header'){
+      pdf.setFillColor(240,243,235);pdf.rect(lx,curY,lw,rowH,'F');
+      pdf.setFillColor(107,124,58);pdf.rect(lx,curY,1.5,rowH,'F');
+      pdf.setFont('helvetica','bold');pdf.setFontSize(4.5);pdf.setTextColor(55,80,30);
+      pdf.text(fitT(csText(item.title||'–'),4.5,lw*0.5),C_SEC,curY+rowH*0.72);
+      pdf.setDrawColor(185,195,160);pdf.setLineWidth(0.15);pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
+      curY+=rowH;continue;
+    }
+
+    // Task row
+    const task=item.task, isUrgent=task.urgent;
+    const profObj=(appState.profese||[]).find(p=>p.name===task.sub);
+    const pRgb=hexToRgb(profObj?.color||'#888888');
+    const LH=rowFS/PT_MM*1.55, tY1=curY+LH*0.8;
+
+    if(isUrgent){pdf.setFillColor(255,246,246);pdf.rect(lx,curY,lw,rowH,'F');pdf.setFillColor(239,68,68);pdf.rect(lx,curY,0.8,rowH,'F');}
+
+    // Supplier color dot
+    pdf.setFillColor(...pRgb);pdf.circle(DOT_X+DOT_R,tY1-LH*0.28,DOT_R,'F');
+
+    // Section (shown in urgent rows so user knows origin)
+    if(isUrgent){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(Math.max(3,rowFS-1));pdf.setTextColor(160,60,60);
+      pdf.text(fitT(csText(task.sectionTitle||''),Math.max(3,rowFS-1),C_SUB-C_SEC-0.5),C_SEC,tY1);
+    }
+
+    // Supplier name
+    pdf.setFont('helvetica','normal');pdf.setFontSize(rowFS);pdf.setTextColor(...pRgb);
+    pdf.text(fitT(csText(profObj?.firma||profObj?.name||task.sub||'–'),rowFS,C_TASK-C_SUB-0.5),C_SUB,tY1);
+
+    // Task text (wrapped)
+    pdf.setTextColor(isUrgent?160:50,isUrgent?40:55,isUrgent?40:45);
+    (lines||['']).forEach((line,li)=>{const ty=curY+LH*li+LH*0.8;if(ty>curY+rowH-0.1)return;pdf.text(line,C_TASK,ty);});
+
+    // Dates
+    const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
+    const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
+    const tFS=Math.max(3,rowFS-1);
+    pdf.setFontSize(tFS);pdf.setTextColor(isUrgent?140:90,isUrgent?80:105,isUrgent?20:75);
+    pdf.text(fitT(ts,tFS,C_LOC-C_DATE-0.5),C_DATE,tY1);
+
+    // Locations
+    pdf.setFontSize(tFS);pdf.setTextColor(isUrgent?130:100,isUrgent?70:115,isUrgent?70:120);
+    pdf.text(fitT((task.locations||[]).join(', '),tFS,lx+lw-C_LOC-0.5),C_LOC,tY1);
+
+    pdf.setDrawColor(210,215,205);pdf.setLineWidth(0.1);pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
+    curY+=rowH;
+  }
+}
+
 async function doExportPDF() {
   if (!window.jspdf) { showToast('jsPDF se nenačetlo', 'error'); return; }
 
   const includeDrawing = document.getElementById('pdf-opt-drawing').checked;
   const includeList    = document.getElementById('pdf-opt-list').checked;
-  if (!includeDrawing && !includeList) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
+  const includeKD      = document.getElementById('pdf-opt-kd').checked;
+  if (!includeDrawing && !includeList && !includeKD) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
 
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
-  if (levelIdxs.length === 0) { showToast('Vyber alespoň jedno patro', 'error'); return; }
+  if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
 
   const allProf = document.getElementById('pdf-all-profese').checked;
   const profeseFilter = allProf ? [] : [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
@@ -8783,6 +8960,19 @@ async function doExportPDF() {
         }
       } else if (includeList) {
         drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
+      }
+    }
+
+    // ── KD pages (one per record, sorted newest first) ──────────────────────
+    if (includeKD && kdRecords.length > 0) {
+      const sortedKdRecs = [...kdRecords]
+        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
+      for (const rec of sortedKdRecs) {
+        const hasVisible = (rec.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done));
+        if (!hasVisible) continue;
+        if (!first) pdf.addPage();
+        first = false;
+        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
       }
     }
 
