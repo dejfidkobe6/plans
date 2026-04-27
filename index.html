@@ -7946,6 +7946,7 @@ function atblRebuildThead() {
 }
 
 function openAnotacePage() {
+  closeKDPage();
   saveCurrentLevel();
   populateAnotaceFilters();
   renderAnotacePage();
@@ -8185,6 +8186,7 @@ function setupAnnotEditModal() {
 // ============================================================
 function openPDFExport() {
   if (!currentProject) { showToast('Nejdříve otevři projekt', 'error'); return; }
+  closeKDPage(); closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
 
   const levelsEl = document.getElementById('pdf-export-levels');
   levelsEl.innerHTML = appState.levels.map((l, i) =>
@@ -9763,12 +9765,21 @@ function toggleKDPage() {
     page.classList.remove('visible'); btn.classList.remove('active');
     kdCloseAllPops();
   } else {
-    closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false);
+    closeAnotacePage(); toggleHomePage(false); toggleUsersPage(false); closePDFExport();
     kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
-    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false };
+    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
     kdRenderPage();
+  }
+}
+
+function closeKDPage() {
+  const page = document.getElementById('kd-page');
+  const btn  = document.getElementById('kd-btn');
+  if (page && page.classList.contains('visible')) {
+    page.classList.remove('visible'); btn && btn.classList.remove('active');
+    kdCloseAllPops();
   }
 }
 
@@ -10191,7 +10202,7 @@ function toggleHomePage(forceState) {
   const hp = document.getElementById('home-page');
   const btn = document.getElementById('subddodavatele-btn');
   if (forceState === true) {
-    closeAnotacePage(); toggleUsersPage(false); kdCloseAllPops();
+    closeAnotacePage(); toggleUsersPage(false); closeKDPage();
     hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
   } else if (forceState === false) {
     hp.classList.remove('visible'); btn.classList.remove('active');
@@ -10200,7 +10211,7 @@ function toggleHomePage(forceState) {
     if (isVisible) {
       hp.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      closeAnotacePage(); toggleUsersPage(false); kdCloseAllPops();
+      closeAnotacePage(); toggleUsersPage(false); closeKDPage();
       hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
     }
   }
@@ -10210,7 +10221,7 @@ function toggleUsersPage(forceState) {
   const up = document.getElementById('users-page');
   const btn = document.getElementById('users-mgmt-btn');
   if (forceState === true) {
-    closeAnotacePage(); toggleHomePage(false); kdCloseAllPops();
+    closeAnotacePage(); toggleHomePage(false); closeKDPage();
     up.classList.add('visible'); btn.classList.add('active'); loadMembers();
   } else if (forceState === false) {
     up.classList.remove('visible'); btn.classList.remove('active');
@@ -10219,7 +10230,7 @@ function toggleUsersPage(forceState) {
     if (isVisible) {
       up.classList.remove('visible'); btn.classList.remove('active');
     } else {
-      closeAnotacePage(); toggleHomePage(false); kdCloseAllPops();
+      closeAnotacePage(); toggleHomePage(false); closeKDPage();
       up.classList.add('visible'); btn.classList.add('active'); loadMembers();
     }
   }
