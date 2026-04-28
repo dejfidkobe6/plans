@@ -4596,7 +4596,7 @@ async function loadImage(file, levelIdx) {
   });
 }
 
-function loadBackgroundImage(dataUrl, fit, onDone) {
+function loadBackgroundImage(dataUrl, fit, onDone, beforeSave) {
   fabric.Image.fromURL(dataUrl, (img) => {
     const level = appState.levels[appState.activeLevel];
     const cw = fabricCanvas.getWidth();
@@ -4628,6 +4628,7 @@ function loadBackgroundImage(dataUrl, fit, onDone) {
     fabricCanvas.renderAll();
     showDropZone(false);
     _isProjectLoading = false; // loading complete – saves are now allowed
+    if (beforeSave) beforeSave(img); // e.g. reposition annotations after crop
     saveCurrentLevel();
     if (onDone) onDone();
   });
@@ -4861,12 +4862,39 @@ async function confirmCrop() {
     img.src = srcUrl;
   });
 
+  // Capture old background params before replacing
+  const oldBgLeft = bgObj.left, oldBgTop = bgObj.top;
+  const oldBgSX   = bgObj.scaleX, oldBgSY = bgObj.scaleY;
+
   level.backgroundImage = croppedUrl;
   level.backgroundImageOriginal = croppedUrl;
   level.drawingAdjust = { brightness: 0, contrast: 0, grayscale: false };
   exitCropMode();
-  loadBackgroundImage(croppedUrl, true);
-  saveCurrentLevel();
+
+  // Load new background; beforeSave callback repositions all annotations
+  // then loadBackgroundImage calls saveCurrentLevel() once with correct state.
+  loadBackgroundImage(croppedUrl, true, null, (newBgImg) => {
+    const newBgLeft = newBgImg.left, newBgTop = newBgImg.top;
+    const newBgSX   = newBgImg.scaleX, newBgSY = newBgImg.scaleY;
+    const ratioX = newBgSX / oldBgSX;
+    const ratioY = newBgSY / oldBgSY;
+
+    fabricCanvas.getObjects().forEach(obj => {
+      if (obj.isBackground) return;
+      // Transform position: canvas → old-image → cropped-image → new canvas
+      const newLeft = (obj.left - oldBgLeft - cX * oldBgSX) * ratioX + newBgLeft;
+      const newTop  = (obj.top  - oldBgTop  - cY * oldBgSY) * ratioY + newBgTop;
+      obj.set({
+        left:   newLeft,
+        top:    newTop,
+        scaleX: obj.scaleX * ratioX,
+        scaleY: obj.scaleY * ratioY,
+      });
+      obj.setCoords();
+    });
+    fabricCanvas.renderAll();
+  });
+
   showToast('Výkres oříznut', 'success');
 }
 
