@@ -8861,7 +8861,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
 
   // Only suppliers that have a firma filled in, sorted alphabetically
   const suppliers = (appState.profese || [])
-    .filter(p => (p.firma || '').trim())
+    .slice()
     .sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
 
   // ── Page header (shared with KD pages) ─────────────────────
