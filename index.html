@@ -11715,22 +11715,31 @@ async function _pollLiveSync() {
     remoteLevels.forEach((remLvl, i) => {
       if (i === appState.activeLevel) return; // never overwrite active level
       if (!appState.levels[i]) return;
-      appState.levels[i].fabricJSON   = remLvl.fabricJSON;
-      appState.levels[i].annotations  = remLvl.annotations;
-      appState.levels[i].bgServerUrl  = remLvl.bgServerUrl || appState.levels[i].bgServerUrl;
-      appState.levels[i].bgLeft       = remLvl.bgLeft;
-      appState.levels[i].bgTop        = remLvl.bgTop;
-      appState.levels[i].bgScaleX     = remLvl.bgScaleX;
-      appState.levels[i].bgScaleY     = remLvl.bgScaleY;
+      // Detect background replacement (crop) before overwriting the stored URL
+      const bgChanged = remLvl.bgServerUrl && remLvl.bgServerUrl !== appState.levels[i].bgServerUrl;
+      appState.levels[i].fabricJSON       = remLvl.fabricJSON;
+      appState.levels[i].annotations      = remLvl.annotations;
+      appState.levels[i].bgServerUrl      = remLvl.bgServerUrl     || appState.levels[i].bgServerUrl;
+      appState.levels[i].bgOrigServerUrl  = remLvl.bgOrigServerUrl || appState.levels[i].bgOrigServerUrl;
+      appState.levels[i].bgLeft           = remLvl.bgLeft;
+      appState.levels[i].bgTop            = remLvl.bgTop;
+      appState.levels[i].bgScaleX         = remLvl.bgScaleX;
+      appState.levels[i].bgScaleY         = remLvl.bgScaleY;
+      if (bgChanged) {
+        // Clear locally cached image so switchLevel fetches the new (cropped) URL from server
+        appState.levels[i].backgroundImage         = null;
+        appState.levels[i].backgroundImageOriginal = null;
+      }
       changed = true;
     });
 
     if (serverData.counter > annotIdCounter) annotIdCounter = serverData.counter;
 
-    // Active level: silently merge new annotations, show badge only for structural changes
+    // Active level: silently merge new annotations; show badge when background changed or count differs
     const remActive = remoteLevels[appState.activeLevel];
     const locActive = appState.levels[appState.activeLevel];
     if (remActive) {
+      const bgChanged = remActive.bgServerUrl && remActive.bgServerUrl !== locActive?.bgServerUrl;
       const localIds  = new Set((locActive?.annotations || []).map(a => a.annotId));
       const serverOnlyObjs = (remActive.fabricJSON?.objects || [])
         .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor && !localIds.has(o.annotId));
@@ -11738,8 +11747,13 @@ async function _pollLiveSync() {
         // Merge new annotations silently into active canvas
         _applyServerAdded([{ levelId: remActive.id, objects: serverOnlyObjs }]);
         changed = true;
-      } else {
-        // Structural changes (deletions, edits) – prompt user to reload
+      }
+      // Show badge when background was replaced (crop) or annotation count differs (deletions/edits)
+      if (bgChanged) {
+        _syncPending = true;
+        const si = document.getElementById('status-sync-info');
+        if (si) si.style.display = '';
+      } else if (!serverOnlyObjs.length) {
         const remoteAnnotCount = (remActive.annotations || []).length;
         const localAnnotCount  = (locActive?.annotations || []).length;
         if (remoteAnnotCount !== localAnnotCount) {
@@ -11788,8 +11802,21 @@ document.getElementById('status-sync-info').addEventListener('click', async () =
   if (!serverData) return;
   const remLvl = (serverData.state.levels || [])[appState.activeLevel];
   if (!remLvl) return;
-  appState.levels[appState.activeLevel].fabricJSON  = remLvl.fabricJSON;
-  appState.levels[appState.activeLevel].annotations = remLvl.annotations;
+  const lvl = appState.levels[appState.activeLevel];
+  const bgChanged = remLvl.bgServerUrl && remLvl.bgServerUrl !== lvl?.bgServerUrl;
+  lvl.fabricJSON        = remLvl.fabricJSON;
+  lvl.annotations       = remLvl.annotations;
+  lvl.bgLeft            = remLvl.bgLeft;
+  lvl.bgTop             = remLvl.bgTop;
+  lvl.bgScaleX          = remLvl.bgScaleX;
+  lvl.bgScaleY          = remLvl.bgScaleY;
+  lvl.bgServerUrl       = remLvl.bgServerUrl      || lvl.bgServerUrl;
+  lvl.bgOrigServerUrl   = remLvl.bgOrigServerUrl  || lvl.bgOrigServerUrl;
+  if (bgChanged) {
+    // Background was replaced (crop) – point to the new server image
+    lvl.backgroundImage         = remLvl.bgServerUrl;
+    lvl.backgroundImageOriginal = remLvl.bgOrigServerUrl || remLvl.bgServerUrl;
+  }
   _isProjectLoading = true;
   switchLevel(appState.activeLevel);
   setTimeout(() => { _isProjectLoading = false; }, 8000);
