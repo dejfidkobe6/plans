@@ -8952,17 +8952,17 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const rowY = curY;
     if (rowY + ROW_H > ly + lh) return; // overflow guard
 
-    // Alternating row background
-    if (i % 2 === 0) {
-      pdf.setFillColor(249, 251, 246);
-      pdf.rect(lx, rowY, lw, ROW_H, 'F');
-    }
-
-    // Supplier color stripe
+    // Supplier color
     const [r, g, b] = (() => {
       const hex = (p.color || '#888888').replace('#', '');
       return [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
     })();
+
+    // Full-row light tint background (15% color + 85% white)
+    pdf.setFillColor(Math.round(r * 0.15 + 255 * 0.85), Math.round(g * 0.15 + 255 * 0.85), Math.round(b * 0.15 + 255 * 0.85));
+    pdf.rect(lx, rowY, lw, ROW_H, 'F');
+
+    // Full-color left accent stripe
     pdf.setFillColor(r, g, b);
     pdf.rect(lx, rowY, 1.8, ROW_H, 'F');
 
