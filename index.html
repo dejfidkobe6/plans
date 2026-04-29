@@ -8205,6 +8205,11 @@ function updateAnnotStatusFromAnotacePage(annotId, levelIdx, newStatus) {
       updateAnnotList();
     }
   } else {
+    // Also patch fabricJSON.objects — this is what the server stores and the canvas loads
+    if (level && level.fabricJSON && Array.isArray(level.fabricJSON.objects)) {
+      const fabObj = level.fabricJSON.objects.find(o => o.annotId === annotId);
+      if (fabObj) fabObj.status = newStatus;
+    }
     saveState();
   }
   renderAnotacePage();
@@ -8276,6 +8281,19 @@ function saveAnnotEdit() {
     saveCurrentLevel();
     updateAnnotList();
   } else {
+    // Patch fabricJSON.objects — this is what the server stores and the canvas loads
+    if (level.fabricJSON && Array.isArray(level.fabricJSON.objects)) {
+      const fabObj = level.fabricJSON.objects.find(o => o.annotId === annotId);
+      if (fabObj) {
+        fabObj.profese   = ann.profese;
+        fabObj.popisek   = ann.popisek;
+        fabObj.priorita  = ann.priorita;
+        fabObj.status    = ann.status;
+        fabObj.prirazeno = ann.prirazeno;
+        fabObj.deadline  = ann.deadline;
+        fabObj.dateFrom  = ann.dateFrom;
+      }
+    }
     saveState();
   }
 
