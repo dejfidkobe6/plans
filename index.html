@@ -8943,15 +8943,18 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
     return out.length?out:[''];
   };
 
-  // Build item list: urgent block first, then chapters in app order
+  // Build item list: per chapter — urgent tasks first, then sections in app order
   const items=[];
-  const urgentTasks=visible.filter(t=>t.urgent).sort((a,b)=>getSupName(a.sub).localeCompare(getSupName(b.sub),'cs'));
-  if (urgentTasks.length>0) {
-    items.push({type:'urgent-header'});
-    urgentTasks.forEach(t=>items.push({type:'task',task:t}));
-  }
   (rec.chapters||[]).forEach(ch=>{
+    const chUrgent=(ch.cards||[]).flatMap(card=>
+      (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.urgent)
+        .map(t=>({...t,sectionTitle:card.title||'',chapterTitle:ch.title||''}))
+    );
     const chItems=[];
+    if (chUrgent.length>0) {
+      chItems.push({type:'urgent-header'});
+      chUrgent.forEach(t=>chItems.push({type:'task',task:t}));
+    }
     (ch.cards||[]).forEach(card=>{
       const cardTasks=(card.tasks||[]).filter(t=>(inclDone||!t.done)&&!t.urgent);
       if (!cardTasks.length) return;
