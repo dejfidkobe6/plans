@@ -925,12 +925,12 @@ option { background: var(--card); color: var(--text); }
 .status-btn.active-hotovo { background: rgba(16,185,129,0.2); border-color: #10B981; color: #10B981; }
 .status-btn.active-urgence { background: rgba(239,68,68,0.2); border-color: #EF4444; color: #EF4444; }
 
-/* DELETE BTN */
-#delete-annot-btn {
+/* MARK DONE BTN */
+#mark-done-annot-btn {
   width: 100%;
-  background: rgba(239,68,68,0.15);
-  border: 1px solid rgba(239,68,68,0.4);
-  color: #EF4444;
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.35);
+  color: #10B981;
   font-family: var(--font-main);
   font-size: 13px;
   font-weight: 600;
@@ -940,7 +940,7 @@ option { background: var(--card); color: var(--text); }
   margin-top: 8px;
   transition: background 0.15s;
 }
-#delete-annot-btn:hover { background: rgba(239,68,68,0.3); }
+#mark-done-annot-btn:hover { background: rgba(16,185,129,0.25); }
 
 /* STATUS BAR */
 #status-bar {
@@ -3009,8 +3009,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .prop-section-body { padding: 4px 0 8px; }
 .prop-section-body .field-group { padding: 6px 12px 0; }
 .prop-section-body .field-group:first-child { padding-top: 6px; }
-/* Delete button outside sections */
-#delete-annot-btn {
+/* Mark done button outside sections */
+#mark-done-annot-btn {
   display: block;
   width: calc(100% - 24px);
   margin: 10px 12px 12px;
@@ -3611,7 +3611,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
           </div>
         </details>
 
-        <button id="delete-annot-btn">🗑 Smazat anotaci</button>
+        <button id="mark-done-annot-btn" title="Označit anotaci jako hotovou (skryje ji)">✓ Označit jako hotové</button>
       </div>
     </div>
   </div>
@@ -3823,6 +3823,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <button id="kd-close-btn" title="Zavřít">×</button>
     </div>
     <button id="kd-new-record-btn">+ Nový záznam</button>
+    <button id="kd-toggle-done-btn" title="Zobrazit/skrýt splněné úkoly" style="font-size:11px;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);cursor:pointer;white-space:nowrap;width:100%;margin-bottom:4px;">✓ Hotové úkoly</button>
     <div id="kd-record-list"></div>
     <div id="kd-chapters-section">
       <div class="kd-backup-title">Kapitoly</div>
@@ -3961,9 +3962,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     Vložit
   </div>
   <div class="ctx-sep"></div>
-  <div class="ctx-item danger" id="ctx-delete">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-    Smazat
+  <div class="ctx-item" id="ctx-mark-done">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+    Označit jako hotové
   </div>
 </div>
 
@@ -6291,8 +6292,24 @@ function setupEventListeners() {
   document.getElementById('prop-profese').addEventListener('change', () => updateActiveAnnotProp('profese', document.getElementById('prop-profese').value));
   document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
   document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
-  document.getElementById('prop-deadline').addEventListener('change', () => updateActiveAnnotProp('deadline', document.getElementById('prop-deadline').value));
-  document.getElementById('prop-date-from').addEventListener('change', () => updateActiveAnnotProp('dateFrom', document.getElementById('prop-date-from').value));
+  document.getElementById('prop-date-from').addEventListener('change', () => {
+    const from = document.getElementById('prop-date-from').value;
+    const to   = document.getElementById('prop-deadline').value;
+    if (from && to && from > to) {
+      document.getElementById('prop-deadline').value = from;
+      updateActiveAnnotProp('deadline', from);
+    }
+    updateActiveAnnotProp('dateFrom', from);
+  });
+  document.getElementById('prop-deadline').addEventListener('change', () => {
+    const to   = document.getElementById('prop-deadline').value;
+    const from = document.getElementById('prop-date-from').value;
+    if (to && from && to < from) {
+      document.getElementById('prop-date-from').value = to;
+      updateActiveAnnotProp('dateFrom', to);
+    }
+    updateActiveAnnotProp('deadline', to);
+  });
 
   document.querySelectorAll('.prio-btn').forEach(btn => {
     btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
@@ -6301,7 +6318,10 @@ function setupEventListeners() {
     btn.addEventListener('click', () => updateActiveAnnotProp('status', btn.dataset.status));
   });
 
-  document.getElementById('delete-annot-btn').addEventListener('click', deleteActiveAnnot);
+  document.getElementById('mark-done-annot-btn').addEventListener('click', () => {
+    const obj = fabricCanvas.getActiveObject();
+    if (obj && !obj.isBackground && obj.annotId) _markAnnotAsDone(obj);
+  });
 
   // Filters
   document.getElementById('filter-profese').addEventListener('change', (e) => { filterProfese = e.target.value; updateAnnotList(); });
@@ -6313,7 +6333,7 @@ function setupEventListeners() {
   });
 
   // Context menu
-  document.getElementById('ctx-delete').addEventListener('click', () => { hideContextMenu(); deleteContextAnnot(); });
+  document.getElementById('ctx-mark-done').addEventListener('click', () => { hideContextMenu(); if (contextMenuTarget && !contextMenuTarget.isBackground && contextMenuTarget.annotId) _markAnnotAsDone(contextMenuTarget); });
   document.getElementById('ctx-copy').addEventListener('click', () => { hideContextMenu(); copySelected(); });
   document.getElementById('ctx-paste').addEventListener('click', () => { hideContextMenu(); pasteSelected(); });
   document.getElementById('ctx-select').addEventListener('click', () => { hideContextMenu(); if (contextMenuTarget) { fabricCanvas.setActiveObject(contextMenuTarget); fabricCanvas.renderAll(); } });
@@ -6434,11 +6454,8 @@ function onKeyDown(e) {
   if (e.key === 'g' || e.key === 'G') toggleGrid();
   if (e.key === 'Delete' || e.key === 'Backspace') {
     const active = fabricCanvas.getActiveObject();
-    if (active && !active.isBackground) {
-      const lbl = findLabel(active.annotId);
-      if (lbl) fabricCanvas.remove(lbl);
-      fabricCanvas.remove(active);
-      pushUndoState(); updateAnnotList(); saveCurrentLevel(); deselectAnnot();
+    if (active && !active.isBackground && active.annotId) {
+      _markAnnotAsDone(active);
     }
   }
   if (e.key === 'Escape') {
@@ -6617,27 +6634,16 @@ function deselectAnnot() {
   document.getElementById('prop-form').style.display = 'none';
 }
 
-function deleteActiveAnnot() {
-  const obj = fabricCanvas.getActiveObject();
-  if (!obj || obj.isBackground) return;
-  const lbl = findLabel(obj.annotId);
-  if (lbl) fabricCanvas.remove(lbl);
-  fabricCanvas.remove(obj);
-  pushUndoState();
-  updateAnnotList();
+function _markAnnotAsDone(obj) {
+  if (!obj || obj.isBackground || !obj.annotId) return;
+  obj.set('status', 'Hotovo');
+  applyAnnotColorToCanvas(obj);
+  updateLabelFor(obj.annotId);
+  applyStatusButtons('Hotovo');
+  applyHotovoVisibility();
+  fabricCanvas.renderAll();
   saveCurrentLevel();
-  deselectAnnot();
-}
-
-function deleteContextAnnot() {
-  if (!contextMenuTarget || contextMenuTarget.isBackground) return;
-  const lbl = findLabel(contextMenuTarget.annotId);
-  if (lbl) fabricCanvas.remove(lbl);
-  fabricCanvas.remove(contextMenuTarget);
-  pushUndoState();
   updateAnnotList();
-  saveCurrentLevel();
-  deselectAnnot();
 }
 
 // ============================================================
@@ -8266,8 +8272,12 @@ function saveAnnotEdit() {
   ann.priorita  = document.getElementById('ae-priorita').value;
   ann.status    = document.getElementById('ae-status').value;
   ann.prirazeno = document.getElementById('ae-prirazeno').value;
-  ann.deadline  = document.getElementById('ae-deadline').value;
   ann.dateFrom  = document.getElementById('ae-date-from').value;
+  ann.deadline  = document.getElementById('ae-deadline').value;
+  if (ann.dateFrom && ann.deadline && ann.dateFrom > ann.deadline) ann.deadline = ann.dateFrom;
+  if (ann.deadline && ann.dateFrom && ann.deadline < ann.dateFrom) ann.dateFrom = ann.deadline;
+  document.getElementById('ae-date-from').value = ann.dateFrom || '';
+  document.getElementById('ae-deadline').value  = ann.deadline  || '';
 
   // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
   if (levelIdx === appState.activeLevel) {
@@ -10638,11 +10648,21 @@ function kdBuildTask(rec, card, task, isLive) {
     });
     txt.addEventListener('keydown', e => { if (e.key === 'Enter') txt.blur(); });
     wrap.appendChild(txt); wrap.appendChild(picker);
+    // External setter so cross-validation can update the sibling widget
+    wrap._setValue = (newIso) => { iso = newIso; txt.value = kdIsoToDM(newIso); picker.value = newIso || ''; };
     return wrap;
   };
-  const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => { task.dateFrom = v; kdSave(); }) : () => {});
+  const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => {
+    task.dateFrom = v;
+    if (v && task.dateTo && v > task.dateTo) { task.dateTo = v; inpDo._setValue(v); }
+    kdSave();
+  }) : () => {});
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
-  const inpDo = mkDateWidget(task.dateTo, isLive ? (v => { task.dateTo = v; kdSave(); }) : () => {});
+  const inpDo = mkDateWidget(task.dateTo, isLive ? (v => {
+    task.dateTo = v;
+    if (v && task.dateFrom && v < task.dateFrom) { task.dateFrom = v; inpOd._setValue(v); }
+    kdSave();
+  }) : () => {});
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
   ctrl.appendChild(dp);
 
@@ -10866,7 +10886,15 @@ function kdSetupPage() {
   document.getElementById('kdf-from').addEventListener('change', e => { _kdFilter.dateFrom = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-to').addEventListener('change', e => { _kdFilter.dateTo = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-urgent').addEventListener('change', e => { _kdFilter.urgent = e.target.checked; kdRenderContent(); });
-  document.getElementById('kdf-done').addEventListener('change', e => { _kdFilter.showDone = e.target.checked; kdRenderContent(); });
+  document.getElementById('kd-toggle-done-btn').addEventListener('click', () => {
+    _kdFilter.showDone = !_kdFilter.showDone;
+    const btn = document.getElementById('kd-toggle-done-btn');
+    if (btn) { btn.style.opacity = _kdFilter.showDone ? '1' : '0.5'; btn.title = _kdFilter.showDone ? 'Skrýt splněné úkoly' : 'Zobrazit splněné úkoly'; }
+    const cb = document.getElementById('kdf-done');
+    if (cb) cb.checked = _kdFilter.showDone;
+    kdRenderContent();
+  });
+  document.getElementById('kdf-done').addEventListener('change', e => { _kdFilter.showDone = e.target.checked; const btn = document.getElementById('kd-toggle-done-btn'); if (btn) { btn.style.opacity = _kdFilter.showDone ? '1' : '0.5'; } kdRenderContent(); });
   document.getElementById('kdf-reset').addEventListener('click', () => {
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
     kdRenderContent();
