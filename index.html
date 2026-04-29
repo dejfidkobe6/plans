@@ -6292,8 +6292,24 @@ function setupEventListeners() {
   document.getElementById('prop-profese').addEventListener('change', () => updateActiveAnnotProp('profese', document.getElementById('prop-profese').value));
   document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
   document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
-  document.getElementById('prop-deadline').addEventListener('change', () => updateActiveAnnotProp('deadline', document.getElementById('prop-deadline').value));
-  document.getElementById('prop-date-from').addEventListener('change', () => updateActiveAnnotProp('dateFrom', document.getElementById('prop-date-from').value));
+  document.getElementById('prop-date-from').addEventListener('change', () => {
+    const from = document.getElementById('prop-date-from').value;
+    const to   = document.getElementById('prop-deadline').value;
+    if (from && to && from > to) {
+      document.getElementById('prop-deadline').value = from;
+      updateActiveAnnotProp('deadline', from);
+    }
+    updateActiveAnnotProp('dateFrom', from);
+  });
+  document.getElementById('prop-deadline').addEventListener('change', () => {
+    const to   = document.getElementById('prop-deadline').value;
+    const from = document.getElementById('prop-date-from').value;
+    if (to && from && to < from) {
+      document.getElementById('prop-date-from').value = to;
+      updateActiveAnnotProp('dateFrom', to);
+    }
+    updateActiveAnnotProp('deadline', to);
+  });
 
   document.querySelectorAll('.prio-btn').forEach(btn => {
     btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
@@ -8256,8 +8272,12 @@ function saveAnnotEdit() {
   ann.priorita  = document.getElementById('ae-priorita').value;
   ann.status    = document.getElementById('ae-status').value;
   ann.prirazeno = document.getElementById('ae-prirazeno').value;
-  ann.deadline  = document.getElementById('ae-deadline').value;
   ann.dateFrom  = document.getElementById('ae-date-from').value;
+  ann.deadline  = document.getElementById('ae-deadline').value;
+  if (ann.dateFrom && ann.deadline && ann.dateFrom > ann.deadline) ann.deadline = ann.dateFrom;
+  if (ann.deadline && ann.dateFrom && ann.deadline < ann.dateFrom) ann.dateFrom = ann.deadline;
+  document.getElementById('ae-date-from').value = ann.dateFrom || '';
+  document.getElementById('ae-deadline').value  = ann.deadline  || '';
 
   // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
   if (levelIdx === appState.activeLevel) {
@@ -10628,11 +10648,21 @@ function kdBuildTask(rec, card, task, isLive) {
     });
     txt.addEventListener('keydown', e => { if (e.key === 'Enter') txt.blur(); });
     wrap.appendChild(txt); wrap.appendChild(picker);
+    // External setter so cross-validation can update the sibling widget
+    wrap._setValue = (newIso) => { iso = newIso; txt.value = kdIsoToDM(newIso); picker.value = newIso || ''; };
     return wrap;
   };
-  const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => { task.dateFrom = v; kdSave(); }) : () => {});
+  const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => {
+    task.dateFrom = v;
+    if (v && task.dateTo && v > task.dateTo) { task.dateTo = v; inpDo._setValue(v); }
+    kdSave();
+  }) : () => {});
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
-  const inpDo = mkDateWidget(task.dateTo, isLive ? (v => { task.dateTo = v; kdSave(); }) : () => {});
+  const inpDo = mkDateWidget(task.dateTo, isLive ? (v => {
+    task.dateTo = v;
+    if (v && task.dateFrom && v < task.dateFrom) { task.dateFrom = v; inpOd._setValue(v); }
+    kdSave();
+  }) : () => {});
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
   ctrl.appendChild(dp);
 
