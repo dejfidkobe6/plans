@@ -103,7 +103,7 @@ if ($method === 'GET') {
 }
 
 // ============================================================
-// POST – ulož canvas data projektu
+// POST – ulož canvas data projektu s merge (concurrent-safe)
 // Body: { state: {...levels...}, profese: [...], counter: N }
 // ============================================================
 if ($method === 'POST') {
@@ -134,45 +134,171 @@ if ($method === 'POST') {
         unset($lvl);
     }
 
-    // Serializuj JSON – JSON_PARTIAL_OUTPUT_ON_ERROR jako pojistka pro bad UTF-8
-    $stateJson = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-    if ($stateJson === false || $stateJson === 'null') {
-        jsonError('Chyba serializace stavu: ' . json_last_error_msg(), 500);
-    }
-
-    $profeseJson = null;
-    if ($profese !== null) {
-        $profeseJson = json_encode($profese, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-        if ($profeseJson === false) $profeseJson = null;
-    }
-
-    $stateCompressed   = _compress($stateJson);
-    $proteseCompressed = $profeseJson !== null ? _compress($profeseJson) : null;
-
-    // Ověř, že komprimovaná data nejsou prázdná
-    if (empty($stateCompressed)) {
-        jsonError('Komprese selhala – prázdný výsledek', 500);
-    }
-
-    // INSERT nebo UPDATE – explicitní syntax (kompatibilní s MySQL 8.0+)
     $db = getDB();
-    $existing = $db->prepare('SELECT project_id FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
-    $existing->execute([$projectId]);
+    $db->beginTransaction();
 
-    if ($existing->fetch()) {
-        $db->prepare('
-            UPDATE plan_canvas_data
-            SET state_json = ?, profese_json = ?, annot_counter = ?, updated_at = NOW()
-            WHERE project_id = ?
-        ')->execute([$stateCompressed, $proteseCompressed, $counter, $projectId]);
-    } else {
-        $db->prepare('
-            INSERT INTO plan_canvas_data (project_id, state_json, profese_json, annot_counter)
-            VALUES (?, ?, ?, ?)
-        ')->execute([$projectId, $stateCompressed, $proteseCompressed, $counter]);
+    try {
+        // Zamkni řádek – atomická operace (SELECT FOR UPDATE)
+        $stmt = $db->prepare(
+            'SELECT state_json, annot_counter FROM plan_canvas_data WHERE project_id = ? FOR UPDATE'
+        );
+        $stmt->execute([$projectId]);
+        $existingRow = $stmt->fetch();
+
+        // Načti server stav pro merge
+        $serverLevels  = [];
+        $serverCounter = 1;
+        if ($existingRow && $existingRow['state_json']) {
+            $serverState  = json_decode(_decompress($existingRow['state_json']), true);
+            $serverLevels = $serverState['levels'] ?? [];
+            $serverCounter = (int)($existingRow['annot_counter'] ?? 1);
+        }
+
+        // Merge každého levelu – zachová anotace přidané jiným uživatelem
+        $clientLevels = $state['levels'] ?? [];
+        $serverLevelMap = [];
+        foreach ($serverLevels as $sl) {
+            if (!empty($sl['id'])) $serverLevelMap[$sl['id']] = $sl;
+        }
+        $clientLevelMap = [];
+        foreach ($clientLevels as $cl) {
+            if (!empty($cl['id'])) $clientLevelMap[$cl['id']] = $cl;
+        }
+
+        // serverAdded: objekty ze serveru, které klient neměl – vrátíme klientovi
+        $serverAdded = [];
+
+        $mergedLevels = [];
+        foreach ($clientLevels as $cl) {
+            $id = $cl['id'] ?? null;
+            if ($id && isset($serverLevelMap[$id])) {
+                $sl = $serverLevelMap[$id];
+
+                // Merge fabricJSON.objects by annotId
+                $clientObjs = $cl['fabricJSON']['objects'] ?? [];
+                $serverObjs = $sl['fabricJSON']['objects'] ?? [];
+                [$mergedObjs, $serverOnlyObjs] = _mergeCanvasObjects($serverObjs, $clientObjs);
+
+                // Merge annotations by annotId
+                $clientAnnots = $cl['annotations'] ?? [];
+                $serverAnnots = $sl['annotations'] ?? [];
+                [$mergedAnnots] = _mergeCanvasAnnotations($serverAnnots, $clientAnnots);
+
+                $merged = $cl;
+                if (isset($cl['fabricJSON']) && $cl['fabricJSON'] !== null) {
+                    $merged['fabricJSON'] = array_merge($cl['fabricJSON'], ['objects' => $mergedObjs]);
+                }
+                $merged['annotations'] = $mergedAnnots;
+                $mergedLevels[] = $merged;
+
+                if (!empty($serverOnlyObjs)) {
+                    $serverAdded[] = ['levelId' => $id, 'objects' => $serverOnlyObjs];
+                }
+            } else {
+                $mergedLevels[] = $cl;
+            }
+        }
+
+        // Zachovej levely přítomné pouze na serveru (přidal jiný uživatel)
+        foreach ($serverLevels as $sl) {
+            $id = $sl['id'] ?? null;
+            if ($id && !isset($clientLevelMap[$id])) {
+                $mergedLevels[] = $sl;
+            }
+        }
+
+        $mergedState           = $state;
+        $mergedState['levels'] = $mergedLevels;
+        $newCounter            = max($counter, $serverCounter);
+
+        // Serializuj JSON – JSON_PARTIAL_OUTPUT_ON_ERROR jako pojistka pro bad UTF-8
+        $stateJson = json_encode($mergedState, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        if ($stateJson === false || $stateJson === 'null') {
+            $db->rollBack();
+            jsonError('Chyba serializace stavu: ' . json_last_error_msg(), 500);
+        }
+
+        $profeseJson = null;
+        if ($profese !== null) {
+            $profeseJson = json_encode($profese, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+            if ($profeseJson === false) $profeseJson = null;
+        }
+
+        $stateCompressed   = _compress($stateJson);
+        $proteseCompressed = $profeseJson !== null ? _compress($profeseJson) : null;
+
+        if (empty($stateCompressed)) {
+            $db->rollBack();
+            jsonError('Komprese selhala – prázdný výsledek', 500);
+        }
+
+        if ($existingRow) {
+            $db->prepare('
+                UPDATE plan_canvas_data
+                SET state_json = ?, profese_json = ?, annot_counter = ?, updated_at = NOW()
+                WHERE project_id = ?
+            ')->execute([$stateCompressed, $proteseCompressed, $newCounter, $projectId]);
+        } else {
+            $db->prepare('
+                INSERT INTO plan_canvas_data (project_id, state_json, profese_json, annot_counter)
+                VALUES (?, ?, ?, ?)
+            ')->execute([$projectId, $stateCompressed, $proteseCompressed, $newCounter]);
+        }
+
+        $db->commit();
+
+        // Vrať serverAdded klientovi – přidá chybějící anotace do canvasu
+        jsonOk(['saved' => strlen($stateCompressed), 'serverAdded' => $serverAdded, 'counter' => $newCounter]);
+
+    } catch (Exception $e) {
+        $db->rollBack();
+        jsonError('Chyba při ukládání: ' . $e->getMessage(), 500);
+    }
+}
+
+// ============================================================
+// Merge helpers – canvas objects / annotations by annotId
+// server = co je na serveru; client = co posílá klient
+// client vítězí pro shodné annotId (last-write-wins per object)
+// server-only items jsou zachovány (přidal jiný uživatel)
+// Returns: [mergedArray, serverOnlyItems]
+// ============================================================
+function _mergeCanvasObjects(array $serverObjs, array $clientObjs): array {
+    $clientIds = [];
+    foreach ($clientObjs as $o) {
+        $aid = $o['annotId'] ?? null;
+        if ($aid) $clientIds[$aid] = true;
     }
 
-    jsonOk(['saved' => strlen($stateCompressed)]);
+    $merged     = $clientObjs;
+    $serverOnly = [];
+    foreach ($serverObjs as $o) {
+        $aid = $o['annotId'] ?? null;
+        if ($aid && !isset($clientIds[$aid])) {
+            $merged[]     = $o;
+            $serverOnly[] = $o;
+        }
+    }
+    return [$merged, $serverOnly];
+}
+
+function _mergeCanvasAnnotations(array $serverAnnots, array $clientAnnots): array {
+    $clientIds = [];
+    foreach ($clientAnnots as $a) {
+        $aid = $a['annotId'] ?? null;
+        if ($aid) $clientIds[$aid] = true;
+    }
+
+    $merged     = $clientAnnots;
+    $serverOnly = [];
+    foreach ($serverAnnots as $a) {
+        $aid = $a['annotId'] ?? null;
+        if ($aid && !isset($clientIds[$aid])) {
+            $merged[]     = $a;
+            $serverOnly[] = $a;
+        }
+    }
+    return [$merged, $serverOnly];
 }
 
 jsonError('Metoda není povolena', 405);
