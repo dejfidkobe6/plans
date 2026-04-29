@@ -4131,6 +4131,8 @@ function applyAnnotColorToCanvas(obj) {
     obj.set({ stroke: color, fill: color + fillAlpha });
   } else if (obj.type === 'ellipse' || obj.type === 'polygon') {
     obj.set({ stroke: color, fill: color + '22' });
+  } else if (obj.type === 'path' && obj.annotType === 'pin') {
+    obj.set({ stroke: color, fill: color + '22' });
   } else if (obj.type === 'path' || obj.type === 'polyline') {
     obj.set({ stroke: color, fill: 'transparent' });
   } else if (obj.type === 'i-text' || obj.type === 'text') {
@@ -6464,8 +6466,8 @@ function placePinAt(x, y) {
   const pin = new fabric.Path(d, {
     left: x, top: y,
     originX: 'center', originY: 'bottom',
-    fill: color,
-    stroke: 'rgba(0,0,0,0.25)', strokeWidth: 0.5,
+    fill: color + '22',
+    stroke: color, strokeWidth: 2, strokeUniform: true,
     selectable: true,
   });
   addAnnotationProperties(pin, 'pin');
