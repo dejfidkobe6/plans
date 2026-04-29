@@ -1578,7 +1578,6 @@ option { background: var(--card); color: var(--text); }
   display: flex; align-items: center; justify-content: center; padding: 0;
 }
 .kd-task-btn:hover { background: var(--panel); color: var(--text); }
-.kd-task-btn.kdel:hover { color: #EF4444; background: rgba(239,68,68,0.08); }
 .kd-task-sub-chip {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 1px 6px 1px 4px; border-radius: 10px; font-size: 10px;
@@ -10933,13 +10932,6 @@ function kdBuildTask(rec, card, task, isLive) {
   else doneBtn.disabled = true;
   ctrl.appendChild(doneBtn);
 
-  if (isLive) {
-    const delBtn = document.createElement('button');
-    delBtn.className = 'kd-task-btn kdel'; delBtn.title = 'Smazat úkol'; delBtn.innerHTML = '✕';
-    delBtn.onclick = () => { kdDeleteTask(rec, card.id, task.id); };
-    ctrl.appendChild(delBtn);
-  }
-
   el.appendChild(ctrl);
   return el;
 }
@@ -10954,17 +10946,6 @@ function kdAddTask(rec, card) {
   const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false };
   card.tasks.push(task); kdSave(); kdRenderContent();
   setTimeout(() => { const t = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`); if (t) t.focus(); }, 60);
-}
-
-function kdDeleteTask(rec, cardId, taskId) {
-  let card = null;
-  for (const ch of (rec.chapters || [])) {
-    card = (ch.cards||[]).find(c => c.id === cardId);
-    if (card) break;
-  }
-  if (!card) return;
-  card.tasks = card.tasks.filter(t => t.id !== taskId);
-  kdSave(); kdRenderContent();
 }
 
 // ── Chapter helpers ──────────────────────────────────────────────
