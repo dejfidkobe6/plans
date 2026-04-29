@@ -9463,9 +9463,61 @@ async function _serverSaveNow() {
       console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
       _lastOwnSaveTs = Date.now();
+      // Apply any annotations added concurrently by another user
+      if (data?.counter && data.counter > annotIdCounter) annotIdCounter = data.counter;
+      if (Array.isArray(data?.serverAdded) && data.serverAdded.length) {
+        _applyServerAdded(data.serverAdded);
+      }
     }
   } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
   finally { _saving = false; }
+}
+
+// ---- Apply server-added objects (concurrent-save merge) ----
+// serverAdded: [{levelId, objects:[fabricJSON objects]}]
+// Adds objects that were on the server but not in our local state.
+function _applyServerAdded(serverAdded) {
+  let annotListDirty = false;
+  serverAdded.forEach(({ levelId, objects }) => {
+    if (!Array.isArray(objects) || !objects.length) return;
+    const levelIdx = appState.levels.findIndex(l => l.id === levelId);
+    if (levelIdx < 0) return;
+
+    if (levelIdx === appState.activeLevel) {
+      // Live canvas: enlinven and add objects missing locally
+      const existing = new Set(
+        fabricCanvas.getObjects().filter(o => o.annotId).map(o => o.annotId)
+      );
+      const toAdd = objects.filter(o => o.annotId && !existing.has(o.annotId));
+      if (!toAdd.length) return;
+      fabric.util.enlivenObjects(toAdd, (enlivened) => {
+        enlivened.forEach(obj => { fabricCanvas.add(obj); });
+        fabricCanvas.renderAll();
+        saveCurrentLevel(); // update appState.levels[active] from canvas
+        updateAnnotList();
+      });
+    } else {
+      // Inactive level: patch stored fabricJSON and annotations
+      const lvl = appState.levels[levelIdx];
+      if (!lvl.fabricJSON) lvl.fabricJSON = { objects: [] };
+      if (!lvl.fabricJSON.objects) lvl.fabricJSON.objects = [];
+      if (!lvl.annotations) lvl.annotations = [];
+      const existingIds = new Set(lvl.fabricJSON.objects.filter(o => o.annotId).map(o => o.annotId));
+      objects.forEach(o => {
+        if (!o.annotId || existingIds.has(o.annotId)) return;
+        lvl.fabricJSON.objects.push(o);
+        lvl.annotations.push({
+          annotId: o.annotId, profese: o.profese || null, popisek: o.popisek || null,
+          priorita: o.priorita || null, prirazeno: o.prirazeno || null,
+          status: o.status || null, createdAt: o.createdAt || null,
+          deadline: o.deadline || null, dateFrom: o.dateFrom || null
+        });
+        existingIds.add(o.annotId);
+        annotListDirty = true;
+      });
+    }
+  });
+  if (annotListDirty) updateAnnotList();
 }
 
 // ---- Server load ----
@@ -11657,15 +11709,27 @@ async function _pollLiveSync() {
 
     if (serverData.counter > annotIdCounter) annotIdCounter = serverData.counter;
 
-    // Check if active level also changed (show notification instead of forcing reload)
+    // Active level: silently merge new annotations, show badge only for structural changes
     const remActive = remoteLevels[appState.activeLevel];
     const locActive = appState.levels[appState.activeLevel];
-    const remoteAnnotCount = (remActive?.annotations || []).length;
-    const localAnnotCount  = (locActive?.annotations  || []).length;
-    if (remActive && remoteAnnotCount !== localAnnotCount) {
-      _syncPending = true;
-      const si = document.getElementById('status-sync-info');
-      if (si) si.style.display = '';
+    if (remActive) {
+      const localIds  = new Set((locActive?.annotations || []).map(a => a.annotId));
+      const serverOnlyObjs = (remActive.fabricJSON?.objects || [])
+        .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor && !localIds.has(o.annotId));
+      if (serverOnlyObjs.length) {
+        // Merge new annotations silently into active canvas
+        _applyServerAdded([{ levelId: remActive.id, objects: serverOnlyObjs }]);
+        changed = true;
+      } else {
+        // Structural changes (deletions, edits) – prompt user to reload
+        const remoteAnnotCount = (remActive.annotations || []).length;
+        const localAnnotCount  = (locActive?.annotations || []).length;
+        if (remoteAnnotCount !== localAnnotCount) {
+          _syncPending = true;
+          const si = document.getElementById('status-sync-info');
+          if (si) si.style.display = '';
+        }
+      }
     }
 
     if (changed) updateAnnotList();
