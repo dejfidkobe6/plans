@@ -4063,6 +4063,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd" checked> Zahrnout záznamy z kontrolního dne</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-dochazka"> Zahrnout docházkový list</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové/splněné úkoly</label>
       </div>
     </div>
@@ -8844,6 +8845,215 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
 }
 
 // ── KD record pages (multi-page, fixed font size) ───────────────────────────
+// ============================================================
+// DOCHÁZKOVÝ LIST – jedna strana (A4 landscape) per KD záznam
+// Interaktivní: datum a checkboxy jdou vyplnit v PDF readeru
+// ============================================================
+function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
+  const PT_MM = 72 / 25.4;
+  const cs = t => csText(String(t || ''));
+  const fitT = (t, fspt, maxW) => {
+    let s = cs(t);
+    const w = s => pdf.getStringUnitWidth(s) * fspt / PT_MM;
+    if (w(s) <= maxW) return s;
+    while (s.length > 1 && w(s + '…') > maxW) s = s.slice(0, -1);
+    return s + '…';
+  };
+
+  // Only suppliers that have a firma filled in, sorted alphabetically
+  const suppliers = (appState.profese || [])
+    .filter(p => (p.firma || '').trim())
+    .sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
+
+  // ── Page header (shared with KD pages) ─────────────────────
+  pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, PW, 11, 'F');
+  pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
+  const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
+  if (pdfLogo) pdf.addImage(pdfLogo, 'PNG', _lX, _lY, _lW, _lH);
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
+  pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
+  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
+  pdf.text(cs(currentProject?.name || ''), 38, 7.5);
+  const recDateFmt = rec.date ? rec.date.split('-').reverse().join('.') : '–';
+  pdf.setTextColor(120, 125, 115);
+  pdf.text(cs('Kontrolni den ' + recDateFmt), PW - 82, 7.5);
+  pdf.text(new Date().toLocaleDateString('cs-CZ'), PW - 22, 7.5);
+
+  // ── Content box ────────────────────────────────────────────
+  const lx = 4, ly = 13, lw = PW - 8, lh = PH - ly - 4;
+  pdf.setFillColor(255, 255, 255); pdf.rect(lx, ly, lw, lh, 'F');
+  pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.15); pdf.rect(lx, ly, lw, lh, 'S');
+
+  // Title bar
+  const TITLE_H = 10;
+  pdf.setFillColor(242, 244, 240); pdf.rect(lx, ly, lw, TITLE_H, 'F');
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
+  pdf.text('DOCHAZKOBY LIST', lx + 3, ly + TITLE_H * 0.65);
+
+  // "Datum konání KD:" label + editable text field
+  const dateLabel = 'Datum konani KD:';
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 85, 75);
+  const dateLabelW = pdf.getStringUnitWidth(dateLabel) * 7 / PT_MM;
+  const dateLabelX = lx + lw * 0.42;
+  const dateFieldX = dateLabelX + dateLabelW + 2;
+  const dateFieldW = 52;
+  pdf.text(dateLabel, dateLabelX, ly + TITLE_H * 0.65);
+
+  // Underline for the date field fallback
+  pdf.setDrawColor(140, 145, 130); pdf.setLineWidth(0.25);
+  pdf.line(dateFieldX, ly + TITLE_H * 0.70, dateFieldX + dateFieldW, ly + TITLE_H * 0.70);
+
+  // Interactive text field for date
+  try {
+    const tf = new pdf.AcroForm.TextField();
+    tf.fieldName = 'datum_kd_' + (rec.id || 'x');
+    tf.Rect = [dateFieldX, ly + 1.5, dateFieldW, TITLE_H - 3];
+    tf.value = rec.date ? rec.date.split('-').reverse().join('.') : '';
+    tf.fontSize = 7;
+    tf.borderColor = [180, 185, 170];
+    tf.borderWidth = 0.4;
+    pdf.addField(tf);
+  } catch(e) { /* fallback: underline already drawn */ }
+
+  // ── Column definitions ─────────────────────────────────────
+  const COL_NR    = { x: lx + 1,   w: 8   };
+  const COL_FIRMA = { x: lx + 9,   w: 68  };
+  const COL_ROLE  = { x: lx + 77,  w: 38  };
+  const COL_KONT  = { x: lx + 115, w: 48  };
+  const COL_TEL   = { x: lx + 163, w: 40  };
+  const COL_EMAIL = { x: lx + 203, w: 62  };
+  const COL_CHECK = { x: lx + 265, w: lw - 265 - 1 };
+
+  // ── Column header row ───────────────────────────────────────
+  const COLH_Y = ly + TITLE_H;
+  const COLH_H = 6;
+  pdf.setFillColor(228, 232, 220); pdf.rect(lx, COLH_Y, lw, COLH_H, 'F');
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55, 70, 30);
+  const colHdrY = COLH_Y + COLH_H * 0.68;
+  pdf.text('#',                   COL_NR.x,    colHdrY);
+  pdf.text('Firma / Dodavatel',   COL_FIRMA.x, colHdrY);
+  pdf.text('Profese / Role',      COL_ROLE.x,  colHdrY);
+  pdf.text('Kontaktni osoba',     COL_KONT.x,  colHdrY);
+  pdf.text('Telefon',             COL_TEL.x,   colHdrY);
+  pdf.text('E-mail',              COL_EMAIL.x, colHdrY);
+  pdf.text('Pritomen',            COL_CHECK.x, colHdrY);
+
+  // Vertical header separators
+  pdf.setDrawColor(200, 205, 190); pdf.setLineWidth(0.12);
+  [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+    pdf.line(c.x - 1, COLH_Y, c.x - 1, COLH_Y + COLH_H);
+  });
+
+  // ── Data rows ──────────────────────────────────────────────
+  const ROW_H  = 9;
+  const ROW_FS = 6;
+  let curY = COLH_Y + COLH_H;
+
+  suppliers.forEach((p, i) => {
+    const rowY = curY;
+    if (rowY + ROW_H > ly + lh) return; // overflow guard
+
+    // Alternating row background
+    if (i % 2 === 0) {
+      pdf.setFillColor(249, 251, 246);
+      pdf.rect(lx, rowY, lw, ROW_H, 'F');
+    }
+
+    // Supplier color stripe
+    const [r, g, b] = (() => {
+      const hex = (p.color || '#888888').replace('#', '');
+      return [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
+    })();
+    pdf.setFillColor(r, g, b);
+    pdf.rect(lx, rowY, 1.8, ROW_H, 'F');
+
+    const tY = rowY + ROW_H * 0.62;
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40, 45, 35);
+
+    // Nr
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(String(i + 1), COL_NR.x, tY);
+    pdf.setFont('helvetica', 'normal');
+
+    // Firma
+    pdf.text(fitT(p.firma || p.name, ROW_FS, COL_FIRMA.w - 2), COL_FIRMA.x, tY);
+    // Role/profese
+    pdf.setTextColor(100, 105, 90);
+    pdf.text(fitT(p.name, ROW_FS, COL_ROLE.w - 2), COL_ROLE.x, tY);
+    pdf.setTextColor(40, 45, 35);
+    // Kontakt
+    pdf.text(fitT(p.kontakt || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, tY);
+    // Telefon
+    pdf.text(fitT(p.telefon || '', ROW_FS, COL_TEL.w - 2), COL_TEL.x, tY);
+    // Email
+    pdf.setTextColor(30, 90, 200);
+    pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
+    pdf.setTextColor(40, 45, 35);
+
+    // Checkbox – interactive (PDF form) with visual fallback
+    const cbSize = 4.5;
+    const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
+    const cbY = rowY + (ROW_H - cbSize) / 2;
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      cb.value = 'Off';
+      pdf.addField(cb);
+    } catch(e) {
+      // Visual fallback: draw a box
+      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
+      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
+    }
+
+    // Row separator
+    pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
+    pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
+
+    // Vertical column separators
+    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+      pdf.line(c.x - 1, rowY, c.x - 1, rowY + ROW_H);
+    });
+
+    curY += ROW_H;
+  });
+
+  // Empty rows if fewer than 8 suppliers (space for late additions)
+  const minRows = 8;
+  for (let i = suppliers.length; i < minRows && curY + ROW_H <= ly + lh; i++) {
+    const rowY = curY;
+    if (i % 2 === 0) { pdf.setFillColor(249, 251, 246); pdf.rect(lx, rowY, lw, ROW_H, 'F'); }
+    const tY = rowY + ROW_H * 0.62;
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160, 165, 150);
+    pdf.text(String(i + 1), COL_NR.x, tY);
+
+    const cbSize = 4.5;
+    const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
+    const cbY = rowY + (ROW_H - cbSize) / 2;
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_empty_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      cb.value = 'Off';
+      pdf.addField(cb);
+    } catch(e) {
+      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
+      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
+    }
+
+    pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
+    pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
+    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+      pdf.line(c.x - 1, rowY, c.x - 1, rowY + ROW_H);
+    });
+    curY += ROW_H;
+  }
+
+  // Footer note
+  pdf.setFont('helvetica', 'italic'); pdf.setFontSize(4.5); pdf.setTextColor(150, 155, 140);
+  pdf.text('* Datum konani KD a pritomnost ucastniku lze upravit primo v PDF readeru.', lx + 2, ly + lh - 1.5);
+}
+
 function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
   const PT_MM = 72 / 25.4;
   const textW = (t, fspt) => pdf.getStringUnitWidth(csText(t)) * fspt / PT_MM;
@@ -9053,10 +9263,11 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
 async function doExportPDF() {
   if (!window.jspdf) { showToast('jsPDF se nenačetlo', 'error'); return; }
 
-  const includeDrawing = document.getElementById('pdf-opt-drawing').checked;
-  const includeList    = document.getElementById('pdf-opt-list').checked;
-  const includeKD      = document.getElementById('pdf-opt-kd').checked;
-  if (!includeDrawing && !includeList && !includeKD) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
+  const includeDrawing  = document.getElementById('pdf-opt-drawing').checked;
+  const includeList     = document.getElementById('pdf-opt-list').checked;
+  const includeKD       = document.getElementById('pdf-opt-kd').checked;
+  const includeDochazka = document.getElementById('pdf-opt-dochazka')?.checked ?? false;
+  if (!includeDrawing && !includeList && !includeKD && !includeDochazka) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
 
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
   if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
@@ -9192,6 +9403,19 @@ async function doExportPDF() {
         if (!first) pdf.addPage();
         first = false;
         drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
+      }
+    }
+
+    // ── Docházkový list ─────────────────────────────────────────
+    if (includeDochazka) {
+      const kdRecsForDochazka = kdRecords.length > 0
+        ? [...kdRecords].sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0)
+        : [{ date: '', chapters: [] }];
+      for (const rec of kdRecsForDochazka) {
+        if (!first) pdf.addPage();
+        first = false;
+        drawDochazkaPDF(pdf, rec, _pdfLogo, PW, PH);
+        break; // one attendance sheet is enough (profese list is global)
       }
     }
 
