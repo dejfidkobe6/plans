@@ -4342,6 +4342,13 @@ function switchLevel(idx) {
       applyHotovoVisibility();
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
+      } else if (level.bgServerUrl) {
+        // Background cleared after remote crop — fetch fresh from server
+        _fetchBgFromServer(level).then(ok => {
+          if (ok && level.backgroundImage) {
+            loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
+          } else { _isProjectLoading = false; fitToWindow(); updateAllLabelScales(); }
+        });
       } else {
         _isProjectLoading = false; // no background – loading done
         fitToWindow();
@@ -4352,6 +4359,12 @@ function switchLevel(idx) {
     });
   } else if (level.backgroundImage) {
     loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
+  } else if (level.bgServerUrl) {
+    _fetchBgFromServer(level).then(ok => {
+      if (ok && level.backgroundImage) {
+        loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
+      } else { _isProjectLoading = false; fabricCanvas.renderAll(); fitToWindow(); }
+    });
   } else {
     _isProjectLoading = false; // empty canvas – loading done
     fabricCanvas.renderAll();
@@ -4361,7 +4374,7 @@ function switchLevel(idx) {
   renderLevelTabs();
   updateAnnotList();
   updateStatusBar();
-  showDropZone(!level.backgroundImage && (!level.fabricJSON || !level.fabricJSON.objects || level.fabricJSON.objects.length === 0));
+  showDropZone(!level.backgroundImage && !level.bgServerUrl && (!level.fabricJSON || !level.fabricJSON.objects || level.fabricJSON.objects.length === 0));
   updateChangeDrawingBtn();
   undoStack = [];
   redoStack = [];
@@ -8873,10 +8886,6 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
   pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
   pdf.text(cs(currentProject?.name || ''), 38, 7.5);
-  const recDateFmt = rec.date ? rec.date.split('-').reverse().join('.') : '–';
-  pdf.setTextColor(120, 125, 115);
-  pdf.text(cs('Kontrolni den ' + recDateFmt), PW - 82, 7.5);
-  pdf.text(new Date().toLocaleDateString('cs-CZ'), PW - 22, 7.5);
 
   // ── Content box ────────────────────────────────────────────
   const lx = 4, ly = 13, lw = PW - 8, lh = PH - ly - 4;
@@ -8998,21 +9007,20 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – interactive (PDF form) with visual fallback
+    // Checkbox – always draw the empty box, overlay AcroForm field for interactivity
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
+    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
+    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
     try {
       const cb = new pdf.AcroForm.CheckBox();
       cb.fieldName = 'ucast_' + i;
       cb.Rect = [cbX, cbY, cbSize, cbSize];
       cb.value = 'Off';
+      cb.borderWidth = 0;
       pdf.addField(cb);
-    } catch(e) {
-      // Visual fallback: draw a box
-      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
-      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
-    }
+    } catch(e) { /* visual box already drawn */ }
 
     // Row separator
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9037,16 +9045,16 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
+    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
+    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
     try {
       const cb = new pdf.AcroForm.CheckBox();
       cb.fieldName = 'ucast_empty_' + i;
       cb.Rect = [cbX, cbY, cbSize, cbSize];
       cb.value = 'Off';
+      cb.borderWidth = 0;
       pdf.addField(cb);
-    } catch(e) {
-      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
-      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
-    }
+    } catch(e) { /* visual box already drawn */ }
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
@@ -9548,6 +9556,24 @@ function bgDBSave(pid, levelId, dataUrl, originalUrl) {
     else store.delete(key);
   }).catch(() => {});
 }
+// Fetch background from server into appState + IndexedDB; returns true on success
+async function _fetchBgFromServer(level) {
+  if (!currentProject) return false;
+  const pid = String(currentProject.id);
+  try {
+    const { ok, data } = await apiFetch(
+      `api/background.php?project_id=${pid}&level_id=${encodeURIComponent(level.id)}`
+    );
+    if (ok && data.dataUrl) {
+      level.backgroundImage         = data.dataUrl;
+      level.backgroundImageOriginal = data.originalUrl || data.dataUrl;
+      bgDBSave(pid, level.id, data.dataUrl, data.originalUrl || null);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 async function bgDBLoad(pid, levelId) {
   try {
     const db = await bgDBOpen();
@@ -11972,6 +11998,8 @@ async function _pollLiveSync() {
         // Clear locally cached image so switchLevel fetches the new (cropped) URL from server
         appState.levels[i].backgroundImage         = null;
         appState.levels[i].backgroundImageOriginal = null;
+        // Also evict from IndexedDB so a page reload doesn't restore the stale image
+        if (currentProject) bgDBSave(String(currentProject.id), appState.levels[i].id, null, null);
       }
       changed = true;
     });
@@ -12056,9 +12084,10 @@ document.getElementById('status-sync-info').addEventListener('click', async () =
   lvl.bgServerUrl       = remLvl.bgServerUrl      || lvl.bgServerUrl;
   lvl.bgOrigServerUrl   = remLvl.bgOrigServerUrl  || lvl.bgOrigServerUrl;
   if (bgChanged) {
-    // Background was replaced (crop) – point to the new server image
-    lvl.backgroundImage         = remLvl.bgServerUrl;
-    lvl.backgroundImageOriginal = remLvl.bgOrigServerUrl || remLvl.bgServerUrl;
+    // Background was replaced (crop) – clear cache; switchLevel will re-fetch from server
+    lvl.backgroundImage         = null;
+    lvl.backgroundImageOriginal = null;
+    if (currentProject) bgDBSave(String(currentProject.id), lvl.id, null, null);
   }
   _isProjectLoading = true;
   switchLevel(appState.activeLevel);
