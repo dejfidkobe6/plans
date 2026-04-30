@@ -8886,10 +8886,6 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
   pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
   pdf.text(cs(currentProject?.name || ''), 38, 7.5);
-  const recDateFmt = rec.date ? rec.date.split('-').reverse().join('.') : '–';
-  pdf.setTextColor(120, 125, 115);
-  pdf.text(cs('Kontrolni den ' + recDateFmt), PW - 82, 7.5);
-  pdf.text(new Date().toLocaleDateString('cs-CZ'), PW - 22, 7.5);
 
   // ── Content box ────────────────────────────────────────────
   const lx = 4, ly = 13, lw = PW - 8, lh = PH - ly - 4;
@@ -9011,21 +9007,20 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – interactive (PDF form) with visual fallback
+    // Checkbox – always draw the empty box, overlay AcroForm field for interactivity
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
+    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
+    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
     try {
       const cb = new pdf.AcroForm.CheckBox();
       cb.fieldName = 'ucast_' + i;
       cb.Rect = [cbX, cbY, cbSize, cbSize];
       cb.value = 'Off';
+      cb.borderWidth = 0;
       pdf.addField(cb);
-    } catch(e) {
-      // Visual fallback: draw a box
-      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
-      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
-    }
+    } catch(e) { /* visual box already drawn */ }
 
     // Row separator
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9050,16 +9045,16 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
+    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
+    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
     try {
       const cb = new pdf.AcroForm.CheckBox();
       cb.fieldName = 'ucast_empty_' + i;
       cb.Rect = [cbX, cbY, cbSize, cbSize];
       cb.value = 'Off';
+      cb.borderWidth = 0;
       pdf.addField(cb);
-    } catch(e) {
-      pdf.setDrawColor(120, 125, 110); pdf.setLineWidth(0.4);
-      pdf.rect(cbX, cbY, cbSize, cbSize, 'S');
-    }
+    } catch(e) { /* visual box already drawn */ }
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
