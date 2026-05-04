@@ -1670,6 +1670,8 @@ option { background: var(--card); color: var(--text); }
   display: flex; align-items: center; gap: 8px;
   padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
   flex-shrink: 0;
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg);
 }
 .kd-chapter-title-input {
   flex: 1; background: transparent; border: none; outline: none;
@@ -5561,12 +5563,11 @@ function applyHotovoVisibility() {
     btn.title = showHotovo ? 'Skrýt dokončené úkoly' : 'Zobrazit dokončené úkoly';
   }
   fabricCanvas.getObjects().forEach(o => {
-    if (!o.annotId || o.isBackground) return;
-    if (o.status === 'Hotovo') {
-      o.visible = showHotovo;
-      const lbl = findLabel(o.annotId);
-      if (lbl) lbl.visible = showHotovo;
-    }
+    if (!o.annotId || o.isBackground || o.annotLabelFor) return;
+    const shouldBeVisible = o.status !== 'Hotovo' || showHotovo;
+    o.visible = shouldBeVisible;
+    const lbl = findLabel(o.annotId);
+    if (lbl) lbl.visible = shouldBeVisible;
   });
   fabricCanvas.renderAll();
 }
@@ -10734,6 +10735,7 @@ function kdRenderContent() {
   }
 
   const isLive = !_kdViewingBackup;
+  const savedScrollTop = scroll.scrollTop;
   scroll.innerHTML = '';
   const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
   (rec.chapters || []).forEach(ch => inner.appendChild(kdBuildChapter(rec, ch, isLive)));
@@ -10747,6 +10749,7 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
+  scroll.scrollTop = savedScrollTop;
 }
 
 function kdAllTasks(rec) {
