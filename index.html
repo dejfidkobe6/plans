@@ -1545,6 +1545,8 @@ option { background: var(--card); color: var(--text); }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  position: sticky; top: 38px; z-index: 9;
+  background: var(--panel); border-radius: 8px 8px 0 0;
 }
 .kd-card-title {
   flex: 1; background: transparent; border: none; outline: none;
@@ -1688,10 +1690,8 @@ option { background: var(--card); color: var(--text); }
 .kd-chapter-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
 .kd-chapter-cards {
   display: flex; flex-direction: row; align-items: flex-start; gap: 12px;
-  overflow-x: auto; padding-bottom: 6px;
+  padding-bottom: 6px; overflow: visible;
 }
-.kd-chapter-cards::-webkit-scrollbar { height: 4px; }
-.kd-chapter-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .kd-add-chapter-btn-main {
   align-self: flex-start; padding: 8px 16px; border-radius: 6px; font-size: 12px;
   background: transparent; border: 1px dashed var(--border);
@@ -3875,6 +3875,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <input type="date" id="kdf-to" title="Termín do">
         <label class="kdf-urgent-label"><input type="checkbox" id="kdf-urgent"> Urgentní</label>
         <label class="kdf-done-label"><input type="checkbox" id="kdf-done"> Hotové</label>
+        <label class="kdf-done-label" style="border-left:1px solid var(--border);padding-left:8px;margin-left:2px"><input type="checkbox" id="kdf-sort-sub"> Řadit dle dodavatele</label>
         <button id="kdf-reset" title="Vymazat filtry">✕ Vymazat</button>
       </div>
       <div id="kd-empty-state">
@@ -10247,7 +10248,7 @@ let _kdLastBackupCheck = null;
 let _kdBackupTimer = null;
 let _kdCardWidth = 420; // px — per-card drag resize base
 let _kdZoom = 1.0;      // CSS zoom applied to entire cards area (Ctrl+scroll)
-let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
+let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -10833,6 +10834,14 @@ function kdBuildCardTasks(cardEl, rec, card, cntEl, isLive) {
   list.innerHTML = '';
   const tasks = card.tasks || [];
   const visible = tasks.filter(t => kdTaskVisible(t));
+  if (_kdFilter.sortBySub) {
+    const subName = s => { const p = (appState.profese||[]).find(x=>x.name===s); return (p?.firma||p?.name||s||'').toLowerCase(); };
+    visible.sort((a, b) => {
+      const au = a.urgent ? 0 : 1, bu = b.urgent ? 0 : 1;
+      if (au !== bu) return au - bu;
+      return subName(a.sub).localeCompare(subName(b.sub), 'cs');
+    });
+  }
   visible.forEach(task => list.appendChild(kdBuildTask(rec, card, task, isLive !== false)));
   const cnt = cntEl || cardEl.querySelector('.kd-card-count');
   if (cnt) cnt.textContent = visible.length < tasks.length ? `${visible.length}/${tasks.length}` : String(tasks.length);
@@ -11137,8 +11146,10 @@ function kdSetupPage() {
     kdRenderContent();
   });
   document.getElementById('kdf-done').addEventListener('change', e => { _kdFilter.showDone = e.target.checked; const btn = document.getElementById('kd-toggle-done-btn'); if (btn) { btn.style.opacity = _kdFilter.showDone ? '1' : '0.5'; } kdRenderContent(); });
+  document.getElementById('kdf-sort-sub').addEventListener('change', e => { _kdFilter.sortBySub = e.target.checked; kdRenderContent(); });
   document.getElementById('kdf-reset').addEventListener('click', () => {
-    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
+    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false };
+    const ss = document.getElementById('kdf-sort-sub'); if (ss) ss.checked = false;
     kdRenderContent();
   });
   // Ctrl+scroll to zoom the entire cards area (font size, spacing, everything)
