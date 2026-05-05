@@ -3126,6 +3126,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 .mob-draw-tool:hover { color: var(--text-bright); background: var(--card); border-color: var(--olive); }
 .mob-draw-tool.active { color: var(--olive-light); border-color: var(--olive); background: rgba(74,83,64,0.18); }
+/* Flatpickr – víkend šedivé podbarvení */
+.fp-kd-weekend { background: rgba(0,0,0,0.07) !important; color: #888 !important; border-radius: 3px; }
+.flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
 </style>
 </head>
 <body>
@@ -10888,37 +10891,56 @@ function kdBuildTask(rec, card, task, isLive) {
     none.onclick = e => kdOpenSubPop(e, rec, task); ctrl.appendChild(none);
   }
 
-  // Compact date pair: text shows d.m, click opens native calendar
+  // Compact date pair: text shows d.m, click opens flatpickr calendar
   const dp = document.createElement('span'); dp.className = 'kd-task-date-pair';
+  const _fpLocale = { firstDayOfWeek: 1, weekdays: { shorthand: ['Ne','Po','Út','St','Čt','Pá','So'], longhand: ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'] }, months: { shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'], longhand: ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'] } };
   const mkDateWidget = (isoInit, onCommit) => {
     let iso = isoInit;
     const wrap = document.createElement('span'); wrap.className = 'kd-date-wrap';
     const txt = document.createElement('input'); txt.type = 'text';
     txt.className = 'kd-task-date-txt'; txt.value = kdIsoToDM(iso);
     txt.placeholder = 'd.m'; txt.title = 'Kliknutím otevřít kalendář nebo napište d.m';
-    const picker = document.createElement('input'); picker.type = 'date';
+    const picker = document.createElement('input'); picker.type = 'text';
     picker.className = 'kd-date-hidden-picker'; picker.value = iso || '';
-    // Click on text → open native calendar
-    txt.addEventListener('click', () => {
-      try { picker.showPicker(); } catch(e) { picker.focus(); }
-    });
-    // Calendar selection → update text and store
-    picker.addEventListener('change', () => {
-      iso = picker.value || null;
-      txt.value = kdIsoToDM(iso);
-      onCommit(iso);
-    });
+
+    let fp = null;
+    if (typeof flatpickr !== 'undefined') {
+      fp = flatpickr(picker, {
+        locale: _fpLocale,
+        dateFormat: 'Y-m-d',
+        defaultDate: iso || null,
+        positionElement: txt,
+        disableMobile: false,
+        onDayCreate: (_s, _c, _fp, dayEl) => {
+          if (dayEl.dateObj) {
+            const d = dayEl.dateObj.getDay();
+            if (d === 0 || d === 6) dayEl.classList.add('fp-kd-weekend');
+          }
+        },
+        onChange: (selectedDates, dateStr) => {
+          iso = dateStr || null;
+          txt.value = kdIsoToDM(iso);
+          onCommit(iso);
+        }
+      });
+      txt.addEventListener('click', () => fp.open());
+    } else {
+      txt.addEventListener('click', () => { try { picker.showPicker(); } catch(e) { picker.focus(); } });
+      picker.addEventListener('change', () => { iso = picker.value || null; txt.value = kdIsoToDM(iso); onCommit(iso); });
+    }
     // Manual typing → parse on blur
     txt.addEventListener('blur', () => {
       const parsed = kdDMToIso(txt.value, iso);
-      iso = parsed; txt.value = kdIsoToDM(parsed);
-      if (parsed) picker.value = parsed;
-      onCommit(parsed);
+      if (parsed !== iso) {
+        iso = parsed; txt.value = kdIsoToDM(parsed);
+        picker.value = parsed || '';
+        if (fp && parsed) fp.setDate(parsed, false);
+        onCommit(parsed);
+      }
     });
     txt.addEventListener('keydown', e => { if (e.key === 'Enter') txt.blur(); });
     wrap.appendChild(txt); wrap.appendChild(picker);
-    // External setter so cross-validation can update the sibling widget
-    wrap._setValue = (newIso) => { iso = newIso; txt.value = kdIsoToDM(newIso); picker.value = newIso || ''; };
+    wrap._setValue = (newIso) => { iso = newIso; txt.value = kdIsoToDM(newIso); picker.value = newIso || ''; if (fp) fp.setDate(newIso || null, false); };
     return wrap;
   };
   const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => {
@@ -10986,7 +11008,10 @@ function kdAddCard(rec, ch) {
 function kdAddTask(rec, card) {
   const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false };
   card.tasks.push(task); kdSave(); kdRenderContent();
-  setTimeout(() => { const t = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`); if (t) t.focus(); }, 60);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); el.focus(); }
+  }));
 }
 
 // ── Chapter helpers ──────────────────────────────────────────────
