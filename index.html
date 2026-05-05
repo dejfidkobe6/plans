@@ -10986,7 +10986,10 @@ function kdAddCard(rec, ch) {
 function kdAddTask(rec, card) {
   const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false };
   card.tasks.push(task); kdSave(); kdRenderContent();
-  setTimeout(() => { const t = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`); if (t) t.focus(); }, 60);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); el.focus(); }
+  }));
 }
 
 // ── Chapter helpers ──────────────────────────────────────────────
