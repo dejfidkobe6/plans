@@ -1,6 +1,6 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v1';
+const CACHE = 'besix-plans-v3';
 
 const PRECACHE = [
   './',
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(e.request).catch(() =>
         new Response(
-          JSON.stringify({ error: 'Jste offline. Akce bude dostupná po obnovení připojení.' }),
+          JSON.stringify({ error: 'Server není dostupný. Zkontrolujte připojení nebo počkejte na obnovení (může jít o přechodný výpadek nebo změnu DNS).' }),
           { status: 503, headers: { 'Content-Type': 'application/json' } }
         )
       )
@@ -55,7 +55,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // uploads/ obrázky → cache-first (výkresy uložené na serveru)
+  // Pozadí výkresů /uploads/bg/ → network-first (mění se při ořezu)
+  if (url.pathname.startsWith('/uploads/bg/') || url.pathname.includes('/uploads/bg/')) {
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if (resp.ok) caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
+        return resp;
+      }).catch(() =>
+        caches.match(e.request).then(cached =>
+          cached || new Response('', { status: 503 })
+        )
+      )
+    );
+    return;
+  }
+
+  // Ostatní uploads/ obrázky → cache-first
   if (url.pathname.startsWith('/uploads/') || url.pathname.includes('/uploads/')) {
     e.respondWith(
       caches.open(CACHE).then(cache =>
