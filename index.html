@@ -4628,7 +4628,7 @@ function loadBackgroundImage(dataUrl, fit, onDone, beforeSave) {
     const scale = Math.min(scaleX, scaleY) * 0.95;
 
     // Použij uloženou pozici+měřítko při přepínání podlaží; při novém nahrání vždy vycentruj
-    const useSaved = !fit && level && level.bgLeft !== undefined && level.bgScaleX !== undefined;
+    const useSaved = !fit && level && Number.isFinite(level.bgLeft) && Number.isFinite(level.bgScaleX);
     const finalScale = useSaved ? level.bgScaleX : scale;
     const left = useSaved ? level.bgLeft : (cw - img.width * finalScale) / 2;
     const top  = useSaved ? level.bgTop  : (ch - img.height * finalScale) / 2;
@@ -9569,10 +9569,9 @@ async function _fetchBgFromServer(level) {
     const { ok, data } = await apiFetch(
       `api/background.php?project_id=${pid}&level_id=${encodeURIComponent(level.id)}`
     );
-    if (ok && data.dataUrl) {
-      level.backgroundImage         = data.dataUrl;
-      level.backgroundImageOriginal = data.originalUrl || data.dataUrl;
-      bgDBSave(pid, level.id, data.dataUrl, data.originalUrl || null);
+    if (ok && data.url) {
+      level.backgroundImage         = data.url;
+      level.backgroundImageOriginal = data.origUrl || data.url;
       return true;
     }
   } catch {}
@@ -9596,13 +9595,12 @@ async function bgDBLoadAll(pid, levels) {
       lvl.backgroundImage = rec.dataUrl || null;
       lvl.backgroundImageOriginal = rec.originalUrl || null;
     } else if (currentProject) {
-      // Fallback: načti z serveru pokud není v IndexedDB
+      // Fallback: URL ze serveru pokud není v IndexedDB
       try {
         const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&level_id=${encodeURIComponent(lvl.id)}`);
-        if (ok && data.dataUrl) {
-          lvl.backgroundImage = data.dataUrl;
-          lvl.backgroundImageOriginal = data.originalUrl || null;
-          bgDBSave(pid, lvl.id, lvl.backgroundImage, lvl.backgroundImageOriginal);
+        if (ok && data.url) {
+          lvl.backgroundImage = data.url;
+          lvl.backgroundImageOriginal = data.origUrl || null;
         }
       } catch {}
     }
@@ -12029,10 +12027,10 @@ async function _pollLiveSync() {
       appState.levels[i].annotations      = remLvl.annotations;
       appState.levels[i].bgServerUrl      = remLvl.bgServerUrl     || appState.levels[i].bgServerUrl;
       appState.levels[i].bgOrigServerUrl  = remLvl.bgOrigServerUrl || appState.levels[i].bgOrigServerUrl;
-      appState.levels[i].bgLeft           = remLvl.bgLeft;
-      appState.levels[i].bgTop            = remLvl.bgTop;
-      appState.levels[i].bgScaleX         = remLvl.bgScaleX;
-      appState.levels[i].bgScaleY         = remLvl.bgScaleY;
+      if (remLvl.bgLeft   != null) appState.levels[i].bgLeft   = remLvl.bgLeft;
+      if (remLvl.bgTop    != null) appState.levels[i].bgTop    = remLvl.bgTop;
+      if (remLvl.bgScaleX != null) appState.levels[i].bgScaleX = remLvl.bgScaleX;
+      if (remLvl.bgScaleY != null) appState.levels[i].bgScaleY = remLvl.bgScaleY;
       if (bgChanged) {
         // Clear locally cached image so switchLevel fetches the new (cropped) URL from server
         appState.levels[i].backgroundImage         = null;
