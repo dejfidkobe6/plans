@@ -1,6 +1,6 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v1';
+const CACHE = 'besix-plans-v2';
 
 const PRECACHE = [
   './',
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(e.request).catch(() =>
         new Response(
-          JSON.stringify({ error: 'Jste offline. Akce bude dostupná po obnovení připojení.' }),
+          JSON.stringify({ error: 'Server není dostupný. Zkontrolujte připojení nebo počkejte na obnovení (může jít o přechodný výpadek nebo změnu DNS).' }),
           { status: 503, headers: { 'Content-Type': 'application/json' } }
         )
       )
