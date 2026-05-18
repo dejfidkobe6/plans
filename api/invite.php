@@ -10,7 +10,7 @@ $db = getDB();
 $stmt = $db->prepare('
     SELECT i.*, p.name AS project_name
     FROM invitations i
-    JOIN projects p ON p.id = i.project_id
+    JOIN plan_projects p ON p.id = i.project_id
     WHERE i.token = ? AND i.expires_at > NOW()
     LIMIT 1
 ');
@@ -30,10 +30,10 @@ if (!$sessionUser) {
 $userId = (int)$sessionUser['id'];
 
 // Přidej uživatele do projektu (pokud ještě není členem)
-$exists = $db->prepare('SELECT id FROM project_members WHERE project_id = ? AND user_id = ?');
+$exists = $db->prepare('SELECT id FROM plan_project_members WHERE project_id = ? AND user_id = ?');
 $exists->execute([$inv['project_id'], $userId]);
 if (!$exists->fetch()) {
-    $db->prepare('INSERT INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,?,?)')
+    $db->prepare('INSERT INTO plan_project_members (project_id, user_id, role, invited_by) VALUES (?,?,?,?)')
        ->execute([$inv['project_id'], $userId, $inv['role'], $inv['invited_by']]);
 }
 

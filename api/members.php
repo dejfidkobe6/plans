@@ -35,7 +35,7 @@ if ($method === 'GET') {
     $stmt = getDB()->prepare('
         SELECT pm.id, pm.user_id, pm.role, pm.joined_at,
                u.name, u.email, u.avatar_color
-        FROM project_members pm
+        FROM plan_project_members pm
         JOIN users u ON u.id = pm.user_id
         WHERE pm.project_id = ?
         ORDER BY FIELD(pm.role,"owner","admin","member","viewer"), u.name
@@ -58,7 +58,7 @@ if ($method === 'PUT') {
     if (!in_array($newRole, ['admin', 'member', 'viewer'])) jsonError('Neplatná role');
 
     $db   = getDB();
-    $stmt = $db->prepare('SELECT user_id, role FROM project_members WHERE id = ? AND project_id = ?');
+    $stmt = $db->prepare('SELECT user_id, role FROM plan_project_members WHERE id = ? AND project_id = ?');
     $stmt->execute([$memberId, $projectId]);
     $target = $stmt->fetch();
 
@@ -66,7 +66,7 @@ if ($method === 'PUT') {
     if ($target['role'] === 'owner')      jsonError('Nelze měnit roli vlastníka');
     if ((int)$target['user_id'] === $userId) jsonError('Nelze měnit vlastní roli');
 
-    $db->prepare('UPDATE project_members SET role = ? WHERE id = ?')->execute([$newRole, $memberId]);
+    $db->prepare('UPDATE plan_project_members SET role = ? WHERE id = ?')->execute([$newRole, $memberId]);
     jsonOk();
 }
 
@@ -80,14 +80,14 @@ if ($method === 'DELETE') {
     if (!$memberId) jsonError('Chybí member_id');
 
     $db   = getDB();
-    $stmt = $db->prepare('SELECT user_id, role FROM project_members WHERE id = ? AND project_id = ?');
+    $stmt = $db->prepare('SELECT user_id, role FROM plan_project_members WHERE id = ? AND project_id = ?');
     $stmt->execute([$memberId, $projectId]);
     $target = $stmt->fetch();
 
     if (!$target)                    jsonError('Člen nenalezen', 404);
     if ($target['role'] === 'owner') jsonError('Nelze odebrat vlastníka');
 
-    $db->prepare('DELETE FROM project_members WHERE id = ?')->execute([$memberId]);
+    $db->prepare('DELETE FROM plan_project_members WHERE id = ?')->execute([$memberId]);
     jsonOk();
 }
 
