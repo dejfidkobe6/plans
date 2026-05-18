@@ -34,6 +34,19 @@ try {
         $result['project_members_count']   = $pdo->query("SELECT COUNT(*) FROM project_members")->fetchColumn();
     }
 
+    // board_projects columns + plans rows
+    if (in_array('board_projects', $result['tables'])) {
+        $cols = $pdo->query("SHOW COLUMNS FROM board_projects")->fetchAll();
+        $result['board_projects_columns'] = array_column($cols, 'Field');
+        try {
+            $result['board_projects_app_ids'] = $pdo->query("SELECT DISTINCT app_id FROM board_projects")->fetchAll(PDO::FETCH_COLUMN);
+        } catch (\Exception $e2) {}
+    }
+    if (in_array('board_project_members', $result['tables'])) {
+        $cols = $pdo->query("SHOW COLUMNS FROM board_project_members")->fetchAll();
+        $result['board_project_members_columns'] = array_column($cols, 'Field');
+    }
+
     $result['ok'] = true;
 } catch (Throwable $e) {
     $result['error'] = $e->getMessage();
