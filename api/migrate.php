@@ -7,46 +7,42 @@ $result = ['ok' => false];
 
 try {
     require_once __DIR__ . '/functions.php';
-    $db    = getDB();
-    $appId = getPlansAppId();
-    $result['plans_app_id'] = $appId;
+    $db = getDB();
 
-    // ── 1. Copy missing projects from board_projects ──────────────────────
-    $missing = $db->query(
-        "SELECT bp.id FROM board_projects bp
-         LEFT JOIN plan_projects pp ON pp.id = bp.id
-         WHERE pp.id IS NULL"
-    )->fetchAll(PDO::FETCH_COLUMN);
-    $result['missing_project_ids'] = $missing;
-
-    if (!empty($missing)) {
-        $ids = implode(',', array_map('intval', $missing));
-        $result['projects_copied'] = $db->exec(
-            "INSERT IGNORE INTO plan_projects
-                 (id, app_id, name, created_by, invite_code, is_active, created_at)
-             SELECT id, app_id, name, created_by, invite_code, is_active, created_at
-             FROM board_projects WHERE id IN ($ids)"
-        );
-        $result['members_copied'] = $db->exec(
-            "INSERT IGNORE INTO plan_project_members
-                 (id, project_id, user_id, role, invited_by, joined_at)
-             SELECT bpm.id, bpm.project_id, bpm.user_id, bpm.role, bpm.invited_by, bpm.joined_at
-             FROM board_project_members bpm WHERE bpm.project_id IN ($ids)"
-        );
+    // ── Apps table ────────────────────────────────────────────────────────
+    try {
+        $result['apps_table'] = $db->query("SELECT * FROM apps ORDER BY id")->fetchAll();
+    } catch (\Exception $e) {
+        $result['apps_table_error'] = $e->getMessage();
     }
 
-    // ── 2. Soft-deleted projects (is_active = 0) ──────────────────────────
-    $result['inactive_projects'] = $db->query(
-        "SELECT id, app_id, name, created_by, is_active FROM plan_projects WHERE is_active = 0"
+    $result['current_plans_app_id'] = getPlansAppId();
+
+    // ── Projects grouped by app_id ────────────────────────────────────────
+    $result['projects_by_app_id'] = $db->query(
+        "SELECT app_id, COUNT(*) as total,
+                SUM(is_active) as active,
+                SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) as inactive,
+                GROUP_CONCAT(name ORDER BY id SEPARATOR ' | ') as names
+         FROM plan_projects GROUP BY app_id ORDER BY app_id"
     )->fetchAll();
 
-    // ── 3. Fix: restore soft-deleted if ?restore=1 ────────────────────────
-    if (($_GET['restore'] ?? '') === '1') {
-        $restored = $db->exec("UPDATE plan_projects SET is_active = 1 WHERE is_active = 0");
-        $result['restored_count'] = $restored;
-    }
+    // ── Which app_ids have plans-specific data ────────────────────────────
+    try {
+        $result['app_ids_with_canvas_data'] = $db->query(
+            "SELECT DISTINCT p.app_id FROM plan_projects p
+             INNER JOIN plan_canvas_data c ON c.project_id = p.id"
+        )->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Exception $e) { $result['canvas_data_error'] = $e->getMessage(); }
 
-    // ── 4. Projects where creator has no membership row ───────────────────
+    try {
+        $result['app_ids_with_backgrounds'] = $db->query(
+            "SELECT DISTINCT p.app_id FROM plan_projects p
+             INNER JOIN plan_backgrounds b ON b.project_id = p.id"
+        )->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Exception $e) { $result['backgrounds_error'] = $e->getMessage(); }
+
+    // ── Creator without membership (all app_ids) ──────────────────────────
     $result['creator_without_membership'] = $db->query(
         "SELECT p.id, p.name, p.created_by, p.app_id
          FROM plan_projects p
@@ -54,7 +50,7 @@ try {
          WHERE pm.id IS NULL AND p.is_active = 1"
     )->fetchAll();
 
-    // ── 5. Fix: add missing creator memberships if ?fix_members=1 ─────────
+    // ── FIX: add missing creator memberships (?fix_members=1) ────────────
     if (($_GET['fix_members'] ?? '') === '1') {
         $orphans = $db->query(
             "SELECT p.id, p.created_by FROM plan_projects p
@@ -64,20 +60,40 @@ try {
         $added = 0;
         foreach ($orphans as $o) {
             $db->prepare(
-                "INSERT IGNORE INTO plan_project_members (project_id, user_id, role, invited_by) VALUES (?,?,'owner',?)"
+                "INSERT IGNORE INTO plan_project_members (project_id, user_id, role, invited_by)
+                 VALUES (?,?,'owner',?)"
             )->execute([$o['id'], $o['created_by'], $o['created_by']]);
             $added++;
         }
         $result['creator_memberships_added'] = $added;
     }
 
-    // ── 6. Full project list ──────────────────────────────────────────────
+    // ── FIX: normalize all plans projects to app_id=1 (?normalize_appid=1) ─
+    // Sets app_id=1 for all projects that have plan_canvas_data or plan_backgrounds,
+    // plus all projects already at app_id=1.
+    if (($_GET['normalize_appid'] ?? '') === '1') {
+        try {
+            $updated = $db->exec(
+                "UPDATE plan_projects SET app_id = 1
+                 WHERE id IN (
+                     SELECT DISTINCT project_id FROM plan_canvas_data
+                     UNION
+                     SELECT DISTINCT project_id FROM plan_backgrounds
+                 ) AND app_id != 1"
+            );
+            $result['projects_normalized'] = $updated;
+        } catch (\Exception $e) {
+            $result['normalize_error'] = $e->getMessage();
+        }
+    }
+
+    // ── Full project list ─────────────────────────────────────────────────
     $result['plan_projects_all'] = $db->query(
         "SELECT p.id, p.app_id, p.name, p.created_by, p.is_active,
                 COUNT(pm.id) as member_count
          FROM plan_projects p
          LEFT JOIN plan_project_members pm ON pm.project_id = p.id
-         GROUP BY p.id ORDER BY p.id DESC"
+         GROUP BY p.id ORDER BY p.app_id, p.id DESC"
     )->fetchAll();
 
     $result['ok'] = true;
