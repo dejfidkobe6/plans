@@ -1849,6 +1849,14 @@ option { background: var(--card); color: var(--text); }
 }
 .srch-pop-opt:hover { background: var(--card); }
 .srch-pop-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+@media (max-width: 768px) {
+  #srch-pop { z-index: 1500 !important; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+  /* 16px prevents iOS Safari from auto-zooming on focus */
+  #srch-pop-input { font-size: 16px !important; padding: 12px 14px !important; }
+  #srch-pop-list { max-height: 45vh !important; }
+  .srch-pop-opt { padding: 11px 14px; font-size: 14px; }
+  #kd-pop-backdrop { background: rgba(0,0,0,0.35); }
+}
 
 /* Global KD filter bar */
 #kd-filter-bar {
@@ -10445,6 +10453,16 @@ function kdDMToIso(dm, existing) {
 // Smart popover positioning: opens upward if off-screen
 let _srchPopClose = null;
 function _positionPop(pop, anchor) {
+  if (window.innerWidth <= 768) {
+    // Mobile: fixed position at top of screen, full width
+    pop.style.top = '58px';
+    pop.style.left = '16px';
+    pop.style.right = '16px';
+    pop.style.width = 'auto';
+    pop.style.maxWidth = 'none';
+    pop.style.transform = '';
+    return;
+  }
   pop.style.cssText += ';top:-9999px;left:-9999px;display:flex;';
   const ph = pop.offsetHeight, pw = pop.offsetWidth;
   const r = anchor.getBoundingClientRect();
@@ -10486,7 +10504,8 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
   render('');
   _positionPop(pop, anchor);
   pop.classList.add('open');
-  setTimeout(() => inp.focus(), 0);
+  // On mobile use slight delay so the popup renders before keyboard opens
+  setTimeout(() => inp.focus(), window.innerWidth <= 768 ? 80 : 0);
   const _bd = document.getElementById('kd-pop-backdrop'); if (_bd) _bd.style.display = 'block';
 }
 
