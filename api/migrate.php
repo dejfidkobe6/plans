@@ -9,40 +9,20 @@ try {
     require_once __DIR__ . '/functions.php';
     $db = getDB();
 
-    // ── Apps table ────────────────────────────────────────────────────────
-    try {
-        $result['apps_table'] = $db->query("SELECT * FROM apps ORDER BY id")->fetchAll();
-    } catch (\Exception $e) {
-        $result['apps_table_error'] = $e->getMessage();
-    }
+    $result['current_plans_app_id'] = getPlansAppId(); // should be 1
 
-    $result['current_plans_app_id'] = getPlansAppId();
-
-    // ── Projects grouped by app_id ────────────────────────────────────────
+    // ── Diagnose ──────────────────────────────────────────────────────────
     $result['projects_by_app_id'] = $db->query(
         "SELECT app_id, COUNT(*) as total,
-                SUM(is_active) as active,
-                SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) as inactive,
-                GROUP_CONCAT(name ORDER BY id SEPARATOR ' | ') as names
+                GROUP_CONCAT(CONCAT(id,':',name) ORDER BY id SEPARATOR ' | ') as projects
          FROM plan_projects GROUP BY app_id ORDER BY app_id"
     )->fetchAll();
 
-    // ── Which app_ids have plans-specific data ────────────────────────────
-    try {
-        $result['app_ids_with_canvas_data'] = $db->query(
-            "SELECT DISTINCT p.app_id FROM plan_projects p
-             INNER JOIN plan_canvas_data c ON c.project_id = p.id"
-        )->fetchAll(PDO::FETCH_COLUMN);
-    } catch (\Exception $e) { $result['canvas_data_error'] = $e->getMessage(); }
+    $result['app_ids_with_canvas_data'] = $db->query(
+        "SELECT DISTINCT p.app_id FROM plan_projects p
+         INNER JOIN plan_canvas_data c ON c.project_id = p.id"
+    )->fetchAll(PDO::FETCH_COLUMN);
 
-    try {
-        $result['app_ids_with_backgrounds'] = $db->query(
-            "SELECT DISTINCT p.app_id FROM plan_projects p
-             INNER JOIN plan_backgrounds b ON b.project_id = p.id"
-        )->fetchAll(PDO::FETCH_COLUMN);
-    } catch (\Exception $e) { $result['backgrounds_error'] = $e->getMessage(); }
-
-    // ── Creator without membership (all app_ids) ──────────────────────────
     $result['creator_without_membership'] = $db->query(
         "SELECT p.id, p.name, p.created_by, p.app_id
          FROM plan_projects p
@@ -50,7 +30,29 @@ try {
          WHERE pm.id IS NULL AND p.is_active = 1"
     )->fetchAll();
 
-    // ── FIX: add missing creator memberships (?fix_members=1) ────────────
+    // ── FIX A: normalize orphan app_ids to 1 (?fix_appid=1) ──────────────
+    // Moves projects with app_id NOT IN apps table → app_id=1 (plans)
+    if (($_GET['fix_appid'] ?? '') === '1') {
+        $orphanAppIds = $db->query(
+            "SELECT DISTINCT pp.app_id FROM plan_projects pp
+             LEFT JOIN apps a ON a.id = pp.app_id
+             WHERE a.id IS NULL"
+        )->fetchAll(PDO::FETCH_COLUMN);
+
+        if (!empty($orphanAppIds)) {
+            $ids = implode(',', array_map('intval', $orphanAppIds));
+            $updated = $db->exec(
+                "UPDATE plan_projects SET app_id = 1 WHERE app_id IN ($ids)"
+            );
+            $result['projects_app_id_fixed'] = $updated;
+            $result['orphan_app_ids_fixed']  = $orphanAppIds;
+        } else {
+            $result['projects_app_id_fixed'] = 0;
+            $result['note_appid'] = 'No orphan app_ids found';
+        }
+    }
+
+    // ── FIX B: add missing creator memberships (?fix_members=1) ──────────
     if (($_GET['fix_members'] ?? '') === '1') {
         $orphans = $db->query(
             "SELECT p.id, p.created_by FROM plan_projects p
@@ -68,26 +70,7 @@ try {
         $result['creator_memberships_added'] = $added;
     }
 
-    // ── FIX: normalize all plans projects to app_id=1 (?normalize_appid=1) ─
-    // Sets app_id=1 for all projects that have plan_canvas_data or plan_backgrounds,
-    // plus all projects already at app_id=1.
-    if (($_GET['normalize_appid'] ?? '') === '1') {
-        try {
-            $updated = $db->exec(
-                "UPDATE plan_projects SET app_id = 1
-                 WHERE id IN (
-                     SELECT DISTINCT project_id FROM plan_canvas_data
-                     UNION
-                     SELECT DISTINCT project_id FROM plan_backgrounds
-                 ) AND app_id != 1"
-            );
-            $result['projects_normalized'] = $updated;
-        } catch (\Exception $e) {
-            $result['normalize_error'] = $e->getMessage();
-        }
-    }
-
-    // ── Full project list ─────────────────────────────────────────────────
+    // ── Summary after fixes ───────────────────────────────────────────────
     $result['plan_projects_all'] = $db->query(
         "SELECT p.id, p.app_id, p.name, p.created_by, p.is_active,
                 COUNT(pm.id) as member_count
