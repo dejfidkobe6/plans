@@ -9,50 +9,57 @@ try {
     require_once __DIR__ . '/functions.php';
     $db = getDB();
 
-    $result['current_plans_app_id'] = getPlansAppId(); // should be 1
+    // ── Kdo jsem? (session) ───────────────────────────────────────────────
+    $sessionUser = $_SESSION['user'] ?? null;
+    $result['session_user'] = $sessionUser;
 
-    // ── Diagnose ──────────────────────────────────────────────────────────
-    $result['projects_by_app_id'] = $db->query(
-        "SELECT app_id, COUNT(*) as total,
-                GROUP_CONCAT(CONCAT(id,':',name) ORDER BY id SEPARATOR ' | ') as projects
-         FROM plan_projects GROUP BY app_id ORDER BY app_id"
-    )->fetchAll();
+    $appId = getPlansAppId();
+    $result['plans_app_id'] = $appId;
 
-    $result['app_ids_with_canvas_data'] = $db->query(
-        "SELECT DISTINCT p.app_id FROM plan_projects p
-         INNER JOIN plan_canvas_data c ON c.project_id = p.id"
-    )->fetchAll(PDO::FETCH_COLUMN);
+    if ($sessionUser) {
+        $userId = (int)$sessionUser['id'];
+        $result['my_user_id'] = $userId;
 
-    $result['creator_without_membership'] = $db->query(
-        "SELECT p.id, p.name, p.created_by, p.app_id
-         FROM plan_projects p
-         LEFT JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = p.created_by
-         WHERE pm.id IS NULL AND p.is_active = 1"
-    )->fetchAll();
+        // Projekty které vidím (stejná query jako projects.php GET)
+        $stmt = $db->prepare('
+            SELECT p.id, p.name, p.created_at, pm.role
+            FROM plan_projects p
+            JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+            WHERE p.app_id = ? AND p.is_active = 1
+            ORDER BY p.created_at DESC
+        ');
+        $stmt->execute([$userId, $appId]);
+        $result['my_visible_projects'] = $stmt->fetchAll();
 
-    // ── FIX A: normalize orphan app_ids to 1 (?fix_appid=1) ──────────────
-    // Moves projects with app_id NOT IN apps table → app_id=1 (plans)
-    if (($_GET['fix_appid'] ?? '') === '1') {
-        $orphanAppIds = $db->query(
-            "SELECT DISTINCT pp.app_id FROM plan_projects pp
-             LEFT JOIN apps a ON a.id = pp.app_id
-             WHERE a.id IS NULL"
-        )->fetchAll(PDO::FETCH_COLUMN);
+        // Všechny projekty kde jsem member (bez app_id filtru)
+        $stmt2 = $db->prepare('
+            SELECT p.id, p.app_id, p.name, pm.role
+            FROM plan_projects p
+            JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+            WHERE p.is_active = 1
+        ');
+        $stmt2->execute([$userId]);
+        $result['my_all_memberships'] = $stmt2->fetchAll();
 
-        if (!empty($orphanAppIds)) {
-            $ids = implode(',', array_map('intval', $orphanAppIds));
-            $updated = $db->exec(
-                "UPDATE plan_projects SET app_id = 1 WHERE app_id IN ($ids)"
-            );
-            $result['projects_app_id_fixed'] = $updated;
-            $result['orphan_app_ids_fixed']  = $orphanAppIds;
-        } else {
-            $result['projects_app_id_fixed'] = 0;
-            $result['note_appid'] = 'No orphan app_ids found';
-        }
+        // Projekty kde jsem creator ale nemám členství
+        $stmt3 = $db->prepare('
+            SELECT p.id, p.name, p.app_id
+            FROM plan_projects p
+            LEFT JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+            WHERE p.created_by = ? AND p.is_active = 1 AND pm.id IS NULL
+        ');
+        $stmt3->execute([$userId, $userId]);
+        $result['my_projects_without_membership'] = $stmt3->fetchAll();
+
+    } else {
+        $result['note'] = 'Nejsi přihlášen – otevři tuto stránku jako přihlášený uživatel v aplikaci';
     }
 
-    // ── FIX B: add missing creator memberships (?fix_members=1) ──────────
+    // ── Celkový stav tabulek ──────────────────────────────────────────────
+    $result['plan_projects_total']        = (int)$db->query("SELECT COUNT(*) FROM plan_projects WHERE is_active=1")->fetchColumn();
+    $result['plan_project_members_total'] = (int)$db->query("SELECT COUNT(*) FROM plan_project_members")->fetchColumn();
+
+    // ── FIX: přidat chybějící membershipy creator → owner ────────────────
     if (($_GET['fix_members'] ?? '') === '1') {
         $orphans = $db->query(
             "SELECT p.id, p.created_by FROM plan_projects p
@@ -69,15 +76,6 @@ try {
         }
         $result['creator_memberships_added'] = $added;
     }
-
-    // ── Summary after fixes ───────────────────────────────────────────────
-    $result['plan_projects_all'] = $db->query(
-        "SELECT p.id, p.app_id, p.name, p.created_by, p.is_active,
-                COUNT(pm.id) as member_count
-         FROM plan_projects p
-         LEFT JOIN plan_project_members pm ON pm.project_id = p.id
-         GROUP BY p.id ORDER BY p.app_id, p.id DESC"
-    )->fetchAll();
 
     $result['ok'] = true;
 } catch (Throwable $e) {
