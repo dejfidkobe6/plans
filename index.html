@@ -2883,35 +2883,71 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #kd-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   #kd-body  { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
-  /* Horizontal snap carousel: swipe left/right between sections */
+  /* Outer scroll: vertical only, regular scroll between chapters */
   #kd-cards-scroll {
     flex: 1; min-height: 0;
-    overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
+  /* Inner: chapters stack vertically (same as desktop), zoom disabled on mobile */
   #kd-cards-inner {
-    flex-direction: row !important;
-    height: 100%;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 0 !important;
     padding: 0 !important;
-    min-height: 0;
+    height: auto !important;
+    zoom: 1 !important;
   }
-  /* Each section = one full-width snap slide */
+  /* Chapter: full width, chapter-header stays sticky on vertical scroll */
+  .kd-chapter {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100%;
+    padding-bottom: 12px;
+  }
+  .kd-chapter-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5;
+    background: var(--bg) !important;
+  }
+  /* Cards row = horizontal snap carousel */
+  .kd-chapter-cards {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 0 !important;
+    padding: 8px 10px !important;
+    align-items: flex-start !important;
+  }
+  /* Each card = one snap slide; slightly narrower than container to show peek of next */
   .kd-card {
-    flex: 0 0 100% !important;
-    width: 100% !important;
+    flex: 0 0 calc(100% - 52px) !important;
+    width: calc(100% - 52px) !important;
     min-width: 0 !important;
     max-height: none !important;
-    height: 100%;
+    height: auto !important;
     scroll-snap-align: start;
-    border-radius: 0;
-    border-left: none; border-right: none; border-top: none;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    margin: 0 8px !important;
+    overflow-y: visible;
   }
-  /* Section header always above tasks – no sticky needed in horizontal layout */
-  .kd-card-header { position: static !important; }
-  /* Tasks scroll vertically within each slide */
-  .kd-tasks-list { flex: 1; overflow-y: auto; }
+  .kd-card-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 4;
+    background: var(--panel) !important;
+    border-radius: 8px 8px 0 0 !important;
+  }
+  .kd-tasks-list { overflow-y: visible !important; max-height: none !important; }
+  /* Hide add-card button inside snap row (use add-chapter-btn-main instead) */
+  .kd-add-card-btn { display: none !important; }
+  .kd-add-chapter-btn-main { display: none !important; }
 
   /* Task controls wrap on small screens */
   .kd-task-row { flex-wrap: wrap; }
