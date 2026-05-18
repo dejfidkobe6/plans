@@ -11065,7 +11065,7 @@ function kdBuildTask(rec, card, task, isLive) {
         dateFormat: 'Y-m-d',
         defaultDate: iso || null,
         positionElement: txt,
-        disableMobile: false,
+        disableMobile: true,
         onDayCreate: (_s, _c, _fp, dayEl) => {
           if (dayEl.dateObj) {
             const d = dayEl.dateObj.getDay();
@@ -11165,7 +11165,7 @@ function kdAddTask(rec, card) {
   card.tasks.push(task); kdSave(); kdRenderContent();
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const el = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`);
-    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); el.focus(); }
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
   }));
 }
 
@@ -12308,7 +12308,7 @@ setInterval(_pollLiveSync, 3000);
     locale: { firstDayOfWeek: 1, weekdays: { shorthand: ['Ne','Po','Út','St','Čt','Pá','So'], longhand: ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'] }, months: { shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'], longhand: ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'] } },
     dateFormat: 'Y-m-d',
     allowInput: true,
-    disableMobile: false
+    disableMobile: true
   };
 
   function initFP(el) {
