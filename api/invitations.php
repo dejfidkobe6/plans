@@ -90,19 +90,19 @@ if ($method === 'POST') {
         $invitedUserId = (int)$registeredUser['id'];
 
         // Zkontroluj zda uživatel není již členem projektu
-        $check = $db->prepare('SELECT id FROM project_members WHERE project_id = ? AND user_id = ?');
+        $check = $db->prepare('SELECT id FROM plan_project_members WHERE project_id = ? AND user_id = ?');
         $check->execute([$projectId, $invitedUserId]);
         if ($check->fetch()) jsonError('Uživatel je již členem projektu');
 
         // Přidej uživatele přímo do projektu
-        $db->prepare('INSERT INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,?,?)')
+        $db->prepare('INSERT INTO plan_project_members (project_id, user_id, role, invited_by) VALUES (?,?,?,?)')
            ->execute([$projectId, $invitedUserId, $role, $userId]);
 
         // Odešli notifikační email pokud je Brevo nakonfigurovaný
         $mailSent = false;
         if (defined('BREVO_API_KEY') && BREVO_API_KEY) {
             try {
-                $proj = $db->prepare('SELECT name FROM projects WHERE id = ? LIMIT 1');
+                $proj = $db->prepare('SELECT name FROM plan_projects WHERE id = ? LIMIT 1');
                 $proj->execute([$projectId]);
                 $projName  = htmlspecialchars($proj->fetch()['name'] ?? 'projekt', ENT_QUOTES, 'UTF-8');
                 $roleLabel = htmlspecialchars(['admin'=>'Administrátor','member'=>'Člen','viewer'=>'Pozorovatel'][$role] ?? $role, ENT_QUOTES, 'UTF-8');

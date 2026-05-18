@@ -206,7 +206,7 @@ function getPlansAppId(): int {
     $plansTables = ['plan_canvas_data', 'plan_backgrounds'];
     foreach ($plansTables as $tbl) {
         try {
-            $r = $db->query("SELECT DISTINCT p.app_id FROM projects p
+            $r = $db->query("SELECT DISTINCT p.app_id FROM plan_projects p
                              INNER JOIN `$tbl` t ON t.project_id = p.id
                              WHERE p.app_id IS NOT NULL LIMIT 1")->fetch();
             if ($r && $r['app_id']) { $plansAppId = (int)$r['app_id']; break; }
@@ -216,7 +216,7 @@ function getPlansAppId(): int {
     // 4) Fall back to any app_id in projects if no plans-specific data exists yet
     if (!$plansAppId) {
         try {
-            $r = $db->query("SELECT DISTINCT app_id FROM projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
+            $r = $db->query("SELECT DISTINCT app_id FROM plan_projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
             if ($r && $r['app_id']) $plansAppId = (int)$r['app_id'];
         } catch (\Exception $e) {}
     }
@@ -249,7 +249,7 @@ function _ensureProjectTables(): void {
     $done = true;
     $db = getDB();
 
-    $db->exec("CREATE TABLE IF NOT EXISTS projects (
+    $db->exec("CREATE TABLE IF NOT EXISTS plan_projects (
         id          INT AUTO_INCREMENT PRIMARY KEY,
         app_id      INT          NOT NULL,
         name        VARCHAR(255) NOT NULL,
@@ -261,7 +261,7 @@ function _ensureProjectTables(): void {
         INDEX idx_creator (created_by)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-    $db->exec("CREATE TABLE IF NOT EXISTS project_members (
+    $db->exec("CREATE TABLE IF NOT EXISTS plan_project_members (
         id          INT AUTO_INCREMENT PRIMARY KEY,
         project_id  INT         NOT NULL,
         user_id     INT         NOT NULL,
@@ -273,22 +273,22 @@ function _ensureProjectTables(): void {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     // One-time migration from board_projects → projects (runs only when projects is empty)
-    $empty = ((int)$db->query("SELECT COUNT(*) FROM projects")->fetchColumn()) === 0;
+    $empty = ((int)$db->query("SELECT COUNT(*) FROM plan_projects")->fetchColumn()) === 0;
     if ($empty) {
         try {
             $appRow = $db->query("SELECT id FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch();
             $appId  = $appRow ? (int)$appRow['id'] : 1;
-            $db->exec("INSERT IGNORE INTO projects
+            $db->exec("INSERT IGNORE INTO plan_projects
                            (id, app_id, name, created_by, invite_code, is_active, created_at)
                        SELECT id, app_id, name, created_by, invite_code, is_active, created_at
                        FROM board_projects
                        WHERE app_id = $appId");
-            $db->exec("INSERT IGNORE INTO project_members
+            $db->exec("INSERT IGNORE INTO plan_project_members
                            (id, project_id, user_id, role, invited_by, joined_at)
                        SELECT bpm.id, bpm.project_id, bpm.user_id, bpm.role,
                               bpm.invited_by, bpm.joined_at
                        FROM board_project_members bpm
-                       INNER JOIN projects p ON p.id = bpm.project_id");
+                       INNER JOIN plan_projects p ON p.id = bpm.project_id");
         } catch (\Exception $e) { /* board_projects unavailable – skip */ }
     }
 }
@@ -298,16 +298,16 @@ function _ensureProjectTables(): void {
 // ============================================================
 function getProjectMembership(int $projectId, int $userId): array|false {
     $db   = getDB();
-    $stmt = $db->prepare('SELECT id, role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+    $stmt = $db->prepare('SELECT id, role FROM plan_project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
     $stmt->execute([$projectId, $userId]);
     $row = $stmt->fetch();
     if ($row) return $row;
 
-    // Fallback: pokud je user creator projektu, auto-migruj ho do project_members
-    $check = $db->prepare('SELECT id FROM projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
+    // Fallback: pokud je user creator projektu, auto-migruj ho do plan_project_members
+    $check = $db->prepare('SELECT id FROM plan_projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
     $check->execute([$projectId, $userId]);
     if ($check->fetch()) {
-        $db->prepare('INSERT IGNORE INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
+        $db->prepare('INSERT IGNORE INTO plan_project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
            ->execute([$projectId, $userId, $userId]);
         return ['id' => 0, 'role' => 'owner'];
     }
