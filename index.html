@@ -2059,6 +2059,9 @@ option { background: var(--card); color: var(--text); }
   flex-shrink: 0;
 }
 #close-home-btn:hover { background: var(--card); color: var(--text-bright); }
+/* Mobile back label — hidden on desktop, shown on mobile */
+.mob-back-label { display: none; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.mob-back-x { display: inline; }
 #home-page-header h1 {
   font-size: 20px;
   font-weight: 600;
@@ -2877,11 +2880,18 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Hide secondary sidebar sections on mobile to save space */
   #kd-chapters-section, #kd-backup-section { display: none; }
 
-  /* Close/back buttons – bigger tap targets on mobile */
+  /* Back buttons – show label, hide × on mobile */
+  .mob-back-label { display: inline !important; }
+  .mob-back-x     { display: none !important; }
+
+  /* Close/back buttons – auto width, pill style on mobile */
   #close-anotace-btn, #close-users-btn, #kd-close-btn, #close-home-btn {
-    width: 44px !important;
-    height: 44px !important;
-    font-size: 20px !important;
+    width: auto !important;
+    height: 36px !important;
+    padding: 0 14px !important;
+    gap: 6px;
+    font-size: 13px !important;
+    font-weight: 600 !important;
     border-radius: 8px !important;
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
@@ -2889,8 +2899,16 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    flex-shrink: 0 !important;
     cursor: pointer;
   }
+
+  /* Anotace header – stat row shrinks so back button is always visible */
+  #anotace-page-header { flex-wrap: nowrap; min-height: 52px; }
+  #anotace-stats-row { display: none; }
+
+  /* KD close button sits in sidebar-top which is already flex row */
+  #kd-close-btn { margin-left: auto; }
 
   /* Home page header – wrap on mobile */
   #home-page-header { flex-wrap: wrap; padding: 12px 16px; gap: 8px; margin-bottom: 8px; }
@@ -3778,7 +3796,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="home-page-header">
       <h1>Subdodavatelé projektu</h1>
       <input type="text" id="home-search" placeholder="Hledat profesi nebo firmu...">
-      <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zavřít">×</button>
+      <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
     </div>
     <div id="prof-grid"></div>
   </div>
@@ -3793,7 +3811,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Správa uživatelů
     </div>
-    <button id="close-users-btn" title="Zavřít">×</button>
+    <button id="close-users-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
   </div>
   <div id="users-page-body">
     <div id="members-section">
@@ -3821,7 +3839,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       Anotace
     </div>
     <div id="anotace-stats-row"></div>
-    <button id="close-anotace-btn" title="Zavřít">×</button>
+    <button id="close-anotace-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
   </div>
   <div id="anotace-filters-bar">
     <div class="tfilter-group">
@@ -3877,7 +3895,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div id="kd-sidebar">
     <div id="kd-sidebar-top">
       <span class="kd-page-title">Kontrolní den</span>
-      <button id="kd-close-btn" title="Zavřít">×</button>
+      <button id="kd-close-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
     </div>
     <button id="kd-new-record-btn">+ Nový záznam</button>
     <button id="kd-toggle-done-btn" title="Zobrazit/skrýt splněné úkoly" style="font-size:11px;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);cursor:pointer;white-space:nowrap;width:100%;margin-bottom:4px;">✓ Hotové úkoly</button>
