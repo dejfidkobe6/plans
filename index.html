@@ -2050,6 +2050,15 @@ option { background: var(--card); color: var(--text); }
   margin-bottom: 16px;
   gap: 16px;
 }
+#close-home-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 22px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+#close-home-btn:hover { background: var(--card); color: var(--text-bright); }
 #home-page-header h1 {
   font-size: 20px;
   font-weight: 600;
@@ -2848,10 +2857,49 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #toolbar-right { display: none; }
 
   /* Overlay pages – extend to cover full height minus bottom bar */
-  #home-page, #users-page, #anotace-page {
+  #home-page, #users-page, #anotace-page, #kd-page {
     bottom: 54px;
-    z-index: 950; /* above bottom bar so it doesn't conflict */
+    z-index: 950;
   }
+
+  /* KD page – stack sidebar above main on mobile */
+  #kd-page { flex-direction: column; }
+  #kd-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  #kd-sidebar-top { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  #kd-main { flex: 1; min-height: 0; overflow-y: auto; }
+  /* Hide secondary sidebar sections on mobile to save space */
+  #kd-chapters-section, #kd-backup-section { display: none; }
+
+  /* Close/back buttons – bigger tap targets on mobile */
+  #close-anotace-btn, #close-users-btn, #kd-close-btn, #close-home-btn {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 20px !important;
+    border-radius: 8px !important;
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer;
+  }
+
+  /* Home page header – wrap on mobile */
+  #home-page-header { flex-wrap: wrap; padding: 12px 16px; gap: 8px; margin-bottom: 8px; }
+  #home-page-header h1 { font-size: 16px; flex: 1 0 100%; }
+  #home-search { flex: 1; width: auto; }
+  #close-home-btn { flex-shrink: 0; }
+
+  /* Subdodavatele content padding */
+  #home-subdod-section { padding: 0 12px 12px; }
 
   /* Hide status bar (replaced by bottom bar on mobile) */
   #status-bar { display: none; }
@@ -3362,6 +3410,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/></svg>
       Export
     </button>
+    <button class="mob-action-btn" onclick="toggleKDPage();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+      Kontrolní den
+    </button>
   </div>
   <div id="mobile-dropdown-tools">
     <button class="tb-btn tool-btn mob-tool" data-tool="select" title="Výběr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 2-4 7L5 3z"/></svg></button>
@@ -3726,6 +3778,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="home-page-header">
       <h1>Subdodavatelé projektu</h1>
       <input type="text" id="home-search" placeholder="Hledat profesi nebo firmu...">
+      <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zavřít">×</button>
     </div>
     <div id="prof-grid"></div>
   </div>
