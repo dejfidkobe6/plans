@@ -11539,7 +11539,7 @@ async function renderProjectGrid() {
   grid.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px;">Načítám projekty…</div>';
 
   const { ok, data } = await apiFetch('api/projects.php');
-  const projects = (ok && data.projects) ? data.projects : [];
+  const projects = (ok && data.plan_projects) ? data.plan_projects : [];
 
   grid.innerHTML = '';
 
@@ -11747,8 +11747,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       await showProjectScreen();
       const projId = parseInt(_inviteOk);
       const { ok: pok, data: pd } = await apiFetch('api/projects.php');
-      if (pok && pd.projects) {
-        const proj = pd.projects.find(p => p.id === projId);
+      if (pok && pd.plan_projects) {
+        const proj = pd.plan_projects.find(p => p.id === projId);
         if (proj) { openProject(proj); return; }
       }
       showToast('Byl(a) jsi přidán(a) do projektu!', 'success');
