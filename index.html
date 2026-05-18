@@ -2866,35 +2866,62 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   }
 
   /* KD page – stack sidebar above main on mobile */
-  #kd-page { flex-direction: column; }
+  #kd-page { flex-direction: column !important; }
   #kd-sidebar {
     width: 100% !important;
     min-width: 0 !important;
-    max-height: 220px;
+    max-height: 190px;
     border-right: none;
     border-bottom: 1px solid var(--border);
     overflow-y: auto;
   }
   #kd-sidebar-top { position: sticky; top: 0; background: var(--panel); z-index: 1; }
-  #kd-main { flex: 1; min-height: 0; overflow-y: auto; }
   /* Hide secondary sidebar sections on mobile to save space */
   #kd-chapters-section, #kd-backup-section { display: none; }
 
-  /* KD cards – full width on mobile, no horizontal scroll */
-  #kd-cards-scroll { overflow-x: hidden; }
+  /* KD main: flex column, clips overflow */
+  #kd-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  #kd-body  { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Horizontal snap carousel: swipe left/right between sections */
+  #kd-cards-scroll {
+    flex: 1; min-height: 0;
+    overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  #kd-cards-inner {
+    flex-direction: row !important;
+    height: 100%;
+    gap: 0 !important;
+    padding: 0 !important;
+    min-height: 0;
+  }
+  /* Each section = one full-width snap slide */
   .kd-card {
+    flex: 0 0 100% !important;
     width: 100% !important;
     min-width: 0 !important;
     max-height: none !important;
-    flex-shrink: 1 !important;
+    height: 100%;
+    scroll-snap-align: start;
+    border-radius: 0;
+    border-left: none; border-right: none; border-top: none;
   }
+  /* Section header always above tasks – no sticky needed in horizontal layout */
+  .kd-card-header { position: static !important; }
+  /* Tasks scroll vertically within each slide */
+  .kd-tasks-list { flex: 1; overflow-y: auto; }
+
   /* Task controls wrap on small screens */
   .kd-task-row { flex-wrap: wrap; }
   .kd-task-controls-row { flex-wrap: wrap; }
+  /* Task text always full width */
+  .kd-task-text { width: 100%; }
   /* Meta bar wraps on mobile */
   #kd-meta-bar { flex-wrap: wrap; gap: 6px; }
   #kd-note-input { min-width: 0; width: 100%; }
-  /* Filter bar scrolls horizontally instead of wrapping awkwardly */
+  /* Filter bar scrolls horizontally */
   #kd-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
 
   /* Back buttons – show label, hide × on mobile */
