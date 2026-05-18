@@ -185,31 +185,59 @@ function getPlansAppId(): int {
     static $id = null;
     if ($id) return $id;
     $db = getDB();
-    // Ensure apps table exists (may have been renamed/dropped in shared DB)
-    $db->exec("CREATE TABLE IF NOT EXISTS apps (
-        id      INT AUTO_INCREMENT PRIMARY KEY,
-        app_key VARCHAR(64) NOT NULL UNIQUE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    // Recover existing app_id from projects table if possible
+
+    // 1) Try to recreate apps table if dropped/renamed externally
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS apps (
+            id      INT AUTO_INCREMENT PRIMARY KEY,
+            app_key VARCHAR(64) NOT NULL UNIQUE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (\Exception $e) { /* no CREATE privilege – continue to fallbacks */ }
+
+    // 2) Query apps table for the plans row
     try {
         $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
-    } catch (\Exception $e) { $row = false; }
-    if (!$row) {
-        // Try to find the app_id already used in the projects table
+        if ($row) { $id = (int)$row['id']; return $id; }
+    } catch (\Exception $e) { /* apps table still unavailable */ }
+
+    // 3) Find app_id by joining projects with a plans-specific table (avoids
+    //    confusing board.besix.cz projects which share the same projects table)
+    $plansAppId = null;
+    $plansTables = ['plan_canvas_data', 'plan_backgrounds'];
+    foreach ($plansTables as $tbl) {
         try {
-            $existing = $db->query("SELECT DISTINCT app_id FROM projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
-        } catch (\Exception $e) { $existing = false; }
-        if ($existing && $existing['app_id']) {
-            // Re-register with the same ID so existing projects are found
-            $db->exec("INSERT IGNORE INTO apps (id, app_key) VALUES (" . (int)$existing['app_id'] . ", '" . PLANS_APP_KEY . "')");
-        } else {
-            $db->exec("INSERT IGNORE INTO apps (app_key) VALUES ('" . PLANS_APP_KEY . "')");
-        }
-        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+            $r = $db->query("SELECT DISTINCT p.app_id FROM projects p
+                             INNER JOIN `$tbl` t ON t.project_id = p.id
+                             WHERE p.app_id IS NOT NULL LIMIT 1")->fetch();
+            if ($r && $r['app_id']) { $plansAppId = (int)$r['app_id']; break; }
+        } catch (\Exception $e2) {}
     }
-    if (!$row) jsonError('Nelze inicializovat plans app v DB.', 500);
-    $id = (int)$row['id'];
-    return $id;
+
+    // 4) Fall back to any app_id in projects if no plans-specific data exists yet
+    if (!$plansAppId) {
+        try {
+            $r = $db->query("SELECT DISTINCT app_id FROM projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
+            if ($r && $r['app_id']) $plansAppId = (int)$r['app_id'];
+        } catch (\Exception $e) {}
+    }
+
+    // 5) Re-register in apps table with the found ID so future requests are fast
+    if ($plansAppId) {
+        try {
+            $db->exec("INSERT IGNORE INTO apps (id, app_key) VALUES ($plansAppId, '" . PLANS_APP_KEY . "')");
+        } catch (\Exception $e) {}
+        $id = $plansAppId;
+        return $id;
+    }
+
+    // 6) Fresh install: insert a new row with auto-increment
+    try {
+        $db->exec("INSERT IGNORE INTO apps (app_key) VALUES ('" . PLANS_APP_KEY . "')");
+        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+        if ($row) { $id = (int)$row['id']; return $id; }
+    } catch (\Exception $e) {}
+
+    jsonError('Nelze zjistit plans app_id z DB.', 500);
 }
 
 // ============================================================
