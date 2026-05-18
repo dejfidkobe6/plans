@@ -241,6 +241,59 @@ function getPlansAppId(): int {
 }
 
 // ============================================================
+// Ensure plan project tables exist (creates + migrates from board_projects)
+// ============================================================
+function _ensureProjectTables(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $db = getDB();
+
+    $db->exec("CREATE TABLE IF NOT EXISTS projects (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        app_id      INT          NOT NULL,
+        name        VARCHAR(255) NOT NULL,
+        created_by  INT          NOT NULL,
+        invite_code VARCHAR(64)  DEFAULT NULL,
+        is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_app (app_id),
+        INDEX idx_creator (created_by)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS project_members (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        project_id  INT         NOT NULL,
+        user_id     INT         NOT NULL,
+        role        VARCHAR(32) NOT NULL DEFAULT 'viewer',
+        invited_by  INT         DEFAULT NULL,
+        joined_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_pm (project_id, user_id),
+        INDEX      idx_uid (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // One-time migration from board_projects → projects (runs only when projects is empty)
+    $empty = ((int)$db->query("SELECT COUNT(*) FROM projects")->fetchColumn()) === 0;
+    if ($empty) {
+        try {
+            $appRow = $db->query("SELECT id FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch();
+            $appId  = $appRow ? (int)$appRow['id'] : 1;
+            $db->exec("INSERT IGNORE INTO projects
+                           (id, app_id, name, created_by, invite_code, is_active, created_at)
+                       SELECT id, app_id, name, created_by, invite_code, is_active, created_at
+                       FROM board_projects
+                       WHERE app_id = $appId");
+            $db->exec("INSERT IGNORE INTO project_members
+                           (id, project_id, user_id, role, invited_by, joined_at)
+                       SELECT bpm.id, bpm.project_id, bpm.user_id, bpm.role,
+                              bpm.invited_by, bpm.joined_at
+                       FROM board_project_members bpm
+                       INNER JOIN projects p ON p.id = bpm.project_id");
+        } catch (\Exception $e) { /* board_projects unavailable – skip */ }
+    }
+}
+
+// ============================================================
 // Project membership helper
 // ============================================================
 function getProjectMembership(int $projectId, int $userId): array|false {
@@ -297,3 +350,6 @@ function sendMail(string $to, string $subject, string $htmlBody): bool {
     $headers .= "Content-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
     return (bool)@mail($to, $subject, $htmlBody, $headers);
 }
+
+// Auto-create / migrate project tables on first request
+_ensureProjectTables();
