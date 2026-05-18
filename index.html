@@ -1545,7 +1545,7 @@ option { background: var(--card); color: var(--text); }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-  position: sticky; top: 38px; z-index: 9;
+  position: sticky; top: 0; z-index: 9;
   background: var(--panel); border-radius: 8px 8px 0 0;
 }
 .kd-card-title {
@@ -2879,6 +2879,23 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #kd-main { flex: 1; min-height: 0; overflow-y: auto; }
   /* Hide secondary sidebar sections on mobile to save space */
   #kd-chapters-section, #kd-backup-section { display: none; }
+
+  /* KD cards – full width on mobile, no horizontal scroll */
+  #kd-cards-scroll { overflow-x: hidden; }
+  .kd-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: none !important;
+    flex-shrink: 1 !important;
+  }
+  /* Task controls wrap on small screens */
+  .kd-task-row { flex-wrap: wrap; }
+  .kd-task-controls-row { flex-wrap: wrap; }
+  /* Meta bar wraps on mobile */
+  #kd-meta-bar { flex-wrap: wrap; gap: 6px; }
+  #kd-note-input { min-width: 0; width: 100%; }
+  /* Filter bar scrolls horizontally instead of wrapping awkwardly */
+  #kd-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
 
   /* Back buttons – show label, hide × on mobile */
   .mob-back-label { display: inline !important; }
