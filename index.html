@@ -8324,7 +8324,10 @@ function saveAnnotEdit() {
         fabObj.dateFrom  = ann.dateFrom;
       }
     }
-    saveState();
+    // Inactive level edit — flush quickly before next poll can overwrite
+    _hasPendingSave = true;
+    clearTimeout(_srvTimer);
+    _srvTimer = setTimeout(_serverSaveNow, 300);
   }
 
   closeAnnotEditModal();
@@ -9698,14 +9701,17 @@ function _flushSave() {
 }
 
 // ---- Server save (debounce 2 s) ----
-let _srvTimer = null;
+let _srvTimer        = null;
+let _hasPendingSave  = false; // true while debounce is queued or save is in-flight
 function _serverSave() {
   if (_isProjectLoading) return; // don't schedule during async canvas load
   clearTimeout(_srvTimer);
+  _hasPendingSave = true;
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
 let _saving = false;
 async function _serverSaveNow() {
+  _hasPendingSave = false;
   if (!currentProject || _isProjectLoading || _saving || !canEdit()) return;
   _saving = true;
   // Capture active level canvas into appState before serialising
@@ -12021,6 +12027,7 @@ async function _pollLiveSync() {
     remoteLevels.forEach((remLvl, i) => {
       if (i === appState.activeLevel) return; // never overwrite active level
       if (!appState.levels[i]) return;
+      if (_hasPendingSave) return; // local has unsaved edits – don't overwrite
       // Detect background replacement (crop) before overwriting the stored URL
       const bgChanged = remLvl.bgServerUrl && remLvl.bgServerUrl !== appState.levels[i].bgServerUrl;
       appState.levels[i].fabricJSON       = remLvl.fabricJSON;
