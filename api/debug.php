@@ -13,6 +13,21 @@ try {
     $db = getDB();
     $result['db'] = 'connected';
 
+    // List all tables in DB
+    $tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+    $result['tables'] = $tables;
+
+    // Check key tables
+    foreach (['apps','projects','project_members','plan_canvas_data','plan_backgrounds'] as $tbl) {
+        $result['table_exists'][$tbl] = in_array($tbl, $tables);
+    }
+
+    // Count projects rows
+    try {
+        $result['projects_count'] = $db->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+        $result['projects_app_ids'] = $db->query("SELECT DISTINCT app_id FROM projects")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Exception $e) { $result['projects_error'] = $e->getMessage(); }
+
     try { $app = $db->query("SELECT id, app_key FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch(); } catch (\Exception $e) { $app = false; }
     $result['plans_app'] = $app ?: 'NOT FOUND';
 
