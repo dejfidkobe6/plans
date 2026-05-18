@@ -184,8 +184,30 @@ function logoutSession(): void {
 function getPlansAppId(): int {
     static $id = null;
     if ($id) return $id;
-    $row = getDB()->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
-    if (!$row) jsonError('Plans app není registrována v DB. Spusť setup.sql.', 500);
+    $db = getDB();
+    // Ensure apps table exists (may have been renamed/dropped in shared DB)
+    $db->exec("CREATE TABLE IF NOT EXISTS apps (
+        id      INT AUTO_INCREMENT PRIMARY KEY,
+        app_key VARCHAR(64) NOT NULL UNIQUE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Recover existing app_id from projects table if possible
+    try {
+        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+    } catch (\Exception $e) { $row = false; }
+    if (!$row) {
+        // Try to find the app_id already used in the projects table
+        try {
+            $existing = $db->query("SELECT DISTINCT app_id FROM projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
+        } catch (\Exception $e) { $existing = false; }
+        if ($existing && $existing['app_id']) {
+            // Re-register with the same ID so existing projects are found
+            $db->exec("INSERT IGNORE INTO apps (id, app_key) VALUES (" . (int)$existing['app_id'] . ", '" . PLANS_APP_KEY . "')");
+        } else {
+            $db->exec("INSERT IGNORE INTO apps (app_key) VALUES ('" . PLANS_APP_KEY . "')");
+        }
+        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+    }
+    if (!$row) jsonError('Nelze inicializovat plans app v DB.', 500);
     $id = (int)$row['id'];
     return $id;
 }

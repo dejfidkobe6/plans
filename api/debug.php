@@ -13,7 +13,7 @@ try {
     $db = getDB();
     $result['db'] = 'connected';
 
-    $app = $db->query("SELECT id, app_key FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch();
+    try { $app = $db->query("SELECT id, app_key FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch(); } catch (\Exception $e) { $app = false; }
     $result['plans_app'] = $app ?: 'NOT FOUND';
 
     $appId = getPlansAppId();
