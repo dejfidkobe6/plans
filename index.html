@@ -1541,12 +1541,11 @@ option { background: var(--card); color: var(--text); }
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
   max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  overflow-y: auto;
+  overflow: hidden;
 }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-  position: sticky; top: 0; z-index: 9;
   background: var(--panel); border-radius: 8px 8px 0 0;
 }
 .kd-card-title {
@@ -1568,7 +1567,7 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-card-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
 .kd-tasks-list {
-  flex: 1; overflow-y: visible; padding: 5px 6px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 5px 6px;
   display: flex; flex-direction: column; gap: 4px;
 }
 .kd-task {
@@ -10516,31 +10515,28 @@ function kdSave() {
   _kdDirectSave();  // dedicated KD endpoint – not blocked by _isProjectLoading
 }
 
-let _kdSaveTimer = null;
-let _kdLastKdTs  = null;   // KD-specific updated_at from server
+let _kdSaveTimer   = null;
+let _kdLastKdTs    = null;   // KD-specific updated_at from server
+let _kdSavePending = false;  // true while a save is in-flight (blocks merge to protect deletions)
 
 function _kdDirectSave() {
   clearTimeout(_kdSaveTimer);
+  _kdSavePending = true;
   _kdSaveTimer = setTimeout(async () => {
-    if (!currentProject) return;
+    if (!currentProject) { _kdSavePending = false; return; }
     try {
       const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
-      const { ok, data } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
+      const { ok } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formBody,
       });
-      // Server returns merged records (may include items added by concurrent users)
-      if (ok && Array.isArray(data.records)) {
-        const hadChange = _kdMergeFromServer(data.records);
-        if (hadChange) {
-          const pid = currentProject?.id;
-          try { if (pid) localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords)); } catch(e) {}
-          const kdPage = document.getElementById('kd-page');
-          if (kdPage && kdPage.classList.contains('visible')) kdRenderPage();
-        }
-      }
+      // Don't merge response — client already has the correct post-deletion state.
+      // Merging here would undo local deletions (server still has old data until this save).
+      // Concurrent additions from other users are handled by _pollKDSync.
+      if (ok) _kdLastKdTs = null; // force next poll to fetch fresh server state
     } catch(e) { console.error('[kd] save error:', e); }
+    finally { _kdSavePending = false; }
   }, 1000);
 }
 
@@ -10556,6 +10552,9 @@ async function _kdServerLoad(projectId) {
 // Returns true if anything was added (so caller can re-render).
 function _kdMergeFromServer(serverRecords) {
   if (!Array.isArray(serverRecords)) return false;
+  // Skip merge while a save is in-flight — merging now would restore locally-deleted items
+  // because the server hasn't received the deletion yet.
+  if (_kdSavePending) return false;
   serverRecords.forEach(rec => {
     if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
   });
