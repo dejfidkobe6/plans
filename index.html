@@ -1541,12 +1541,11 @@ option { background: var(--card); color: var(--text); }
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
   max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  overflow-y: auto;
+  overflow: hidden;
 }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-  position: sticky; top: 0; z-index: 9;
   background: var(--panel); border-radius: 8px 8px 0 0;
 }
 .kd-card-title {
@@ -1568,7 +1567,7 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-card-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
 .kd-tasks-list {
-  flex: 1; overflow-y: visible; padding: 5px 6px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 5px 6px;
   display: flex; flex-direction: column; gap: 4px;
 }
 .kd-task {
