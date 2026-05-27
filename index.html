@@ -8526,7 +8526,7 @@ function openPDFExport() {
   const pinnedProf = profList.filter(p => p.exportPinned);
   const nonPinnedProf = profList.filter(p => !p.exportPinned);
   const pinnedHtml = pinnedProf.map(p => `
-    <label class="pdf-check-label" style="opacity:0.65;cursor:default;" title="Vždy zahrnuto (nastaveno jako fixní)">
+    <label class="pdf-check-label" style="opacity:0.6;cursor:default;" title="Vždy zahrnuto (nastaveno jako fixní)">
       <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
       <span style="font-size:10px;margin-right:2px;">🔒</span>
       ${escHtml(p.firma || p.name)}
@@ -8537,22 +8537,10 @@ function openPDFExport() {
       <input type="checkbox" class="pdf-profese-check" value="${escHtml(p.name)}" checked>
       ${escHtml(p.firma || p.name)}
     </label>`).join('');
-  profEl.innerHTML = `<label class="pdf-check-label">
-      <input type="checkbox" id="pdf-all-profese" checked> Všichni subdodavatelé
-    </label>
-    <div class="pdf-profese-checks" id="pdf-profese-checks" style="display:none">
-      ${pinnedHtml}${filterHtml}
-    </div>`;
-
-  // Toggle individual profese
-  setTimeout(() => {
-    const allCb = document.getElementById('pdf-all-profese');
-    const checksDiv = document.getElementById('pdf-profese-checks');
-    allCb.addEventListener('change', () => {
-      checksDiv.style.display = allCb.checked ? 'none' : 'flex';
-      checksDiv.style.flexDirection = 'column';
-    });
-  }, 0);
+  const allProfHtml = profList.length === 0
+    ? '<span style="font-size:12px;color:var(--text-dim)">Žádné profese</span>'
+    : pinnedHtml + filterHtml;
+  profEl.innerHTML = allProfHtml;
 
   document.getElementById('pdf-export-overlay').classList.add('visible');
 }
@@ -9076,7 +9064,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   const TITLE_H = 10;
   pdf.setFillColor(242, 244, 240); pdf.rect(lx, ly, lw, TITLE_H, 'F');
   pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
-  pdf.text('DOCHAZKOBY LIST', lx + 3, ly + TITLE_H * 0.65);
+  pdf.text(cs('DOCHÁZKOVÝ LIST'), lx + 3, ly + TITLE_H * 0.65);
 
   // "Datum konání KD:" label + editable text field
   const dateLabel = 'Datum konani KD:';
@@ -9187,20 +9175,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – always draw the empty box, overlay AcroForm field for interactivity
+    // Checkbox – drawn as empty square for hand-marking at the meeting
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
     pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
     pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
-    try {
-      const cb = new pdf.AcroForm.CheckBox();
-      cb.fieldName = 'ucast_' + i;
-      cb.Rect = [cbX, cbY, cbSize, cbSize];
-      cb.value = 'Off';
-      cb.borderWidth = 0;
-      pdf.addField(cb);
-    } catch(e) { /* visual box already drawn */ }
 
     // Row separator
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9227,14 +9207,6 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const cbY = rowY + (ROW_H - cbSize) / 2;
     pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
     pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
-    try {
-      const cb = new pdf.AcroForm.CheckBox();
-      cb.fieldName = 'ucast_empty_' + i;
-      cb.Rect = [cbX, cbY, cbSize, cbSize];
-      cb.value = 'Off';
-      cb.borderWidth = 0;
-      pdf.addField(cb);
-    } catch(e) { /* visual box already drawn */ }
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
@@ -9475,9 +9447,11 @@ async function doExportPDF() {
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
   if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
 
-  const allKdProf = document.getElementById('pdf-all-profese').checked;
-  const kdSubFilter = allKdProf ? [] : [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
+  const checkedKdProf = [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
+  const allNonPinnedCount = (appState.profese||[]).filter(p => !p.exportPinned).length;
   const pinnedProfNames = (appState.profese||[]).filter(p => p.exportPinned).map(p => p.name);
+  // kdSubFilter empty = include all; otherwise restrict to these + pinned
+  const kdSubFilter = checkedKdProf.length === allNonPinnedCount ? [] : checkedKdProf;
   const inclHotovo = document.getElementById('pdf-opt-hotovo').checked;
 
   const btn = document.getElementById('pdf-export-do-btn');
