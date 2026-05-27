@@ -9871,8 +9871,12 @@ function _serverSave() {
 }
 let _saving = false;
 async function _serverSaveNow() {
-  _hasPendingSave = false;
-  if (!currentProject || _isProjectLoading || _saving || !canEdit()) return;
+  // Keep _hasPendingSave = true until save fully completes — prevents _pollLiveSync
+  // from overwriting appState with stale server data during in-flight network call.
+  if (!currentProject || _isProjectLoading || _saving || !canEdit()) {
+    _hasPendingSave = false; // bail-out path: safe to clear
+    return;
+  }
   _saving = true;
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
@@ -9926,7 +9930,7 @@ async function _serverSaveNow() {
       }
     }
   } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
-  finally { _saving = false; }
+  finally { _saving = false; _hasPendingSave = false; }
 }
 
 // ---- Apply server-added objects (concurrent-save merge) ----
