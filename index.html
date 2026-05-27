@@ -2290,6 +2290,8 @@ option { background: var(--card); color: var(--text); }
 }
 .profese-action-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
 .profese-action-btn.danger:hover { background: rgba(239,68,68,0.15); color: #EF4444; border-color: rgba(239,68,68,0.4); }
+.profese-action-btn.pinned { background: rgba(107,124,58,0.15); color: #5a7a25; border-color: rgba(107,124,58,0.5); }
+.profese-action-btn.pinned:hover { background: rgba(107,124,58,0.25); }
 .profese-edit-form {
   padding: 12px 14px;
   background: rgba(0,0,0,0.04);
@@ -4220,7 +4222,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div id="pdf-export-levels"></div>
       </div>
       <div class="pdf-section">
-        <div class="pdf-section-title">Subdodavatelé / profese</div>
+        <div class="pdf-section-title">Filtr subdodavatelů v KD</div>
         <div id="pdf-export-profese"></div>
       </div>
       <div class="pdf-section">
@@ -8521,15 +8523,25 @@ function openPDFExport() {
 
   const profEl = document.getElementById('pdf-export-profese');
   const profList = appState.profese || [];
+  const pinnedProf = profList.filter(p => p.exportPinned);
+  const nonPinnedProf = profList.filter(p => !p.exportPinned);
+  const pinnedHtml = pinnedProf.map(p => `
+    <label class="pdf-check-label" style="opacity:0.65;cursor:default;" title="Vždy zahrnuto (nastaveno jako fixní)">
+      <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
+      <span style="font-size:10px;margin-right:2px;">🔒</span>
+      ${escHtml(p.firma || p.name)}
+    </label>`).join('');
+  const filterHtml = nonPinnedProf.map(p => `
+    <label class="pdf-check-label">
+      <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
+      <input type="checkbox" class="pdf-profese-check" value="${escHtml(p.name)}" checked>
+      ${escHtml(p.firma || p.name)}
+    </label>`).join('');
   profEl.innerHTML = `<label class="pdf-check-label">
-      <input type="checkbox" id="pdf-all-profese" checked> Všechny profese
+      <input type="checkbox" id="pdf-all-profese" checked> Všichni subdodavatelé
     </label>
     <div class="pdf-profese-checks" id="pdf-profese-checks" style="display:none">
-      ${profList.map(p => `<label class="pdf-check-label">
-        <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
-        <input type="checkbox" class="pdf-profese-check" value="${escHtml(p.name)}" checked>
-        ${escHtml(p.name)}
-      </label>`).join('')}
+      ${pinnedHtml}${filterHtml}
     </div>`;
 
   // Toggle individual profese
@@ -9237,7 +9249,11 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   pdf.text('* Datum konani KD a pritomnost ucastniku lze upravit primo v PDF readeru.', lx + 2, ly + lh - 1.5);
 }
 
-function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
+function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = [], pinnedProfNames = []) {
+  const taskMatchesSub = t => {
+    if (!kdSubFilter.length) return true;
+    return pinnedProfNames.includes(t.sub) || kdSubFilter.includes(t.sub);
+  };
   const PT_MM = 72 / 25.4;
   const textW = (t, fspt) => pdf.getStringUnitWidth(csText(t)) * fspt / PT_MM;
   const fitT  = (t, fspt, maxW) => {
@@ -9268,8 +9284,8 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
   // Gather tasks & counts (for badges)
   const allTasks=[];
   (rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(card=>(card.tasks||[]).forEach(task=>allTasks.push({...task,sectionTitle:card.title||'',chapterTitle:ch.title||''}))));
-  const visible=allTasks.filter(t=>inclDone||!t.done);
-  const visibleCnt=visible.length, urgCnt=visible.filter(t=>t.urgent).length, doneCnt=allTasks.filter(t=>t.done).length;
+  const visible=allTasks.filter(t=>(inclDone||!t.done)&&taskMatchesSub(t));
+  const visibleCnt=visible.length, urgCnt=visible.filter(t=>t.urgent).length, doneCnt=allTasks.filter(t=>t.done&&taskMatchesSub(t)).length;
 
   // Draw logo/title bar (top 11mm)
   const drawPageHeader = () => {
@@ -9308,6 +9324,10 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
       if (urgCnt>0) drawBadge(urgCnt+' urgent.',[255,220,220],[239,68,68]);
       drawBadge(visibleCnt+' ukolu',[238,242,230],[107,124,58]);
       if (!inclDone&&doneCnt>0) drawBadge(doneCnt+' hotovo',[220,242,230],[34,197,94]);
+      if (kdSubFilter.length>0) {
+        const filterLabel='Filtr: '+[...pinnedProfNames,...kdSubFilter].map(n=>{const p=(appState.profese||[]).find(x=>x.name===n);return p?.firma||p?.name||n;}).join(', ');
+        drawBadge(filterLabel,[230,240,255],[60,100,200]);
+      }
       if (rec.note&&rec.note.trim()) {
         pdf.setFont('helvetica','normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
         const nw=lw*0.3; pdf.text(fitT(rec.note,5,nw),lx+lw-nw-1,ly+TITLE_H*0.70);
@@ -9340,7 +9360,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
   const items=[];
   (rec.chapters||[]).forEach(ch=>{
     const chUrgent=(ch.cards||[]).flatMap(card=>
-      (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.urgent)
+      (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.urgent&&taskMatchesSub(t))
         .map(t=>({...t,sectionTitle:card.title||'',chapterTitle:ch.title||''}))
     );
     const chItems=[];
@@ -9349,7 +9369,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone) {
       chUrgent.forEach(t=>chItems.push({type:'task',task:t}));
     }
     (ch.cards||[]).forEach(card=>{
-      const cardTasks=(card.tasks||[]).filter(t=>(inclDone||!t.done)&&!t.urgent);
+      const cardTasks=(card.tasks||[]).filter(t=>(inclDone||!t.done)&&!t.urgent&&taskMatchesSub(t));
       if (!cardTasks.length) return;
       chItems.push({type:'section-header',title:card.title||''});
       cardTasks.forEach(task=>chItems.push({type:'task',task:{...task,sectionTitle:card.title||'',chapterTitle:ch.title||''}}));
@@ -9455,8 +9475,9 @@ async function doExportPDF() {
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
   if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
 
-  const allProf = document.getElementById('pdf-all-profese').checked;
-  const profeseFilter = allProf ? [] : [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
+  const allKdProf = document.getElementById('pdf-all-profese').checked;
+  const kdSubFilter = allKdProf ? [] : [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
+  const pinnedProfNames = (appState.profese||[]).filter(p => p.exportPinned).map(p => p.name);
   const inclHotovo = document.getElementById('pdf-opt-hotovo').checked;
 
   const btn = document.getElementById('pdf-export-do-btn');
@@ -9492,7 +9513,6 @@ async function doExportPDF() {
       const lvl = appState.levels[idx];
       if (!lvl) return m;
       let anns = [...(lvl.annotations || [])];
-      if (profeseFilter.length > 0) anns = anns.filter(a => profeseFilter.includes(a.profese));
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
       return Math.max(m, anns.length);
     }, 0);
@@ -9512,7 +9532,6 @@ async function doExportPDF() {
       if (!level) continue;
 
       let anns = [...(level.annotations || [])];
-      if (profeseFilter.length > 0) anns = anns.filter(a => profeseFilter.includes(a.profese));
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
       // Urgence first, then alphabetically by firma within each group
       anns.sort((a, b) => {
@@ -9591,11 +9610,15 @@ async function doExportPDF() {
       const sortedKdRecs = [...kdRecords]
         .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
       for (const rec of sortedKdRecs) {
-        const hasVisible = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
+        const hasVisible = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>{
+          if (!inclHotovo && t.done) return false;
+          if (!kdSubFilter.length) return true;
+          return pinnedProfNames.includes(t.sub) || kdSubFilter.includes(t.sub);
+        })));
         if (!hasVisible) continue;
         if (!first) pdf.addPage();
         first = false;
-        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
+        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo, kdSubFilter, pinnedProfNames);
       }
     }
 
@@ -10162,6 +10185,7 @@ function renderProfeseList() {
         <div class="profese-row-name">${escHtml(prof.firma || prof.name)}</div>
         <div class="profese-row-firma">${escHtml(prof.name)}</div>
         <div class="profese-row-actions">
+          <button class="profese-action-btn${prof.exportPinned ? ' pinned' : ''} prof-pin-btn" data-idx="${idx}" title="Vždy zahrnout do KD exportu">${prof.exportPinned ? '📌 Vždy' : '📌'}</button>
           <button class="profese-action-btn prof-edit-btn" data-idx="${idx}">Upravit</button>
           <button class="profese-action-btn danger prof-delete-btn" data-idx="${idx}">Smazat</button>
         </div>
@@ -10222,6 +10246,15 @@ function renderProfeseList() {
     });
   });
 
+  container.querySelectorAll('.prof-pin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      appState.profese[idx].exportPinned = !appState.profese[idx].exportPinned;
+      saveState();
+      renderProfeseList();
+    });
+  });
+
   container.querySelectorAll('.prof-cancel-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
@@ -10241,7 +10274,8 @@ function renderProfeseList() {
       const telefon = form.querySelector('.pf-telefon').value.trim();
       const email = form.querySelector('.pf-email').value.trim();
       const oldName = appState.profese[idx].name; // capture before update
-      appState.profese[idx] = { name, color, firma, kontakt, telefon, email };
+      const exportPinned = appState.profese[idx].exportPinned || false;
+      appState.profese[idx] = { name, color, firma, kontakt, telefon, email, exportPinned };
       // Cascade rename: update all annotations and KD tasks that reference oldName
       if (oldName !== name) {
         appState.levels.forEach(level => {
