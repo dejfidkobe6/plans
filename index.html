@@ -4222,10 +4222,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div id="pdf-export-levels"></div>
       </div>
       <div class="pdf-section">
-        <div class="pdf-section-title">Filtr subdodavatelů v KD</div>
-        <div id="pdf-export-profese"></div>
-      </div>
-      <div class="pdf-section">
         <div class="pdf-section-title">Obsah exportu</div>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
@@ -8521,27 +8517,6 @@ function openPDFExport() {
     </label>`
   ).join('');
 
-  const profEl = document.getElementById('pdf-export-profese');
-  const profList = appState.profese || [];
-  const pinnedProf = profList.filter(p => p.exportPinned);
-  const nonPinnedProf = profList.filter(p => !p.exportPinned);
-  const pinnedHtml = pinnedProf.map(p => `
-    <label class="pdf-check-label" style="opacity:0.6;cursor:default;" title="Vždy zahrnuto (nastaveno jako fixní)">
-      <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
-      <span style="font-size:10px;margin-right:2px;">🔒</span>
-      ${escHtml(p.firma || p.name)}
-    </label>`).join('');
-  const filterHtml = nonPinnedProf.map(p => `
-    <label class="pdf-check-label">
-      <span class="pdf-prof-dot" style="background:${escHtml(p.color)}"></span>
-      <input type="checkbox" class="pdf-profese-check" value="${escHtml(p.name)}" checked>
-      ${escHtml(p.firma || p.name)}
-    </label>`).join('');
-  const allProfHtml = profList.length === 0
-    ? '<span style="font-size:12px;color:var(--text-dim)">Žádné profese</span>'
-    : pinnedHtml + filterHtml;
-  profEl.innerHTML = allProfHtml;
-
   document.getElementById('pdf-export-overlay').classList.add('visible');
 }
 
@@ -9435,6 +9410,238 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
   }
 }
 
+// ── KD in-PDF filter: navigation page ─────────────────────────────────────────
+function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, subPageNums, inclDone) {
+  const csT = s => csText(String(s || ''));
+  const PT_MM = 72 / 25.4;
+  const tw = (t, fs) => pdf.getStringUnitWidth(csT(t)) * fs / PT_MM;
+
+  // Page header
+  pdf.setFillColor(255,255,255); pdf.rect(0,0,PW,11,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
+  const lH=7.5,lW=lH*(943/840),lX=1.5,lY=(11-lH)/2;
+  if (pdfLogo) pdf.addImage(pdfLogo,'PNG',lX,lY,lW,lH);
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+  pdf.text('BeSix Plans',lX+lW+1.5,7.5);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+  pdf.text(csT(currentProject?.name||''),38,7.5);
+  pdf.setTextColor(120,125,115);
+  pdf.text(csT('KD – Filtr subdodavatelu'),PW-68,7.5);
+  pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
+
+  const lx=4, ly=13, lw=PW-8, lh=PH-ly-4;
+  pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.15); pdf.rect(lx,ly,lw,lh,'S');
+
+  // Title bar
+  const TH=10;
+  pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TH,'F');
+  pdf.setFillColor(107,124,58); pdf.rect(lx,ly,4,TH,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(45,70,20);
+  pdf.text(csT('KONTROLNÍ DNY — VÝBĚR SUBDODAVATELE'),lx+7,ly+TH*0.68);
+  pdf.setFont('helvetica','italic'); pdf.setFontSize(5.5); pdf.setTextColor(120,130,100);
+  pdf.text(csT('Klikněte na řádek pro přechod na stranu daného subdodavatele'),lx+lw*0.52,ly+TH*0.68);
+
+  let curY = ly + TH + 5;
+
+  // Task counter helper
+  const countTasks = subName => {
+    let n=0;
+    kdRecords.forEach(rec=>(rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(c=>(c.tasks||[]).forEach(t=>{
+      if((inclDone||!t.done)&&(subName===null||t.sub===subName))n++;
+    }))));
+    return n;
+  };
+
+  const ROW_H=11, FS=7, FS_SM=5.5;
+  const rowX=lx+3, rowW=lw-6;
+
+  // Overview row
+  if (overviewPage) {
+    const cnt=countTasks(null);
+    pdf.setFillColor(238,243,228); pdf.roundedRect(rowX,curY,rowW,ROW_H,1.2,1.2,'F');
+    pdf.setDrawColor(107,124,58); pdf.setLineWidth(0.35); pdf.roundedRect(rowX,curY,rowW,ROW_H,1.2,1.2,'S');
+    pdf.setFillColor(107,124,58); pdf.rect(rowX,curY,4,ROW_H,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(FS); pdf.setTextColor(40,65,20);
+    pdf.text(csT('Celkový přehled — všichni subdodavatelé'),rowX+7,curY+ROW_H*0.64);
+    const cntStr=csT(cnt+' úkolů');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(80,100,55);
+    pdf.text(cntStr,rowX+rowW-tw(cntStr,FS_SM)-8,curY+ROW_H*0.64);
+    pdf.setTextColor(107,124,58);
+    pdf.text('›',rowX+rowW-4,curY+ROW_H*0.68);
+    pdf.link(rowX,curY,rowW,ROW_H,{pageNumber:overviewPage});
+    curY += ROW_H+3;
+  }
+
+  // Per-subcontractor rows (two columns)
+  const subsWithPages = profList.filter(p=>subPageNums[p.name]);
+  const colW = (rowW-4)/2;
+  let col=0;
+  const rowStartX = [rowX, rowX+colW+4];
+
+  subsWithPages.forEach(prof => {
+    if (curY + ROW_H > ly+lh-8) return;
+    const rx = rowStartX[col];
+    const rw = colW;
+    const cnt=countTasks(prof.name);
+    const [r,g,b]=hexToRgb(prof.color||'#888');
+
+    pdf.setFillColor(Math.round(r*.09+255*.91),Math.round(g*.09+255*.91),Math.round(b*.09+255*.91));
+    pdf.roundedRect(rx,curY,rw,ROW_H,1.2,1.2,'F');
+    pdf.setDrawColor(r,g,b); pdf.setLineWidth(0.3); pdf.roundedRect(rx,curY,rw,ROW_H,1.2,1.2,'S');
+    pdf.setFillColor(r,g,b); pdf.rect(rx,curY,4,ROW_H,'F');
+
+    // Firm name bold
+    const firma=csT(prof.firma||prof.name);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(FS); pdf.setTextColor(Math.round(r*.5),Math.round(g*.5),Math.round(b*.5));
+    const fW=tw(firma,FS);
+    pdf.text(firma,rx+7,curY+ROW_H*0.64);
+    // Profese name if different
+    if (prof.firma&&prof.firma!==prof.name) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM-0.5); pdf.setTextColor(130,135,120);
+      pdf.text(csT(' '+prof.name),rx+7+fW,curY+ROW_H*0.64);
+    }
+    // Count
+    const cntStr=csT(cnt+' úkolů');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(r,g,b);
+    pdf.text(cntStr,rx+rw-tw(cntStr,FS_SM)-8,curY+ROW_H*0.64);
+    pdf.setFont('helvetica','bold'); pdf.text('›',rx+rw-4,curY+ROW_H*0.68);
+    pdf.link(rx,curY,rw,ROW_H,{pageNumber:subPageNums[prof.name]});
+
+    col=1-col;
+    if (col===0) curY+=ROW_H+2;
+  });
+  if (col===1) curY+=ROW_H+2;
+
+  // Footer
+  pdf.setFont('helvetica','italic'); pdf.setFontSize(4.5); pdf.setTextColor(160,165,150);
+  pdf.text(csT('* Navigace kliknutím funguje v Adobe Acrobat/Reader, prohlížeči Chrome, Firefox a kompatibilních PDF čtečkách.'),lx+3,ly+lh-1.5);
+}
+
+// ── KD in-PDF filter: single-subcontractor page(s) ────────────────────────────
+function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, navPageNum) {
+  const csT = s => csText(String(s || ''));
+  const PT_MM = 72/25.4;
+  const tw = (t,fs) => pdf.getStringUnitWidth(csT(t))*fs/PT_MM;
+  const fitT = (t,fs,maxW) => { let s=csT(String(t||'')); if(tw(s,fs)<=maxW)return s; while(s.length>1&&tw(s+'...',fs)>maxW)s=s.slice(0,-1); return s+'...'; };
+  const kdFmt = iso => { if(!iso)return ''; const p=iso.split('-'); return p.length===3?`${parseInt(p[2])}.${parseInt(p[1])}.`:''; };
+
+  const [r,g,b] = hexToRgb(prof.color||'#888888');
+
+  // Gather tasks for this subcontractor ordered by KD date desc
+  const entries = [];
+  [...kdRecords].sort((a,z)=>(z.date||'')>(a.date||'')?-1:(z.date||'')<(a.date||'')?1:0).forEach(rec=>{
+    (rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(card=>{
+      (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.sub===prof.name).forEach(task=>{
+        entries.push({recDate:rec.date||'',chapterTitle:ch.title||'',sectionTitle:card.title||'',task});
+      });
+    }));
+  });
+  if (!entries.length) return;
+
+  const lx=4,ly=13,lw=PW-8,lh=PH-ly-4;
+  const TITLE_H=10, COLH_H=5.5;
+  const ROW_FS=5, LH=ROW_FS/PT_MM*1.55;
+
+  // Column positions
+  const C_KD   = lx+1;
+  const C_CHAP = lx+lw*0.07;
+  const C_SEC  = lx+lw*0.21;
+  const C_TASK = lx+lw*0.36;
+  const C_TERM = lx+lw*0.74;
+  const C_LOC  = lx+lw*0.86;
+  const taskMaxW = C_TERM-C_TASK-1;
+  const ROWS_START = ly+TITLE_H+COLH_H+0.5;
+  const pageBottom = ly+lh-0.5;
+
+  const drawPageHeader = () => {
+    pdf.setFillColor(255,255,255); pdf.rect(0,0,PW,11,'F');
+    pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
+    const _lH=7.5,_lW=_lH*(943/840),_lX=1.5,_lY=(11-_lH)/2;
+    if (pdfLogo) pdf.addImage(pdfLogo,'PNG',_lX,_lY,_lW,_lH);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+    pdf.text('BeSix Plans',_lX+_lW+1.5,7.5);
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+    pdf.text(csT(currentProject?.name||''),38,7.5);
+    pdf.setTextColor(120,125,115);
+    const hdr=csT('KD – '+(prof.firma||prof.name));
+    pdf.text(hdr,PW-tw(hdr,8)-5,7.5);
+    pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
+  };
+
+  const getLines = text => {
+    const segs=csT(text||'').split('\n'),out=[];
+    for(const seg of segs){const s=seg.trim();if(!s)continue;const words=s.split(' ');let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(tw(t,ROW_FS)<=taskMaxW)cur=t;else{if(cur)out.push(cur);cur=w;}}if(cur)out.push(cur);}
+    return out.length?out:[''];
+  };
+
+  const drawFrame = isFirst => {
+    pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
+    pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.15); pdf.rect(lx,ly,lw,lh,'S');
+    // Title bar
+    pdf.setFillColor(Math.round(r*.10+255*.90),Math.round(g*.10+255*.90),Math.round(b*.10+255*.90));
+    pdf.rect(lx,ly,lw,TITLE_H,'F');
+    pdf.setFillColor(r,g,b); pdf.rect(lx,ly,5,TITLE_H,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.setTextColor(Math.round(r*.55),Math.round(g*.55),Math.round(b*.55));
+    const subTitle = csT((prof.firma||prof.name)+(prof.firma&&prof.firma!==prof.name?' ('+prof.name+')':''));
+    pdf.text(subTitle,lx+8,ly+TITLE_H*0.65);
+    if (isFirst) {
+      // Badge: task count
+      const badge=csT(entries.length+' úkolů');
+      const bw=tw(badge,5)+2.5;
+      const bx=lx+lw*0.38,by=ly+(TITLE_H-5)/2;
+      pdf.setFillColor(r,g,b); pdf.roundedRect(bx,by,bw,5,0.8,0.8,'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(5); pdf.setTextColor(255,255,255);
+      pdf.text(badge,bx+1.2,by+5*0.72);
+      // Back link
+      const back=csT('← Filtr');
+      const backW=tw(back,5.5)+3;
+      const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-5.5)/2;
+      pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,5.5,0.8,0.8,'F');
+      pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.2); pdf.roundedRect(backX,backY,backW,5.5,0.8,0.8,'S');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(5.5); pdf.setTextColor(60,80,40);
+      pdf.text(back,backX+1.5,backY+5.5*0.72);
+      pdf.link(backX,backY,backW,5.5,{pageNumber:navPageNum});
+    } else {
+      pdf.setFont('helvetica','italic'); pdf.setFontSize(5); pdf.setTextColor(130,135,120);
+      pdf.text(csT('pokračování...'),lx+8,ly+TITLE_H*0.65);
+    }
+    // Column headers
+    const chy=ly+TITLE_H+COLH_H-0.8;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
+    pdf.text('KD',C_KD,chy); pdf.text(csT('Kapitola'),C_CHAP,chy); pdf.text('Sekce',C_SEC,chy);
+    pdf.text(csT('Úkol'),C_TASK,chy); pdf.text(csT('Termín'),C_TERM,chy); pdf.text('Lokace',C_LOC,chy);
+    pdf.setDrawColor(195,200,188); pdf.setLineWidth(0.2); pdf.line(lx,ly+TITLE_H+COLH_H,lx+lw,ly+TITLE_H+COLH_H);
+  };
+
+  drawPageHeader(); drawFrame(true);
+  let curY=ROWS_START, isFirst=true;
+
+  for (const {recDate,chapterTitle,sectionTitle,task} of entries) {
+    const lines=getLines(task.text);
+    const rowH=Math.max(LH+LH*.4,LH*lines.length+LH*.4);
+    if (curY+rowH>pageBottom) {
+      pdf.addPage(); drawPageHeader(); drawFrame(false); curY=ROWS_START; isFirst=false;
+    }
+    const tY=curY+LH*.8;
+    if (task.urgent){pdf.setFillColor(255,246,246);pdf.rect(lx,curY,lw,rowH,'F');}
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS);
+    pdf.setTextColor(80,90,70); pdf.text(fitT(kdFmt(recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
+    pdf.setTextColor(55,65,45); pdf.text(fitT(csT(chapterTitle),ROW_FS,C_SEC-C_CHAP-0.5),C_CHAP,tY);
+    pdf.setTextColor(80,90,70); pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
+    const taskFg=task.urgent?[160,40,40]:[40,50,35];
+    pdf.setTextColor(...taskFg);
+    lines.forEach((line,li)=>{const ty=curY+LH*li+LH*.8;if(ty>curY+rowH-.1)return;pdfTextWithLinks(pdf,line,C_TASK,ty,ROW_FS,taskFg);});
+    const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
+    const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
+    const sFS=Math.max(3,ROW_FS-1);
+    pdf.setFontSize(sFS); pdf.setTextColor(90,105,75); pdf.text(fitT(ts,sFS,C_LOC-C_TERM-0.5),C_TERM,tY);
+    pdf.setTextColor(100,115,120); pdf.text(fitT((task.locations||[]).join(', '),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    pdf.setDrawColor(210,215,205); pdf.setLineWidth(0.1); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
+    curY+=rowH;
+  }
+}
+
 async function doExportPDF() {
   if (!window.jspdf) { showToast('jsPDF se nenačetlo', 'error'); return; }
 
@@ -9447,11 +9654,6 @@ async function doExportPDF() {
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
   if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
 
-  const checkedKdProf = [...document.querySelectorAll('.pdf-profese-check:checked')].map(e => e.value);
-  const allNonPinnedCount = (appState.profese||[]).filter(p => !p.exportPinned).length;
-  const pinnedProfNames = (appState.profese||[]).filter(p => p.exportPinned).map(p => p.name);
-  // kdSubFilter empty = include all; otherwise restrict to these + pinned
-  const kdSubFilter = checkedKdProf.length === allNonPinnedCount ? [] : checkedKdProf;
   const inclHotovo = document.getElementById('pdf-opt-hotovo').checked;
 
   const btn = document.getElementById('pdf-export-do-btn');
@@ -9579,21 +9781,41 @@ async function doExportPDF() {
       }
     }
 
-    // ── KD pages (one per record, sorted newest first) ──────────────────────
+    // ── KD pages ─────────────────────────────────────────────────────────────
     if (includeKD && kdRecords.length > 0) {
       const sortedKdRecs = [...kdRecords]
         .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
+      const profList = appState.profese || [];
+
+      // Reserve blank nav/filter page (filled in after we know all page numbers)
+      if (!first) pdf.addPage();
+      first = false;
+      const navPageNum = pdf.getNumberOfPages();
+
+      // Full overview — all subcontractors
+      let overviewStart = null;
       for (const rec of sortedKdRecs) {
-        const hasVisible = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>{
-          if (!inclHotovo && t.done) return false;
-          if (!kdSubFilter.length) return true;
-          return pinnedProfNames.includes(t.sub) || kdSubFilter.includes(t.sub);
-        })));
-        if (!hasVisible) continue;
-        if (!first) pdf.addPage();
-        first = false;
-        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo, kdSubFilter, pinnedProfNames);
+        const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
+        if (!hasVis) continue;
+        pdf.addPage();
+        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
+        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
       }
+
+      // Per-subcontractor filtered pages
+      const subPageNums = {};
+      for (const prof of profList) {
+        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
+        if (!hasTasks) continue;
+        pdf.addPage();
+        subPageNums[prof.name] = pdf.getNumberOfPages();
+        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, _pdfLogo, PW, PH, inclHotovo, navPageNum);
+      }
+
+      // Now go back and draw the nav/filter page
+      pdf.setPage(navPageNum);
+      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
+      pdf.setPage(pdf.getNumberOfPages());
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
