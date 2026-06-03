@@ -1675,6 +1675,15 @@ option { background: var(--card); color: var(--text); }
   background: var(--bg);
   /* Sticky works because zoom is applied to .kd-chapter-cards, not here */
   position: sticky; top: 0; z-index: 10;
+  overflow: visible;
+}
+.kd-chapter-header::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: -2px; left: 100%;
+  width: 9999px;
+  background: var(--bg);
+  border-bottom: 2px solid var(--olive);
 }
 /* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
 .kd-card-headers-bar {
@@ -1689,6 +1698,15 @@ option { background: var(--card); color: var(--text); }
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+  position: relative; overflow: visible;
+}
+.kd-card-headers-bar-inner::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: -1px; left: 100%;
+  width: 9999px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 .kd-card-headers-bar.active .kd-card-headers-bar-inner { display: flex; }
 .kd-card-hdr-chip {
@@ -11363,8 +11381,6 @@ function kdBuildChapter(rec, ch, isLive) {
   titleInp.className = 'kd-chapter-title-input'; titleInp.value = ch.title || '';
   titleInp.placeholder = 'Název kapitoly...'; titleInp.readOnly = !isLive;
   titleInp.onchange = () => { ch.title = titleInp.value; kdSave(); kdRenderSidebar(); };
-  hdr.appendChild(titleInp);
-
   if (isLive) {
     const delBtn = document.createElement('button'); delBtn.className = 'kd-chapter-del-btn'; delBtn.title = 'Smazat kapitolu'; delBtn.textContent = '✕';
     delBtn.onclick = () => {
@@ -11374,6 +11390,7 @@ function kdBuildChapter(rec, ch, isLive) {
     };
     hdr.appendChild(delBtn);
   }
+  hdr.appendChild(titleInp);
   el.appendChild(hdr);
 
   // Sticky section-names bar (outside zoom — CSS sticky works here)
