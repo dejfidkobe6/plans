@@ -1685,19 +1685,18 @@ option { background: var(--card); color: var(--text); }
 .kd-card-headers-bar-inner {
   display: none;
   flex-direction: row; align-items: center; gap: 6px;
-  padding: 4px 14px;
+  padding: 4px 0;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 3px 8px rgba(0,0,0,0.10);
-  overflow-x: auto; scrollbar-width: none;
 }
-.kd-card-headers-bar-inner::-webkit-scrollbar { display: none; }
 .kd-card-headers-bar.active .kd-card-headers-bar-inner { display: flex; }
 .kd-card-hdr-chip {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
   color: var(--text-bright); background: var(--panel);
   border: 1px solid var(--border); border-radius: 4px;
   padding: 3px 10px; white-space: nowrap; flex-shrink: 0;
+  box-sizing: border-box; text-align: center; overflow: hidden; text-overflow: ellipsis;
 }
 .kd-chapter-title-input {
   flex: 1; background: transparent; border: none; outline: none;
@@ -11012,6 +11011,15 @@ function kdApplyZoom() {
   document.querySelectorAll('#kd-cards-inner .kd-chapter-cards').forEach(el => {
     el.style.zoom = String(_kdZoom);
   });
+  // Sync sticky chip widths/gap to match zoomed card columns
+  const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
+  const chipGap = Math.round(12 * _kdZoom) + 'px';
+  document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar-inner').forEach(inner => {
+    inner.style.gap = chipGap;
+    inner.querySelectorAll('.kd-card-hdr-chip').forEach(chip => {
+      chip.style.width = chipW; chip.style.minWidth = chipW;
+    });
+  });
   _kdUpdateSectionBar();
 }
 
@@ -11371,9 +11379,12 @@ function kdBuildChapter(rec, ch, isLive) {
   // Sticky section-names bar (outside zoom — CSS sticky works here)
   const hdrsBar = document.createElement('div'); hdrsBar.className = 'kd-card-headers-bar';
   const hdrsBarInner = document.createElement('div'); hdrsBarInner.className = 'kd-card-headers-bar-inner';
+  hdrsBarInner.style.gap = Math.round(12 * _kdZoom) + 'px';
   (ch.cards || []).forEach(card => {
     const chip = document.createElement('div'); chip.className = 'kd-card-hdr-chip';
     chip.dataset.cardId = card.id; chip.textContent = card.title || 'Úsek';
+    const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
+    chip.style.width = chipW; chip.style.minWidth = chipW;
     hdrsBarInner.appendChild(chip);
   });
   hdrsBar.appendChild(hdrsBarInner);
