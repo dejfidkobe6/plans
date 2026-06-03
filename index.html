@@ -11094,6 +11094,10 @@ function kdFmtDate(d) {
   return p.length === 3 ? `${p[2]}.${p[1]}.${p[0].slice(2)}` : d;
 }
 
+function _normStr(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 function kdTaskVisible(task) {
   if (!_kdFilter.showDone && task.done) return false;
   // Unassigned tasks (no sub) are always shown regardless of sub filter
@@ -11103,9 +11107,16 @@ function kdTaskVisible(task) {
   if (_kdFilter.dateFrom && task.dateTo && task.dateTo < _kdFilter.dateFrom) return false;
   if (_kdFilter.dateTo && task.dateFrom && task.dateFrom > _kdFilter.dateTo) return false;
   if (_kdFilter.search) {
-    const q = _kdFilter.search.toLowerCase();
-    const haystack = (task.text || '') + ' ' + (task.sub || '') + ' ' + (task.locations || []).join(' ');
-    if (!haystack.toLowerCase().includes(q)) return false;
+    const q = _normStr(_kdFilter.search);
+    const profObj = (appState.profese || []).find(p => p.name === task.sub);
+    const haystack = [
+      task.text || '',
+      task.sub || '',
+      profObj?.firma || '',
+      profObj?.kontakt || '',
+      ...(task.locations || []),
+    ].map(_normStr).join(' ');
+    if (!haystack.includes(q)) return false;
   }
   return true;
 }
