@@ -1672,7 +1672,6 @@ option { background: var(--card); color: var(--text); }
   display: flex; align-items: center; gap: 8px;
   padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
   flex-shrink: 0;
-  position: sticky; top: 0; z-index: 10;
   background: var(--bg);
 }
 .kd-chapter-title-input {
@@ -4033,6 +4032,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <div id="kd-body">
       <div id="kd-filter-bar" style="display:none">
+        <input type="search" id="kdf-search" placeholder="Hledat úkoly..." style="padding:3px 7px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:11px;font-family:var(--font-main);width:160px;flex-shrink:0;">
         <select id="kdf-sub"><option value="">Dodavatel: vše</option></select>
         <select id="kdf-loc"><option value="">Lokace: vše</option></select>
         <input type="date" id="kdf-from" title="Termín od">
@@ -4226,7 +4226,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd" checked> Zahrnout záznamy z kontrolního dne</label>
-        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-dochazka"> Zahrnout docházkový list</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-dochazka" checked> Zahrnout docházkový list</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové/splněné úkoly</label>
       </div>
     </div>
@@ -9150,12 +9150,18 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – drawn as empty square for hand-marking at the meeting
+    // Checkbox – visual box + interactive AcroForm field
     const cbSize = Math.min(4.5, ROW_H * 0.6);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
     pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
     pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      pdf.addField(cb);
+    } catch(e) { /* visual box already drawn */ }
 
     // Row separator
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9182,6 +9188,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const cbY = rowY + (ROW_H - cbSize) / 2;
     pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
     pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_empty_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      pdf.addField(cb);
+    } catch(e) { /* visual box already drawn */ }
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
@@ -9407,6 +9419,97 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
 
     pdf.setDrawColor(210,215,205); pdf.setLineWidth(0.1); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
     curY+=rowH;
+  }
+}
+
+// ── Supplier contacts page (after attendance list) ─────────────────────────────
+function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
+  const cs = t => csText(String(t || ''));
+  const PT_MM = 72 / 25.4;
+
+  const suppliers = (appState.profese || [])
+    .slice().sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
+
+  // Page header
+  pdf.setFillColor(255,255,255); pdf.rect(0,0,PW,11,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
+  const lH=7.5,lW=lH*(943/840),lX=1.5,lY=(11-lH)/2;
+  if (pdfLogo) pdf.addImage(pdfLogo,'PNG',lX,lY,lW,lH);
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+  pdf.text('BeSix Plans',lX+lW+1.5,7.5);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+  pdf.text(cs(currentProject?.name||''),38,7.5);
+  pdf.setTextColor(120,125,115);
+  pdf.text(cs('Subdodavatele a kontakty'),PW-72,7.5);
+  pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
+
+  const lx=4,ly=13,lw=PW-8,lh=PH-ly-4;
+  pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
+  pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.15); pdf.rect(lx,ly,lw,lh,'S');
+
+  const TITLE_H=10, COLH_H=6;
+  pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TITLE_H,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(55,80,30);
+  pdf.text(cs('SUBDODAVATELE A KONTAKTY'),lx+3,ly+TITLE_H*0.65);
+
+  const COL_NR   = { x: lx+1,   w: 7  };
+  const COL_FIRM = { x: lx+8,   w: 68 };
+  const COL_PROF = { x: lx+76,  w: 38 };
+  const COL_KONT = { x: lx+114, w: 50 };
+  const COL_TEL  = { x: lx+164, w: 44 };
+  const COL_EMAIL= { x: lx+208, w: lw-208-1 };
+
+  const COLH_Y = ly+TITLE_H;
+  pdf.setFillColor(228,232,220); pdf.rect(lx,COLH_Y,lw,COLH_H,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(5.5); pdf.setTextColor(55,70,30);
+  const chy = COLH_Y+COLH_H*0.68;
+  pdf.text('#',COL_NR.x,chy); pdf.text('Firma / Dodavatel',COL_FIRM.x,chy);
+  pdf.text(cs('Profese / Role'),COL_PROF.x,chy); pdf.text(cs('Kontaktní osoba'),COL_KONT.x,chy);
+  pdf.text('Telefon',COL_TEL.x,chy); pdf.text('E-mail',COL_EMAIL.x,chy);
+  pdf.setDrawColor(200,205,190); pdf.setLineWidth(0.12);
+  [COL_FIRM,COL_PROF,COL_KONT,COL_TEL,COL_EMAIL].forEach(c=>pdf.line(c.x-1,COLH_Y,c.x-1,COLH_Y+COLH_H));
+
+  const minRows=8,rowCount=Math.max(suppliers.length,minRows);
+  const availH=lh-TITLE_H-COLH_H-5;
+  const ROW_H=Math.min(9,Math.max(4,Math.floor(availH/rowCount)));
+  const ROW_FS=Math.max(4,ROW_H*0.67);
+  const fitT=(t,fs,maxW)=>{let s=cs(t);const w=s=>pdf.getStringUnitWidth(s)*fs/PT_MM;if(w(s)<=maxW)return s;while(s.length>1&&w(s+'…')>maxW)s=s.slice(0,-1);return s+'…';};
+
+  let curY=COLH_Y+COLH_H;
+  suppliers.forEach((p,i)=>{
+    if(curY+ROW_H>ly+lh)return;
+    const [r,g,b]=hexToRgb(p.color||'#888888');
+    pdf.setFillColor(Math.round(r*.15+255*.85),Math.round(g*.15+255*.85),Math.round(b*.15+255*.85));
+    pdf.rect(lx,curY,lw,ROW_H,'F');
+    pdf.setFillColor(r,g,b); pdf.rect(lx,curY,1.8,ROW_H,'F');
+    const tY=curY+ROW_H*.62;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40,45,35);
+    pdf.text(String(i+1),COL_NR.x,tY);
+    pdf.setFillColor(r,g,b);
+    const dotR=Math.min(1.3,ROW_H*.16);
+    pdf.circle(COL_FIRM.x+dotR+0.5,curY+ROW_H/2,dotR,'F');
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(40,45,35);
+    pdf.text(fitT(p.firma||p.name,ROW_FS,COL_FIRM.w-6),COL_FIRM.x+4,tY);
+    pdf.setTextColor(100,105,90);
+    pdf.text(fitT(p.name,ROW_FS,COL_PROF.w-2),COL_PROF.x,tY);
+    pdf.setTextColor(40,45,35);
+    pdf.text(fitT(p.kontakt||'',ROW_FS,COL_KONT.w-2),COL_KONT.x,tY);
+    pdf.text(fitT(p.telefon||'',ROW_FS,COL_TEL.w-2),COL_TEL.x,tY);
+    pdf.setTextColor(30,90,200);
+    pdf.text(fitT(p.email||'',ROW_FS,COL_EMAIL.w-2),COL_EMAIL.x,tY);
+    pdf.setDrawColor(218,222,212); pdf.setLineWidth(0.1);
+    pdf.line(lx,curY+ROW_H,lx+lw,curY+ROW_H);
+    [COL_FIRM,COL_PROF,COL_KONT,COL_TEL,COL_EMAIL].forEach(c=>pdf.line(c.x-1,curY,c.x-1,curY+ROW_H));
+    curY+=ROW_H;
+  });
+  for(let i=suppliers.length;i<minRows&&curY+ROW_H<=ly+lh;i++){
+    if(i%2===0){pdf.setFillColor(249,251,246);pdf.rect(lx,curY,lw,ROW_H,'F');}
+    const tY=curY+ROW_H*.62;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160,165,150);
+    pdf.text(String(i+1),COL_NR.x,tY);
+    pdf.setDrawColor(218,222,212); pdf.setLineWidth(0.1);
+    pdf.line(lx,curY+ROW_H,lx+lw,curY+ROW_H);
+    curY+=ROW_H;
   }
 }
 
@@ -9701,6 +9804,8 @@ async function doExportPDF() {
       if (!first) pdf.addPage();
       first = false;
       drawDochazkaPDF(pdf, recForDoc, _pdfLogo, PW, PH);
+      pdf.addPage();
+      drawSupplierContactsToPDF(pdf, _pdfLogo, PW, PH);
     }
 
     for (const idx of levelIdxs) {
@@ -10649,7 +10754,7 @@ let _kdLastBackupCheck = null;
 let _kdBackupTimer = null;
 let _kdCardWidth = 420; // px — per-card drag resize base
 let _kdZoom = 1.0;      // CSS zoom applied to entire cards area (Ctrl+scroll)
-let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false };
+let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, search: '' };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -10744,6 +10849,7 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
 
 function kdSave() {
   const pid = currentProject?.id; if (!pid) return;
+  _kdDirty = true;
   localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords));
   _serverSave();    // keep canvas state in sync
   _kdDirectSave();  // dedicated KD endpoint – not blocked by _isProjectLoading
@@ -10752,6 +10858,7 @@ function kdSave() {
 let _kdSaveTimer   = null;
 let _kdLastKdTs    = null;   // KD-specific updated_at from server
 let _kdSavePending = false;  // true while a save is in-flight (blocks merge to protect deletions)
+let _kdDirty       = false;  // true from first local edit until save completes
 
 function _kdDirectSave() {
   clearTimeout(_kdSaveTimer);
@@ -10768,7 +10875,7 @@ function _kdDirectSave() {
       // Don't merge response — client already has the correct post-deletion state.
       // Merging here would undo local deletions (server still has old data until this save).
       // Concurrent additions from other users are handled by _pollKDSync.
-      if (ok) _kdLastKdTs = null; // force next poll to fetch fresh server state
+      if (ok) { _kdLastKdTs = null; _kdDirty = false; } // force next poll to fetch fresh server state
     } catch(e) { console.error('[kd] save error:', e); }
     finally { _kdSavePending = false; }
   }, 1000);
@@ -10792,6 +10899,11 @@ function _kdMergeFromServer(serverRecords) {
   serverRecords.forEach(rec => {
     if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
   });
+  // Full replace when user has no unsaved local edits (pure viewer — sync everything)
+  if (!_kdDirty) {
+    kdRecords = serverRecords;
+    return true;
+  }
 
   let changed = false;
   serverRecords.forEach(sRec => {
@@ -10875,6 +10987,7 @@ function kdSaveZoom() {
 function kdApplyZoom() {
   const inner = document.getElementById('kd-cards-inner');
   if (inner) inner.style.zoom = String(_kdZoom);
+  requestAnimationFrame(_kdUpdateStickyHeaders);
 }
 
 function kdApplyCardWidth() {
@@ -10957,7 +11070,7 @@ function toggleKDPage() {
     kdLoad(); kdLoadBackupSchedule(); kdLoadCardWidth(); kdLoadZoom();
     if (!kdActiveId && kdRecords.length) kdActiveId = kdRecords[kdRecords.length - 1].id;
     page.classList.add('visible'); btn.classList.add('active');
-    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false };
+    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, search: '' };
     _kdViewingBackup = null;
     kdCheckMissedBackup();
     kdRenderPage();
@@ -10983,11 +11096,17 @@ function kdFmtDate(d) {
 
 function kdTaskVisible(task) {
   if (!_kdFilter.showDone && task.done) return false;
-  if (_kdFilter.sub && task.sub !== _kdFilter.sub) return false;
+  // Unassigned tasks (no sub) are always shown regardless of sub filter
+  if (_kdFilter.sub && task.sub && task.sub !== _kdFilter.sub) return false;
   if (_kdFilter.location && !(task.locations || []).includes(_kdFilter.location)) return false;
   if (_kdFilter.urgent && !task.urgent) return false;
   if (_kdFilter.dateFrom && task.dateTo && task.dateTo < _kdFilter.dateFrom) return false;
   if (_kdFilter.dateTo && task.dateFrom && task.dateFrom > _kdFilter.dateTo) return false;
+  if (_kdFilter.search) {
+    const q = _kdFilter.search.toLowerCase();
+    const haystack = (task.text || '') + ' ' + (task.sub || '') + ' ' + (task.locations || []).join(' ');
+    if (!haystack.toLowerCase().includes(q)) return false;
+  }
   return true;
 }
 
@@ -11566,6 +11685,7 @@ function kdSetupPage() {
     _kdBackupSchedule.time = e.target.value || '23:59'; kdSaveBackupSchedule(); kdUpdateBackupNextLabel();
   });
   // Global filter bar
+  document.getElementById('kdf-search').addEventListener('input', e => { _kdFilter.search = e.target.value.trim(); kdRenderContent(); });
   document.getElementById('kdf-sub').addEventListener('change', e => { _kdFilter.sub = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-loc').addEventListener('change', e => { _kdFilter.location = e.target.value || null; kdRenderContent(); });
   document.getElementById('kdf-from').addEventListener('change', e => { _kdFilter.dateFrom = e.target.value || null; kdRenderContent(); });
@@ -11582,11 +11702,33 @@ function kdSetupPage() {
   document.getElementById('kdf-done').addEventListener('change', e => { _kdFilter.showDone = e.target.checked; const btn = document.getElementById('kd-toggle-done-btn'); if (btn) { btn.style.opacity = _kdFilter.showDone ? '1' : '0.5'; } kdRenderContent(); });
   document.getElementById('kdf-sort-sub').addEventListener('change', e => { _kdFilter.sortBySub = e.target.checked; kdRenderContent(); });
   document.getElementById('kdf-reset').addEventListener('click', () => {
-    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false };
+    _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, search: '' };
     const ss = document.getElementById('kdf-sort-sub'); if (ss) ss.checked = false;
     kdRenderContent();
   });
   // Ctrl+scroll to zoom the entire cards area (font size, spacing, everything)
+function _kdUpdateStickyHeaders() {
+  const scroll = document.getElementById('kd-cards-scroll');
+  if (!scroll) return;
+  const scrollRect = scroll.getBoundingClientRect();
+  const zoom = _kdZoom || 1;
+  document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
+    const hdr = ch.querySelector(':scope > .kd-chapter-header');
+    if (!hdr) return;
+    const chRect = ch.getBoundingClientRect();
+    if (chRect.top < scrollRect.top + 2 && chRect.bottom > scrollRect.top + 35) {
+      const localOffset = (scrollRect.top - chRect.top) / zoom;
+      hdr.style.transform = `translateY(${localOffset}px)`;
+      hdr.style.zIndex = '10';
+      hdr.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+    } else {
+      hdr.style.transform = '';
+      hdr.style.zIndex = '';
+      hdr.style.boxShadow = '';
+    }
+  });
+}
+  document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateStickyHeaders, { passive: true });
   document.getElementById('kd-cards-scroll').addEventListener('wheel', e => {
     if (!e.ctrlKey) return;
     e.preventDefault();
