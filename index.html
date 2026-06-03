@@ -1673,23 +1673,9 @@ option { background: var(--card); color: var(--text); }
   padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
   flex-shrink: 0;
   background: var(--bg);
+  /* Sticky works because zoom is applied to .kd-chapter-cards, not here */
+  position: sticky; top: 0; z-index: 10;
 }
-/* Zero-height sticky overlay — lives outside the zoomed #kd-cards-inner */
-#kd-chapter-sticky-bar {
-  position: sticky; top: 0; z-index: 20;
-  height: 0; overflow: visible;
-}
-#kd-chapter-sticky-content {
-  display: none;
-  align-items: center; gap: 8px;
-  padding: 4px 14px 6px;
-  background: var(--bg);
-  border-bottom: 2px solid var(--olive);
-  font-family: var(--font-mono); font-size: 24px; font-weight: 700;
-  color: var(--olive-light); text-transform: uppercase; letter-spacing: 0.06em;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-}
-#kd-chapter-sticky-content.visible { display: flex; }
 .kd-chapter-title-input {
   flex: 1; background: transparent; border: none; outline: none;
   font-family: var(--font-mono); font-size: 24px; font-weight: 700;
@@ -2930,14 +2916,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     width: 100%;
     padding-bottom: 12px;
   }
-  .kd-chapter-header {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 5;
-    background: var(--bg) !important;
-  }
-  /* On mobile, chapter headers use native CSS sticky — hide JS overlay */
-  #kd-chapter-sticky-bar { display: none !important; }
+  .kd-chapter-header { z-index: 6; }
+  /* Force zoom=1 on cards row so .kd-card-header sticky works inside the card */
+  .kd-chapter-cards { zoom: 1 !important; }
   /* Cards row = horizontal snap carousel */
   .kd-chapter-cards {
     display: flex !important;
@@ -11003,9 +10984,9 @@ function kdSaveZoom() {
 }
 
 function kdApplyZoom() {
-  const inner = document.getElementById('kd-cards-inner');
-  if (inner) inner.style.zoom = String(_kdZoom);
-  requestAnimationFrame(_kdUpdateStickyHeaders);
+  document.querySelectorAll('#kd-cards-inner .kd-chapter-cards').forEach(el => {
+    el.style.zoom = String(_kdZoom);
+  });
 }
 
 function kdApplyCardWidth() {
@@ -11298,11 +11279,6 @@ function kdRenderContent() {
   const isLive = !_kdViewingBackup;
   const savedScrollTop = scroll.scrollTop;
   scroll.innerHTML = '';
-  // Zero-height sticky overlay (outside zoomed inner, so CSS sticky works)
-  const stickyBar = document.createElement('div'); stickyBar.id = 'kd-chapter-sticky-bar';
-  const stickyContent = document.createElement('div'); stickyContent.id = 'kd-chapter-sticky-content';
-  stickyBar.appendChild(stickyContent);
-  scroll.appendChild(stickyBar);
   const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
   (rec.chapters || []).forEach(ch => inner.appendChild(kdBuildChapter(rec, ch, isLive)));
 
@@ -11740,30 +11716,7 @@ function kdSetupPage() {
     const ss = document.getElementById('kdf-sort-sub'); if (ss) ss.checked = false;
     kdRenderContent();
   });
-  // Ctrl+scroll to zoom the entire cards area (font size, spacing, everything)
-function _kdUpdateStickyHeaders() {
-  const scroll = document.getElementById('kd-cards-scroll');
-  const bar = document.getElementById('kd-chapter-sticky-content');
-  if (!scroll || !bar) return;
-  const scrollTop = scroll.getBoundingClientRect().top;
-  let activeTitle = null;
-  document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
-    const hdr = ch.querySelector(':scope > .kd-chapter-header');
-    if (!hdr) return;
-    // Once the header's bottom crosses the scroll container top, it's off-screen
-    if (hdr.getBoundingClientRect().bottom <= scrollTop + 1) {
-      const inp = hdr.querySelector('.kd-chapter-title-input');
-      activeTitle = inp ? (inp.value || inp.placeholder || '') : '';
-    }
-  });
-  if (activeTitle !== null) {
-    if (bar.textContent !== activeTitle) bar.textContent = activeTitle;
-    bar.classList.add('visible');
-  } else {
-    bar.classList.remove('visible');
-  }
-}
-  document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateStickyHeaders, { passive: true });
+  // Ctrl+scroll to zoom the cards area
   document.getElementById('kd-cards-scroll').addEventListener('wheel', e => {
     if (!e.ctrlKey) return;
     e.preventDefault();
