@@ -10900,6 +10900,7 @@ let _kdSaveTimer   = null;
 let _kdLastKdTs    = null;   // KD-specific updated_at from server
 let _kdSavePending = false;  // true while a save is in-flight (blocks merge to protect deletions)
 let _kdDirty       = false;  // true from first local edit until save completes
+let _kdPendingRender = false;  // deferred re-render while user types
 
 function _kdDirectSave() {
   clearTimeout(_kdSaveTimer);
@@ -11806,6 +11807,14 @@ function kdSetupPage() {
     kdRenderContent();
   });
   document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
+  document.getElementById('kd-cards-scroll').addEventListener('focusout', e => {
+    if (!_kdPendingRender) return;
+    const scrollEl = document.getElementById('kd-cards-scroll');
+    // relatedTarget is where focus is going — if still inside, don't render yet
+    if (scrollEl && scrollEl.contains(e.relatedTarget)) return;
+    _kdPendingRender = false;
+    kdRenderPage();
+  });
   // Ctrl+scroll to zoom the cards area
   document.getElementById('kd-cards-scroll').addEventListener('wheel', e => {
     if (!e.ctrlKey) return;
@@ -12729,7 +12738,11 @@ async function _pollKDSync() {
     if (mergeChanged) {
       try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
       const kdPage = document.getElementById('kd-page');
-      if (kdPage && kdPage.classList.contains('visible') && !_kdViewingBackup) kdRenderPage();
+      if (kdPage && kdPage.classList.contains('visible') && !_kdViewingBackup) {
+        const scrollEl = document.getElementById('kd-cards-scroll');
+        const userTyping = document.activeElement && scrollEl && scrollEl.contains(document.activeElement);
+        if (userTyping) { _kdPendingRender = true; } else { kdRenderPage(); }
+      }
     }
   } catch(e) { /* network error – skip */ }
 }
