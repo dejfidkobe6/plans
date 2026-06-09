@@ -10848,7 +10848,9 @@ function renderProfeseList() {
         }))));
         kdSave();
       }
-      saveState();
+      _flushSave();
+      clearTimeout(_srvTimer);
+      _serverSaveNow();
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
@@ -10869,7 +10871,9 @@ function renderProfeseList() {
       const confirmed = await showModal('Smazat profesi', `Opravdu smazat profesi "${prof.name}"?`);
       if (!confirmed) return;
       appState.profese.splice(idx, 1);
-      saveState();
+      _flushSave();
+      clearTimeout(_srvTimer);
+      _serverSaveNow();
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
@@ -10890,7 +10894,9 @@ function closeManageProfese() {
 function addNewProfese() {
   const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', emails: [] };
   appState.profese.push(newProf);
-  saveState();
+  _flushSave();
+  clearTimeout(_srvTimer);
+  _serverSaveNow();
   rebuildProfeseSelects();
   renderProfeseList();
   // Open edit form for the newly added item
@@ -12513,8 +12519,8 @@ async function openProject(proj) {
     if (_lsDirty) {
       loadState();
       annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
-      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
-          && (!appState.profese || appState.profese.length === 0)) {
+      // Always prefer server profese — supplier config is shared and server is authoritative
+      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
         appState.profese = serverData.profese;
       }
       // Push the local state to the server immediately to close the gap
