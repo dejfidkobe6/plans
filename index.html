@@ -8596,6 +8596,9 @@ function saveAnnotEdit() {
       fabricCanvas.renderAll();
     }
     saveCurrentLevel();
+    // Explicit user save — override debounce and push to server immediately
+    clearTimeout(_srvTimer);
+    _serverSaveNow();
     updateAnnotList();
   } else {
     // Patch fabricJSON.objects — this is what the server stores and the canvas loads
@@ -10379,6 +10382,7 @@ function _flushSave() {
     localStorage.setItem(LS_PROJECT_STATE(pid), JSON.stringify(_buildStateObj()));
     localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
     localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
+    localStorage.setItem(LS_PROJECT_DIRTY(pid), '1'); // cleared only after confirmed server save
   } catch(e) { /* localStorage plný */ }
 }
 
@@ -10445,6 +10449,7 @@ async function _serverSaveNow() {
       console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
       _lastOwnSaveTs = Date.now();
+      try { localStorage.removeItem(LS_PROJECT_DIRTY(String(currentProject.id))); } catch(e) {}
       // Apply any annotations added concurrently by another user
       if (data?.counter && data.counter > annotIdCounter) annotIdCounter = data.counter;
       if (Array.isArray(data?.serverAdded) && data.serverAdded.length) {
@@ -12207,6 +12212,7 @@ async function cancelInvitation(invId) {
 const LS_PROJECT_STATE        = (pid) => `besix_plans_state_${pid}`;
 const LS_PROJECT_COUNTER      = (pid) => `besix_plans_counter_${pid}`;
 const LS_PROJECT_PROFESE      = (pid) => `besix_plans_profese_${pid}`;
+const LS_PROJECT_DIRTY        = (pid) => `besix_plans_dirty_${pid}`;
 const LS_MEMBER_PROFESE       = (pid) => `besix_plans_member_profese_${pid}`;
 
 let currentUser    = null;  // {id, name, email, avatar_color}
@@ -12475,22 +12481,37 @@ async function openProject(proj) {
 
   if (serverData) {
     _lastKnownTs = serverData.updated_at || null;
-    const s = serverData.state;
-    appState.levels       = s.levels       || [];
-    appState.activeLevel  = s.activeLevel  || 0;
-    appState.tool         = s.tool         || 'select';
-    appState.showGrid     = s.showGrid     || false;
-    appState.zones3D      = s.zones3D      || [];
-    if (Array.isArray(s.kdLocations)) {
-      kdLocations = s.kdLocations;
-      try { localStorage.setItem(LS_KD_LOCATIONS_KEY(String(proj.id)), JSON.stringify(kdLocations)); } catch(e) {}
-    }
-    annotIdCounter        = serverData.counter || 1;
-    if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
-      appState.profese = serverData.profese;
+    // If localStorage has unsaved changes (dirty flag set before server confirmed them),
+    // prefer localStorage so edits made just before a reload are not lost.
+    const _pid = String(proj.id);
+    const _lsDirty = localStorage.getItem(LS_PROJECT_DIRTY(_pid)) === '1';
+    if (_lsDirty) {
+      loadState();
+      annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
+      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
+          && (!appState.profese || appState.profese.length === 0)) {
+        appState.profese = serverData.profese;
+      }
+      // Push the local state to the server immediately to close the gap
+      setTimeout(() => { if (!_isProjectLoading) { clearTimeout(_srvTimer); _serverSaveNow(); } }, 800);
+    } else {
+      const s = serverData.state;
+      appState.levels       = s.levels       || [];
+      appState.activeLevel  = s.activeLevel  || 0;
+      appState.tool         = s.tool         || 'select';
+      appState.showGrid     = s.showGrid     || false;
+      appState.zones3D      = s.zones3D      || [];
+      if (Array.isArray(s.kdLocations)) {
+        kdLocations = s.kdLocations;
+        try { localStorage.setItem(LS_KD_LOCATIONS_KEY(_pid), JSON.stringify(kdLocations)); } catch(e) {}
+      }
+      annotIdCounter        = serverData.counter || 1;
+      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
+        appState.profese = serverData.profese;
+      }
     }
     rebuildProfeseSelects();
-    if (s.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
+    if (appState.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
     setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
     // Re-render KD if already open so supplier chips appear with fresh profese data
     const _kdP = document.getElementById('kd-page');
