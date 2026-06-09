@@ -9821,7 +9821,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   if (!entries.length) return;
 
   const lx=4,ly=13,lw=PW-8,lh=PH-ly-4;
-  const TITLE_H=10, COLH_H=5.5;
+  const TITLE_H=13, COLH_H=5.5;
   const ROW_FS=5, LH=ROW_FS/PT_MM*1.55;
 
   // Column positions
@@ -9845,8 +9845,6 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
     pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
     pdf.text(csT(currentProject?.name||''),38,7.5);
     pdf.setTextColor(120,125,115);
-    const hdr=csT('KD – '+(prof.firma||prof.name));
-    pdf.text(hdr,PW-tw(hdr,8)-5,7.5);
     pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
   };
 
@@ -9876,13 +9874,13 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
       pdf.text(badge,bx+1.2,by+5*0.72);
       // Back link
       const back=csT('← Návrat k filtru');
-      const backBH=7, backBFS=7;
-      const backW=tw(back,backBFS)+4;
+      const backBH=11, backBFS=9;
+      const backW=tw(back,backBFS)+5;
       const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-backBH)/2;
-      pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,backBH,1,1,'F');
-      pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.2); pdf.roundedRect(backX,backY,backW,backBH,1,1,'S');
+      pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,backBH,1.2,1.2,'F');
+      pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.25); pdf.roundedRect(backX,backY,backW,backBH,1.2,1.2,'S');
       pdf.setFont('helvetica','normal'); pdf.setFontSize(backBFS); pdf.setTextColor(60,80,40);
-      pdf.text(back,backX+2,backY+backBH*0.72);
+      pdf.text(back,backX+2.5,backY+backBH*0.67);
       pdf.link(backX,backY,backW,backBH,{pageNumber:navPageNum});
     } else {
       pdf.setFont('helvetica','italic'); pdf.setFontSize(5); pdf.setTextColor(130,135,120);
@@ -10101,36 +10099,29 @@ async function doExportPDF() {
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
-    // Post-process PDF: replace ZapfDingbats checkbox appearance with solid black fill
-    (() => {
-      try {
-        const rawArr = pdf.output('arraybuffer');
-        const rawBytes = new Uint8Array(rawArr);
-        let raw = '';
-        for (let i = 0; i < rawBytes.length; i++) raw += String.fromCharCode(rawBytes[i]);
-        const patched = raw.replace(
-          /\/BBox \[0 0 ([\d.]+) ([\d.]+)\]([\s\S]*?\/Length )\d+(\s*>>\s*stream\r?\n)([\s\S]*?)(\r?\nendstream)/g,
-          (m, w, h, midDict, streamHdr, content, endStr) => {
-            if (!content.includes('ZaDb') && !content.includes('(l) Tj')) return m;
-            const ns = `q\n0 g\n0 0 ${w} ${h} re\nf\nQ\n`;
-            return `/BBox [0 0 ${w} ${h}]${midDict}${ns.length}${streamHdr}${ns}${endStr}`;
-          }
-        );
-        const outBytes = new Uint8Array(patched.length);
-        for (let j = 0; j < patched.length; j++) outBytes[j] = patched.charCodeAt(j) & 0xff;
-        const blob = new Blob([outBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `BeSix-Plans-${name}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
-      } catch (patchErr) {
-        console.warn('Checkbox patch failed, using default:', patchErr);
-        pdf.save(`BeSix-Plans-${name}.pdf`);
-      }
-    })();
+    // Post-process PDF: replace ZapfDingbats checkbox Yes appearance with solid black fill
+    try {
+      const dataUri = pdf.output('datauristring');
+      let raw = atob(dataUri.substring(dataUri.indexOf(',') + 1));
+      raw = raw.replace(
+        /(\/Length )\d+(\s*>>\s*stream\r?\n)([\s\S]*?)(\r?\nendstream)/g,
+        (m, lp, sh, content, es) => {
+          if (!content.includes('ZaDb') && !content.includes('(l) Tj')) return m;
+          const ns = 'q\n0 g\n-0.5 -0.5 100 100 re\nf\nQ\n';
+          return `${lp}${ns.length}${sh}${ns}${es}`;
+        }
+      );
+      const out = new Uint8Array(raw.length);
+      for (let j = 0; j < raw.length; j++) out[j] = raw.charCodeAt(j) & 0xff;
+      const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `BeSix-Plans-${name}.pdf`;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
+    } catch (patchErr) {
+      console.warn('Checkbox patch failed:', patchErr);
+      pdf.save(`BeSix-Plans-${name}.pdf`);
+    }
     closePDFExport();
     showToast('PDF exportováno', 'success');
   } catch (e) {
