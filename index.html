@@ -8664,9 +8664,11 @@ function hexToRgb(hex) {
 }
 // Transliterate Czech chars not in WinAnsiEncoding so jsPDF Helvetica renders them
 function csText(s) {
-  return String(s || '').replace(/[čČěĚňŇřŘůŮďĎťŤšŠžŽ]/g, c =>
-    ({č:'c',Č:'C',ě:'e',Ě:'E',ň:'n',Ň:'N',ř:'r',Ř:'R',
-      ů:'u',Ů:'U',ď:'d',Ď:'D',ť:'t',Ť:'T',š:'s',Š:'S',ž:'z',Ž:'Z'}[c] || c));
+  return String(s || '')
+    .replace(/←/g, '<').replace(/→/g, '>').replace(/«/g, '<<').replace(/»/g, '>>')
+    .replace(/[čČěĚňŇřŘůŮďĎťŤšŠžŽ]/g, c =>
+      ({č:'c',Č:'C',ě:'e',Ě:'E',ň:'n',Ň:'N',ř:'r',Ř:'R',
+        ů:'u',Ů:'U',ď:'d',Ď:'D',ť:'t',Ť:'T',š:'s',Š:'S',ž:'z',Ž:'Z'}[c] || c));
 }
 
 // Draws the level's background image + annotation shapes + ID labels directly
@@ -9321,12 +9323,19 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – plain visual square for physical signing
+    // Interactive checkbox – Yes appearance is patched to solid black by post-processing
     const cbSize = Math.min(5, BASE_ROW_H * 0.65);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
     pdf.setDrawColor(80, 100, 60); pdf.setLineWidth(0.5); pdf.setFillColor(255, 255, 255);
     pdf.roundedRect(cbX, cbY, cbSize, cbSize, 0.6, 0.6, 'FD');
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      cb.value = 'Off'; cb.defaultValue = 'Off'; cb.AS = '/Off';
+      pdf.addField(cb);
+    } catch(e) { /* visual fallback already drawn */ }
 
     // Row + column separators
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9351,6 +9360,13 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const cbY = rowY + (BASE_ROW_H - cbSize) / 2;
     pdf.setDrawColor(80, 100, 60); pdf.setLineWidth(0.5); pdf.setFillColor(255, 255, 255);
     pdf.roundedRect(cbX, cbY, cbSize, cbSize, 0.6, 0.6, 'FD');
+    try {
+      const cb = new pdf.AcroForm.CheckBox();
+      cb.fieldName = 'ucast_empty_' + i;
+      cb.Rect = [cbX, cbY, cbSize, cbSize];
+      cb.value = 'Off'; cb.defaultValue = 'Off'; cb.AS = '/Off';
+      pdf.addField(cb);
+    } catch(e) { /* visual fallback already drawn */ }
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + BASE_ROW_H, lx + lw, rowY + BASE_ROW_H);
@@ -9860,7 +9876,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
       pdf.text(badge,bx+1.2,by+5*0.72);
       // Back link
       const back=csT('← Návrat k filtru');
-      const backBH=11, backBFS=9;
+      const backBH=13, backBFS=10;
       const backW=tw(back,backBFS)+5;
       const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-backBH)/2;
       pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,backBH,1.2,1.2,'F');
@@ -10085,18 +10101,45 @@ async function doExportPDF() {
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
-    // Post-process PDF: replace ZapfDingbats checkbox Yes appearance with solid black fill
+    // Post-process PDF: replace ZapfDingbats checkbox Yes appearance with solid black fill.
+    // Uses a stream-scanner instead of regex because jsPDF puts /Resources after /Length
+    // in the dict, so a simple ">>\s*stream" pattern never matches.
     try {
       const dataUri = pdf.output('datauristring');
       let raw = atob(dataUri.substring(dataUri.indexOf(',') + 1));
-      raw = raw.replace(
-        /(\/Length )\d+(\s*>>\s*stream\r?\n)([\s\S]*?)(\r?\nendstream)/g,
-        (m, lp, sh, content, es) => {
-          if (!content.includes('ZaDb') && !content.includes('(l) Tj')) return m;
-          const ns = 'q\n0 g\n-0.5 -0.5 100 100 re\nf\nQ\n';
-          return `${lp}${ns.length}${sh}${ns}${es}`;
+      const ns = 'q\n0 g\n-0.5 -0.5 100 100 re\nf\nQ\n';
+      let result = '', pos = 0;
+      while (pos < raw.length) {
+        // Locate next stream body (handle both \r\n and \n delimiters)
+        const i1 = raw.indexOf('\nstream\r\n', pos);
+        const i2 = raw.indexOf('\nstream\n',  pos);
+        let sIdx, sEnd;
+        if (i1 !== -1 && (i2 === -1 || i1 <= i2)) { sIdx = i1; sEnd = sIdx + 9; }
+        else if (i2 !== -1)                         { sIdx = i2; sEnd = sIdx + 8; }
+        else { result += raw.slice(pos); break; }
+        const e1 = raw.indexOf('\r\nendstream', sEnd);
+        const e2 = raw.indexOf('\nendstream',   sEnd);
+        let eIdx, eEnd;
+        if (e1 !== -1 && (e2 === -1 || e1 <= e2)) { eIdx = e1; eEnd = eIdx + 11; }
+        else if (e2 !== -1)                         { eIdx = e2; eEnd = eIdx + 10; }
+        else { result += raw.slice(pos); break; }
+        const content = raw.slice(sEnd, eIdx);
+        const before  = raw.slice(pos, sIdx);
+        if (content.includes('ZaDb') || content.includes('(l) Tj')) {
+          // Find the last /Length N in the preceding dict and update it
+          const lenRe = /\/Length\s+\d+/g;
+          let lm, lastLm;
+          while ((lm = lenRe.exec(before)) !== null) lastLm = lm;
+          const updated = lastLm
+            ? before.slice(0, lastLm.index) + '/Length ' + ns.length + before.slice(lastLm.index + lastLm[0].length)
+            : before;
+          result += updated + '\nstream\n' + ns + '\nendstream';
+        } else {
+          result += raw.slice(pos, eEnd);
         }
-      );
+        pos = eEnd;
+      }
+      raw = result;
       const out = new Uint8Array(raw.length);
       for (let j = 0; j < raw.length; j++) out[j] = raw.charCodeAt(j) & 0xff;
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
