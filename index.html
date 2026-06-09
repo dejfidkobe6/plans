@@ -2388,6 +2388,31 @@ option { background: var(--card); color: var(--text); }
   gap: 6px;
   justify-content: flex-end;
 }
+/* Multiple emails */
+.pf-emails-container { display: flex; flex-direction: column; gap: 4px; }
+.pf-email-row { display: flex; gap: 4px; align-items: center; }
+.pf-email-row input { flex: 1; }
+.pf-email-remove {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-dim); font-size: 14px; line-height: 1; padding: 3px 7px;
+  cursor: pointer; flex-shrink: 0;
+}
+.pf-email-remove:hover { background: rgba(239,68,68,0.1); color: #EF4444; border-color: #EF4444; }
+.pf-email-add {
+  align-self: flex-start; margin-top: 2px;
+  background: none; border: 1px dashed var(--border); border-radius: 4px;
+  color: var(--text-dim); font-size: 11px; padding: 3px 8px; cursor: pointer;
+}
+.pf-email-add:hover { border-color: var(--olive); color: var(--olive); }
+/* Email all button */
+.prof-email-all-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text-dim); font-size: 12px; padding: 5px 12px; cursor: pointer;
+  text-decoration: none; transition: border-color 0.15s, color 0.15s;
+}
+.prof-email-all-btn:hover { border-color: var(--olive); color: var(--olive-light); }
+.prof-email-all-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 .profese-save-btn {
   background: var(--olive);
   border: none;
@@ -3927,6 +3952,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div id="home-page-header">
       <h1>Subdodavatelé projektu</h1>
       <input type="text" id="home-search" placeholder="Hledat profesi nebo firmu...">
+      <a id="email-all-btn" href="#" class="prof-email-all-btn" title="Napsat všem subdodavatelům">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Napsat všem
+      </a>
       <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
     </div>
     <div id="prof-grid"></div>
@@ -4297,14 +4326,22 @@ const PROFESE_COLORS = {
 };
 
 const DEFAULT_PROFESE = [
-  { name: 'Elektro', color: '#F59E0B', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Voda', color: '#3B82F6', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Vzduchotechnika', color: '#06B6D4', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Konstrukce', color: '#EF4444', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Interiér', color: '#8B5CF6', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Koordinace', color: '#10B981', firma: '', kontakt: '', telefon: '', email: '' },
-  { name: 'Vlastní', color: '#6B7280', firma: '', kontakt: '', telefon: '', email: '' }
+  { name: 'Elektro', color: '#F59E0B', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Voda', color: '#3B82F6', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Vzduchotechnika', color: '#06B6D4', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Konstrukce', color: '#EF4444', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Interiér', color: '#8B5CF6', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Koordinace', color: '#10B981', firma: '', kontakt: '', telefon: '', emails: [] },
+  { name: 'Vlastní', color: '#6B7280', firma: '', kontakt: '', telefon: '', emails: [] }
 ];
+
+// Helper: get emails array from profese (supports old single-email format)
+function getProfEmails(prof) {
+  if (!prof) return [];
+  if (Array.isArray(prof.emails)) return prof.emails.filter(Boolean);
+  if (prof.email) return [prof.email];
+  return [];
+}
 
 function getProfColor(name) {
   if (!appState.profese) return '#6B7280';
@@ -9236,9 +9273,14 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.text(fitT(p.kontakt || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, tY);
     // Telefon
     pdf.text(fitT(p.telefon || '', ROW_FS, COL_TEL.w - 2), COL_TEL.x, tY);
-    // Email
-    pdf.setTextColor(30, 90, 200);
-    pdf.text(fitT(p.email || '', ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, tY);
+    // Email(s) — first email as clickable mailto link
+    { const pEmails = getProfEmails(p);
+      const emailStr = pEmails.length > 1 ? pEmails[0] + ' +' + (pEmails.length-1) : (pEmails[0] || '');
+      pdf.setTextColor(30, 90, 200);
+      const emailTxt = fitT(emailStr, ROW_FS, COL_EMAIL.w - 2);
+      pdf.text(emailTxt, COL_EMAIL.x, tY);
+      if (pEmails.length) pdf.link(COL_EMAIL.x, rowY, COL_EMAIL.w, ROW_H, { url: 'mailto:' + pEmails.join(',') });
+    }
     pdf.setTextColor(40, 45, 35);
 
     // Checkbox – visual box + interactive AcroForm field
@@ -9586,8 +9628,12 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
     pdf.setTextColor(40,45,35);
     pdf.text(fitT(p.kontakt||'',ROW_FS,COL_KONT.w-2),COL_KONT.x,tY);
     pdf.text(fitT(p.telefon||'',ROW_FS,COL_TEL.w-2),COL_TEL.x,tY);
-    pdf.setTextColor(30,90,200);
-    pdf.text(fitT(p.email||'',ROW_FS,COL_EMAIL.w-2),COL_EMAIL.x,tY);
+    { const pEmails = getProfEmails(p);
+      const emailStr = pEmails.length > 1 ? pEmails[0] + ' +' + (pEmails.length-1) : (pEmails[0] || '');
+      pdf.setTextColor(30,90,200);
+      pdf.text(fitT(emailStr,ROW_FS,COL_EMAIL.w-2),COL_EMAIL.x,tY);
+      if (pEmails.length) pdf.link(COL_EMAIL.x, curY, COL_EMAIL.w, ROW_H, { url: 'mailto:' + pEmails.join(',') });
+    }
     pdf.setDrawColor(218,222,212); pdf.setLineWidth(0.1);
     pdf.line(lx,curY+ROW_H,lx+lw,curY+ROW_H);
     [COL_FIRM,COL_PROF,COL_KONT,COL_TEL,COL_EMAIL].forEach(c=>pdf.line(c.x-1,curY,c.x-1,curY+ROW_H));
@@ -10611,9 +10657,15 @@ function renderProfeseList() {
             <label>Telefon</label>
             <input type="tel" class="pf-telefon" value="${escHtml(prof.telefon)}" placeholder="+420 ...">
           </div>
-          <div class="profese-form-field">
-            <label>Email</label>
-            <input type="email" class="pf-email" value="${escHtml(prof.email)}" placeholder="email@firma.cz">
+          <div class="profese-form-field" style="grid-column:1/-1">
+            <label>Emaily</label>
+            <div class="pf-emails-container">
+              ${getProfEmails(prof).length
+                ? getProfEmails(prof).map(e => `<div class="pf-email-row"><input type="email" class="pf-email" value="${escHtml(e)}" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button></div>`).join('')
+                : `<div class="pf-email-row"><input type="email" class="pf-email" value="" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button></div>`
+              }
+            </div>
+            <button type="button" class="pf-email-add">+ Přidat email</button>
           </div>
         </div>
         <div class="profese-form-actions">
@@ -10623,6 +10675,29 @@ function renderProfeseList() {
       </div>
     `;
     container.appendChild(row);
+  });
+
+  // Bind add/remove email buttons
+  container.querySelectorAll('.pf-email-add').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cont = btn.previousElementSibling;
+      const row = document.createElement('div'); row.className = 'pf-email-row';
+      row.innerHTML = `<input type="email" class="pf-email" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button>`;
+      row.querySelector('.pf-email-remove').addEventListener('click', () => {
+        if (cont.querySelectorAll('.pf-email-row').length > 1) row.remove();
+        else row.querySelector('.pf-email').value = '';
+      });
+      cont.appendChild(row);
+      row.querySelector('.pf-email').focus();
+    });
+  });
+  container.querySelectorAll('.pf-email-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.pf-email-row');
+      const cont = row.parentElement;
+      if (cont.querySelectorAll('.pf-email-row').length > 1) row.remove();
+      else row.querySelector('.pf-email').value = '';
+    });
   });
 
   // Bind events
@@ -10668,10 +10743,10 @@ function renderProfeseList() {
       const firma = form.querySelector('.pf-firma').value.trim();
       const kontakt = form.querySelector('.pf-kontakt').value.trim();
       const telefon = form.querySelector('.pf-telefon').value.trim();
-      const email = form.querySelector('.pf-email').value.trim();
+      const emails = [...form.querySelectorAll('.pf-email')].map(i => i.value.trim()).filter(Boolean);
       const oldName = appState.profese[idx].name; // capture before update
       const exportPinned = appState.profese[idx].exportPinned || false;
-      appState.profese[idx] = { name, color, firma, kontakt, telefon, email, exportPinned };
+      appState.profese[idx] = { name, color, firma, kontakt, telefon, emails, exportPinned };
       // Cascade rename: update all annotations and KD tasks that reference oldName
       if (oldName !== name) {
         appState.levels.forEach(level => {
@@ -10722,7 +10797,7 @@ function closeManageProfese() {
 }
 
 function addNewProfese() {
-  const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', email: '' };
+  const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', emails: [] };
   appState.profese.push(newProf);
   saveState();
   rebuildProfeseSelects();
@@ -10772,9 +10847,11 @@ function renderHomePage() {
     const telefonHtml = prof.telefon
       ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><a href="tel:${escHtml(prof.telefon)}">${escHtml(prof.telefon)}</a></div>`
       : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
-    const emailHtml = prof.email
-      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a href="mailto:${escHtml(prof.email)}">${escHtml(prof.email)}</a></div>`
-      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
+    const profEmails = getProfEmails(prof);
+    const emailSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+    const emailHtml = profEmails.length
+      ? profEmails.map((e, i) => `<div class="prof-card-row">${i===0?emailSvg:'<span style="width:16px;flex-shrink:0"></span>'}<a href="mailto:${escHtml(e)}">${escHtml(e)}</a></div>`).join('')
+      : `<div class="prof-card-row">${emailSvg}<span class="placeholder">— nevyplněno —</span></div>`;
 
     card.innerHTML = `
       <div class="prof-card-header" style="background:${escHtml(prof.color)}"></div>
@@ -10807,6 +10884,18 @@ function renderHomePage() {
     setTimeout(addNewProfese, 100);
   });
   grid.appendChild(addCard);
+
+  // Wire "Napsat všem" button with all collected emails
+  const emailAllBtn = document.getElementById('email-all-btn');
+  if (emailAllBtn) {
+    const allEmails = (appState.profese || []).flatMap(p => getProfEmails(p));
+    if (allEmails.length) {
+      emailAllBtn.href = 'mailto:' + allEmails.join(',');
+      emailAllBtn.style.display = '';
+    } else {
+      emailAllBtn.style.display = 'none';
+    }
+  }
 
   // Bind edit buttons
   grid.querySelectorAll('.prof-card-edit-btn').forEach(btn => {
@@ -11239,6 +11328,7 @@ function kdTaskVisible(task) {
       task.sub || '',
       profObj?.firma || '',
       profObj?.kontakt || '',
+      ...getProfEmails(profObj),
       ...(task.locations || []),
     ].map(_normStr).join(' ');
     if (!haystack.includes(q)) return false;
