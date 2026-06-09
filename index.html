@@ -10101,7 +10101,36 @@ async function doExportPDF() {
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
-    pdf.save(`BeSix-Plans-${name}.pdf`);
+    // Post-process PDF: replace ZapfDingbats checkbox appearance with solid black fill
+    (() => {
+      try {
+        const rawArr = pdf.output('arraybuffer');
+        const rawBytes = new Uint8Array(rawArr);
+        let raw = '';
+        for (let i = 0; i < rawBytes.length; i++) raw += String.fromCharCode(rawBytes[i]);
+        const patched = raw.replace(
+          /\/BBox \[0 0 ([\d.]+) ([\d.]+)\]([\s\S]*?\/Length )\d+(\s*>>\s*stream\r?\n)([\s\S]*?)(\r?\nendstream)/g,
+          (m, w, h, midDict, streamHdr, content, endStr) => {
+            if (!content.includes('ZaDb') && !content.includes('(l) Tj')) return m;
+            const ns = `q\n0 g\n0 0 ${w} ${h} re\nf\nQ\n`;
+            return `/BBox [0 0 ${w} ${h}]${midDict}${ns.length}${streamHdr}${ns}${endStr}`;
+          }
+        );
+        const outBytes = new Uint8Array(patched.length);
+        for (let j = 0; j < patched.length; j++) outBytes[j] = patched.charCodeAt(j) & 0xff;
+        const blob = new Blob([outBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `BeSix-Plans-${name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
+      } catch (patchErr) {
+        console.warn('Checkbox patch failed, using default:', patchErr);
+        pdf.save(`BeSix-Plans-${name}.pdf`);
+      }
+    })();
     closePDFExport();
     showToast('PDF exportováno', 'success');
   } catch (e) {
