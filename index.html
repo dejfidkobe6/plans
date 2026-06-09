@@ -9321,21 +9321,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
     pdf.setTextColor(40, 45, 35);
 
-    // Checkbox – white square, unchecked by default, interactive
-    const cbSize = Math.min(4.5, BASE_ROW_H * 0.6);
+    // Checkbox – plain visual square for physical signing
+    const cbSize = Math.min(5, BASE_ROW_H * 0.65);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (ROW_H - cbSize) / 2;
-    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
-    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
-    try {
-      const cb = new pdf.AcroForm.CheckBox();
-      cb.fieldName = 'ucast_' + i;
-      cb.Rect = [cbX, cbY, cbSize, cbSize];
-      cb.value = 'Off';
-      cb.defaultValue = 'Off';
-      cb.AS = '/Off';
-      pdf.addField(cb);
-    } catch(e) { /* visual box already drawn */ }
+    pdf.setDrawColor(80, 100, 60); pdf.setLineWidth(0.5); pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(cbX, cbY, cbSize, cbSize, 0.6, 0.6, 'FD');
 
     // Row + column separators
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
@@ -9355,20 +9346,11 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160, 165, 150);
     pdf.text(String(i + 1), COL_NR.x, tY);
 
-    const cbSize = Math.min(4.5, BASE_ROW_H * 0.6);
+    const cbSize = Math.min(5, BASE_ROW_H * 0.65);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
     const cbY = rowY + (BASE_ROW_H - cbSize) / 2;
-    pdf.setDrawColor(100, 110, 90); pdf.setLineWidth(0.4); pdf.setFillColor(255, 255, 255);
-    pdf.rect(cbX, cbY, cbSize, cbSize, 'FD');
-    try {
-      const cb = new pdf.AcroForm.CheckBox();
-      cb.fieldName = 'ucast_empty_' + i;
-      cb.Rect = [cbX, cbY, cbSize, cbSize];
-      cb.value = 'Off';
-      cb.defaultValue = 'Off';
-      cb.AS = '/Off';
-      pdf.addField(cb);
-    } catch(e) { /* visual box already drawn */ }
+    pdf.setDrawColor(80, 100, 60); pdf.setLineWidth(0.5); pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(cbX, cbY, cbSize, cbSize, 0.6, 0.6, 'FD');
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + BASE_ROW_H, lx + lw, rowY + BASE_ROW_H);
@@ -12940,6 +12922,22 @@ async function _pollLiveSync() {
     }
 
     if (changed) updateAnnotList();
+
+    // Sync profese (supplier colors/data) when another user changed them
+    if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
+        && !_hasPendingSave) {
+      const remStr = JSON.stringify(serverData.profese);
+      const locStr = JSON.stringify(appState.profese);
+      if (remStr !== locStr) {
+        appState.profese = serverData.profese;
+        try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), remStr); } catch(e) {}
+        rebuildProfeseSelects();
+        if (fabricCanvas) {
+          fabricCanvas.getObjects().filter(o => o.annotId).forEach(o => applyAnnotColorToCanvas(o));
+          fabricCanvas.renderAll();
+        }
+      }
+    }
 
     // Sync KD records from dedicated endpoint (silent, no user prompt needed)
     await _pollKDSync();
