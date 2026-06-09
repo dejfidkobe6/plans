@@ -9737,18 +9737,21 @@ function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, 
   // Overview row
   if (overviewPage) {
     const cnt=countTasks(null);
-    pdf.setFillColor(238,243,228); pdf.roundedRect(rowX,curY,rowW,ROW_H,1.2,1.2,'F');
-    pdf.setDrawColor(107,124,58); pdf.setLineWidth(0.35); pdf.roundedRect(rowX,curY,rowW,ROW_H,1.2,1.2,'S');
-    pdf.setFillColor(107,124,58); pdf.rect(rowX,curY,4,ROW_H,'F');
+    const OVW_H=15;
+    pdf.setFillColor(238,243,228); pdf.roundedRect(rowX,curY,rowW,OVW_H,1.2,1.2,'F');
+    pdf.setDrawColor(107,124,58); pdf.setLineWidth(0.35); pdf.roundedRect(rowX,curY,rowW,OVW_H,1.2,1.2,'S');
+    pdf.setFillColor(107,124,58); pdf.rect(rowX,curY,4,OVW_H,'F');
     pdf.setFont('helvetica','bold'); pdf.setFontSize(FS); pdf.setTextColor(40,65,20);
-    pdf.text(csT('Celkový přehled — všichni subdodavatelé'),rowX+7,curY+ROW_H*0.64);
+    pdf.text(csT('Celkový přehled — všichni subdodavatelé'),rowX+7,curY+OVW_H*0.40);
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(5); pdf.setTextColor(90,110,60);
+    pdf.text(csT('Pro filtrování úkolů klikni na okno subdodavatele níže'),rowX+7,curY+OVW_H*0.68);
     const cntStr=csT(cnt+' úkolů');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(80,100,55);
-    pdf.text(cntStr,rowX+rowW-tw(cntStr,FS_SM)-8,curY+ROW_H*0.64);
+    pdf.text(cntStr,rowX+rowW-tw(cntStr,FS_SM)-8,curY+OVW_H*0.40);
     pdf.setTextColor(107,124,58);
-    pdf.text('›',rowX+rowW-4,curY+ROW_H*0.68);
-    pdf.link(rowX,curY,rowW,ROW_H,{pageNumber:overviewPage});
-    curY += ROW_H+3;
+    pdf.text('›',rowX+rowW-4,curY+OVW_H*0.44);
+    pdf.link(rowX,curY,rowW,OVW_H,{pageNumber:overviewPage});
+    curY += OVW_H+3;
   }
 
   // Per-subcontractor rows (two columns)
@@ -9872,14 +9875,15 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
       pdf.setFont('helvetica','bold'); pdf.setFontSize(5); pdf.setTextColor(255,255,255);
       pdf.text(badge,bx+1.2,by+5*0.72);
       // Back link
-      const back=csT('← Filtr');
-      const backW=tw(back,5.5)+3;
-      const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-5.5)/2;
-      pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,5.5,0.8,0.8,'F');
-      pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.2); pdf.roundedRect(backX,backY,backW,5.5,0.8,0.8,'S');
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(5.5); pdf.setTextColor(60,80,40);
-      pdf.text(back,backX+1.5,backY+5.5*0.72);
-      pdf.link(backX,backY,backW,5.5,{pageNumber:navPageNum});
+      const back=csT('← Návrat k filtru');
+      const backBH=7, backBFS=7;
+      const backW=tw(back,backBFS)+4;
+      const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-backBH)/2;
+      pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,backBH,1,1,'F');
+      pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.2); pdf.roundedRect(backX,backY,backW,backBH,1,1,'S');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(backBFS); pdf.setTextColor(60,80,40);
+      pdf.text(back,backX+2,backY+backBH*0.72);
+      pdf.link(backX,backY,backW,backBH,{pageNumber:navPageNum});
     } else {
       pdf.setFont('helvetica','italic'); pdf.setFontSize(5); pdf.setTextColor(130,135,120);
       pdf.text(csT('pokračování...'),lx+8,ly+TITLE_H*0.65);
