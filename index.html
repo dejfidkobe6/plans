@@ -12513,8 +12513,8 @@ async function openProject(proj) {
     if (_lsDirty) {
       loadState();
       annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
-      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
-          && (!appState.profese || appState.profese.length === 0)) {
+      // Always prefer server profese — supplier config is shared and server is authoritative
+      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
         appState.profese = serverData.profese;
       }
       // Push the local state to the server immediately to close the gap
