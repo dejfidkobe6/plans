@@ -8230,12 +8230,11 @@ function resizeCanvas() {
 // SHARED ANNOTATION UTILITIES (used by anotace page, home page)
 // ============================================================
 function getAllAnnotations() {
+  const profeseMap = new Map((appState.profese || []).map(p => [p.name, p.firma || '']));
   const rows = [];
   appState.levels.forEach((level, levelIdx) => {
-    const annots = level.annotations || [];
-    annots.forEach(a => {
-      const firma = (appState.profese || []).find(p => p.name === a.profese)?.firma || '';
-      rows.push({ ...a, levelName: level.name, levelIdx, firma });
+    (level.annotations || []).forEach(a => {
+      rows.push({ ...a, levelName: level.name, levelIdx, firma: profeseMap.get(a.profese) || '' });
     });
   });
   return rows;
@@ -10930,9 +10929,17 @@ function renderHomePage() {
     (p.kontakt || '').toLowerCase().includes(searchVal)
   );
 
+  // Pre-compute annotation counts for all profese in one pass
+  const _annotCounts = new Map();
+  appState.levels.forEach(level => {
+    (level.annotations || []).forEach(a => {
+      if (a.profese) _annotCounts.set(a.profese, (_annotCounts.get(a.profese) || 0) + 1);
+    });
+  });
+
   filtered.forEach((prof, rawIdx) => {
     const idx = appState.profese.indexOf(prof);
-    const annotCount = getTotalAnnotCountForProfese(prof.name);
+    const annotCount = _annotCounts.get(prof.name) || 0;
     const card = document.createElement('div');
     card.className = 'prof-card';
     const firmaHtml = prof.firma
@@ -11547,8 +11554,10 @@ function kdRenderContent() {
   if (fbar) fbar.style.display = 'flex';
   empty.style.display = 'none';
   scroll.style.display = 'block';
-  document.getElementById('kd-date-input').value = rec.date || '';
-  document.getElementById('kd-note-input').value = rec.note || '';
+  const _dateEl = document.getElementById('kd-date-input');
+  const _noteEl = document.getElementById('kd-note-input');
+  if (document.activeElement !== _dateEl) _dateEl.value = rec.date || '';
+  if (document.activeElement !== _noteEl) _noteEl.value = rec.note || '';
 
   // Populate filter selects
   if (fbar) {
@@ -12048,11 +12057,11 @@ function kdSetupPage() {
     kdRenderContent();
   });
   document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
-  document.getElementById('kd-cards-scroll').addEventListener('focusout', e => {
+  document.addEventListener('focusout', e => {
     if (!_kdPendingRender) return;
-    const scrollEl = document.getElementById('kd-cards-scroll');
-    // relatedTarget is where focus is going — if still inside, don't render yet
-    if (scrollEl && scrollEl.contains(e.relatedTarget)) return;
+    // relatedTarget is where focus is moving — if still an editable field, defer further
+    const rt = e.relatedTarget;
+    if (rt && (rt.tagName === 'INPUT' || rt.tagName === 'TEXTAREA') && rt.type !== 'checkbox' && rt.type !== 'radio') return;
     _kdPendingRender = false;
     kdRenderPage();
   });
@@ -13022,9 +13031,6 @@ async function _pollLiveSync() {
       }
     }
 
-    // Sync KD records from dedicated endpoint (silent, no user prompt needed)
-    await _pollKDSync();
-
   } catch(e) { /* network error – skip silently */ }
 }
 
@@ -13046,8 +13052,8 @@ async function _pollKDSync() {
       try { localStorage.setItem(LS_KD_KEY(String(currentProject.id)), JSON.stringify(kdRecords)); } catch(e) {}
       const kdPage = document.getElementById('kd-page');
       if (kdPage && kdPage.classList.contains('visible') && !_kdViewingBackup) {
-        const scrollEl = document.getElementById('kd-cards-scroll');
-        const userTyping = document.activeElement && scrollEl && scrollEl.contains(document.activeElement);
+        const _ae = document.activeElement;
+        const userTyping = _ae && (_ae.tagName === 'INPUT' || _ae.tagName === 'TEXTAREA') && _ae.type !== 'checkbox' && _ae.type !== 'radio';
         if (userTyping) { _kdPendingRender = true; } else { kdRenderPage(); }
       }
     }
