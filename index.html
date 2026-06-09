@@ -9246,8 +9246,30 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
 
   suppliers.forEach((p, i) => {
     const pEmails = getProfEmails(p);
-    const emailLines = pEmails.length || 1;
-    const ROW_H = Math.max(BASE_ROW_H, pEmails.length > 1 ? LINE_H * pEmails.length + 2 : BASE_ROW_H);
+
+    // Pack emails side-by-side; wrap to next line only when column is full
+    const twFn = s => pdf.getStringUnitWidth(s) * ROW_FS / PT_MM;
+    const SEP = '  ';  const sepW = twFn(SEP);
+    const emailWrapped = []; // [{email, txt, xOff}] per line
+    if (pEmails.length) {
+      let curLine = [], lineW = 0;
+      pEmails.forEach(email => {
+        const txt = fitT(email, ROW_FS, COL_EMAIL.w - 2);
+        const tw = twFn(txt);
+        const need = curLine.length ? sepW + tw : tw;
+        if (curLine.length && lineW + need > COL_EMAIL.w - 2) {
+          emailWrapped.push(curLine);
+          curLine = [{ email, txt, xOff: 0 }]; lineW = tw;
+        } else {
+          curLine.push({ email, txt, xOff: curLine.length ? lineW + sepW : 0 });
+          lineW = curLine.length === 1 ? tw : lineW + sepW + tw;
+        }
+      });
+      if (curLine.length) emailWrapped.push(curLine);
+    }
+
+    const numELines = Math.max(1, emailWrapped.length);
+    const ROW_H = numELines > 1 ? Math.max(BASE_ROW_H, LINE_H * numELines + 2) : BASE_ROW_H;
     const rowY = curY;
     if (rowY + ROW_H > ly + lh) return; // overflow guard
 
@@ -9262,12 +9284,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFillColor(r, g, b);
     pdf.rect(lx, rowY, 1.8, ROW_H, 'F');
 
-    const tY = rowY + (pEmails.length > 1 ? LINE_H : ROW_H * 0.62);
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40, 45, 35);
+    const midY = rowY + ROW_H * 0.62;
 
     // Nr
     pdf.setFont('helvetica', 'bold');
-    pdf.text(String(i + 1), COL_NR.x, rowY + ROW_H * 0.62);
+    pdf.text(String(i + 1), COL_NR.x, midY);
     pdf.setFont('helvetica', 'normal');
 
     // Color dot + Firma
@@ -9275,26 +9297,28 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const dotR = Math.min(1.3, ROW_H * 0.16);
     pdf.circle(COL_FIRMA.x + dotR + 0.5, rowY + ROW_H / 2, dotR, 'F');
     pdf.setTextColor(40, 45, 35);
-    pdf.text(fitT(p.firma || p.name, ROW_FS, COL_FIRMA.w - 6), COL_FIRMA.x + 4, rowY + ROW_H * 0.62);
+    pdf.text(fitT(p.firma || p.name, ROW_FS, COL_FIRMA.w - 6), COL_FIRMA.x + 4, midY);
 
-    // Role
+    // Role / Kontakt / Telefon
     pdf.setTextColor(100, 105, 90);
-    pdf.text(fitT(p.name, ROW_FS, COL_ROLE.w - 2), COL_ROLE.x, rowY + ROW_H * 0.62);
+    pdf.text(fitT(p.name, ROW_FS, COL_ROLE.w - 2), COL_ROLE.x, midY);
     pdf.setTextColor(40, 45, 35);
+    pdf.text(fitT(p.kontakt || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, midY);
+    pdf.text(fitT(p.telefon || '', ROW_FS, COL_TEL.w - 2),  COL_TEL.x,  midY);
 
-    // Kontakt + Telefon (vertically centered)
-    pdf.text(fitT(p.kontakt || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, rowY + ROW_H * 0.62);
-    pdf.text(fitT(p.telefon || '', ROW_FS, COL_TEL.w - 2),  COL_TEL.x,  rowY + ROW_H * 0.62);
-
-    // Emails — one per line, each individually clickable
-    if (pEmails.length) {
-      pEmails.forEach((email, ei) => {
-        const eY = rowY + LINE_H * (ei + 0.85);
+    // Emails — side by side, wrap to next line when column full
+    emailWrapped.forEach((line, li) => {
+      const eY = rowY + LINE_H * (li + 0.85);
+      line.forEach(({ email, txt, xOff }, ei) => {
+        if (ei > 0) {
+          pdf.setTextColor(160, 165, 150);
+          pdf.text(SEP, COL_EMAIL.x + xOff - sepW, eY);
+        }
         pdf.setTextColor(30, 90, 200);
-        pdf.text(fitT(email, ROW_FS, COL_EMAIL.w - 2), COL_EMAIL.x, eY);
-        pdf.link(COL_EMAIL.x, rowY + LINE_H * ei, COL_EMAIL.w, LINE_H, { url: 'mailto:' + email });
+        pdf.text(txt, COL_EMAIL.x + xOff, eY);
+        pdf.link(COL_EMAIL.x + xOff, rowY + LINE_H * li, twFn(txt) + 1, LINE_H, { url: 'mailto:' + email });
       });
-    }
+    });
     pdf.setTextColor(40, 45, 35);
 
     // Checkbox – white square, unchecked by default, interactive
@@ -10077,7 +10101,36 @@ async function doExportPDF() {
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
-    pdf.save(`BeSix-Plans-${name}.pdf`);
+    // Post-process PDF: replace ZapfDingbats checkbox appearance with solid black fill
+    (() => {
+      try {
+        const rawArr = pdf.output('arraybuffer');
+        const rawBytes = new Uint8Array(rawArr);
+        let raw = '';
+        for (let i = 0; i < rawBytes.length; i++) raw += String.fromCharCode(rawBytes[i]);
+        const patched = raw.replace(
+          /\/BBox \[0 0 ([\d.]+) ([\d.]+)\]([\s\S]*?\/Length )\d+(\s*>>\s*stream\r?\n)([\s\S]*?)(\r?\nendstream)/g,
+          (m, w, h, midDict, streamHdr, content, endStr) => {
+            if (!content.includes('ZaDb') && !content.includes('(l) Tj')) return m;
+            const ns = `q\n0 g\n0 0 ${w} ${h} re\nf\nQ\n`;
+            return `/BBox [0 0 ${w} ${h}]${midDict}${ns.length}${streamHdr}${ns}${endStr}`;
+          }
+        );
+        const outBytes = new Uint8Array(patched.length);
+        for (let j = 0; j < patched.length; j++) outBytes[j] = patched.charCodeAt(j) & 0xff;
+        const blob = new Blob([outBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `BeSix-Plans-${name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
+      } catch (patchErr) {
+        console.warn('Checkbox patch failed, using default:', patchErr);
+        pdf.save(`BeSix-Plans-${name}.pdf`);
+      }
+    })();
     closePDFExport();
     showToast('PDF exportováno', 'success');
   } catch (e) {
