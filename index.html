@@ -5485,62 +5485,103 @@ function positionLabel(label, obj) {
   label.setCoords();
 }
 
-// Iteratively push overlapping labels apart so they never cover each other.
-// Uses fast manual rect calculation (no matrix math) for performance.
+// Place labels close to their annotation by trying 8 candidate positions,
+// then fall back to push-apart for any remaining overlaps.
 function deconflictLabels() {
   if (!fabricCanvas) return;
   const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
   if (labels.length < 2) return;
 
-  const PAD = 2 / fabricCanvas.getZoom(); // 2 screen-px gap between labels
-  const MAX_ITER = 20;
+  const zoom = fabricCanvas.getZoom();
+  const GAP  = 6 / zoom; // gap between label and annotation shape
+  const PAD  = 2 / zoom; // gap between two labels
 
-  // Fast bounding rect from stored properties (originX/Y = 'left'/'top')
   const getR = l => ({
-    l: l.left,
-    t: l.top,
-    r: l.left  + (l.width  || 80) * (l.scaleX || 1),
-    b: l.top   + (l.height || 34) * (l.scaleY || 1)
+    l: l.left, t: l.top,
+    r: l.left + (l.width  || 80) * (l.scaleX || 1),
+    b: l.top  + (l.height || 34) * (l.scaleY || 1)
+  });
+  const overlapArea = (a, b) => {
+    const ox = Math.min(a.r, b.r) - Math.max(a.l, b.l);
+    const oy = Math.min(a.b, b.b) - Math.max(a.t, b.t);
+    return (ox > 0 && oy > 0) ? ox * oy : 0;
+  };
+
+  // Build map: annotId → annotation object
+  const annotMap = {};
+  fabricCanvas.getObjects().filter(o => o.annotId).forEach(a => annotMap[a.annotId] = a);
+
+  // Sort labels top-to-bottom by annotation centre-y
+  const sorted = [...labels].sort((a, b) => {
+    const ay = annotMap[a.annotLabelFor]?.getCenterPoint().y || 0;
+    const by = annotMap[b.annotLabelFor]?.getCenterPoint().y || 0;
+    return ay - by;
   });
 
-  // Cache annotation centre-y positions once (expensive find())
-  const cyArr = labels.map(lbl => {
-    const a = fabricCanvas.getObjects().find(o => o.annotId === lbl.annotLabelFor);
-    return a ? a.getCenterPoint().y : 0;
+  // Greedy placement: for each label try 8 positions and pick the overlap-free one
+  // closest to the annotation. If all overlap, pick the one with least total area.
+  const placed = []; // [{l,t,r,b}] of already-placed labels
+
+  sorted.forEach(lbl => {
+    const ann = annotMap[lbl.annotLabelFor];
+    if (!ann) { placed.push(getR(lbl)); return; }
+
+    const s  = lbl.scaleX || 1;
+    const lw = (lbl.width  || 80) * s;
+    const lh = (lbl.height || 34) * s;
+    const c  = ann.getCenterPoint();
+    const ab = ann.getBoundingRect(true); // {left, top, width, height}
+
+    // Candidate positions [labelLeft, labelTop] in preference order
+    const cands = [
+      [c.x - lw / 2,           ab.top - lh - GAP],                    // above-center
+      [ab.left + ab.width + GAP, c.y - lh / 2],                       // right
+      [ab.left - lw - GAP,      c.y - lh / 2],                        // left
+      [c.x - lw / 2,           ab.top + ab.height + GAP],             // below-center
+      [ab.left + ab.width + GAP, ab.top - lh - GAP],                  // above-right
+      [ab.left - lw - GAP,      ab.top - lh - GAP],                   // above-left
+      [ab.left + ab.width + GAP, ab.top + ab.height + GAP],           // below-right
+      [ab.left - lw - GAP,      ab.top + ab.height + GAP],            // below-left
+    ];
+
+    let bestL = cands[0][0], bestT = cands[0][1], bestScore = Infinity;
+    for (const [cl, ct] of cands) {
+      const cr = { l: cl, t: ct, r: cl + lw, b: ct + lh };
+      const score = placed.reduce((sum, pr) => sum + overlapArea(cr, pr), 0);
+      if (score < bestScore) { bestScore = score; bestL = cl; bestT = ct; }
+      if (score === 0) break; // found a clear spot
+    }
+
+    lbl.left = bestL; lbl.top = bestT; lbl.setCoords();
+    placed.push({ l: bestL, t: bestT, r: bestL + lw, b: bestT + lh });
   });
 
+  // Fallback push-apart for any remaining overlaps after greedy placement
+  const MAX_ITER = 10;
   for (let iter = 0; iter < MAX_ITER; iter++) {
     const rects = labels.map(getR);
     let moved = false;
-
     for (let i = 0; i < labels.length; i++) {
       for (let j = i + 1; j < labels.length; j++) {
         const ri = rects[i], rj = rects[j];
         const ox = Math.min(ri.r, rj.r) - Math.max(ri.l, rj.l);
         const oy = Math.min(ri.b, rj.b) - Math.max(ri.t, rj.t);
-        if (ox <= 0 || oy <= 0) continue; // no overlap
+        if (ox <= 0 || oy <= 0) continue;
         moved = true;
-
-        // Move the label whose annotation sits lower on screen (larger y = more "in the way")
-        const mi = cyArr[i] >= cyArr[j] ? i : j;
+        const ay = annotMap[labels[i].annotLabelFor]?.getCenterPoint().y || 0;
+        const by = annotMap[labels[j].annotLabelFor]?.getCenterPoint().y || 0;
+        const mi = ay >= by ? i : j;
         const lbl = labels[mi];
-
         if (oy <= ox) {
-          // Overlap is taller in Y — resolve by moving up
           lbl.top -= (oy + PAD);
         } else {
-          // Overlap is wider in X — resolve horizontally
-          const ci = (rects[i].l + rects[i].r) / 2;
-          const cj = (rects[j].l + rects[j].r) / 2;
-          const dir = mi === i ? (ci <= cj ? -1 : 1) : (cj <= ci ? -1 : 1);
-          lbl.left += dir * (ox + PAD);
+          const ci = (rects[i].l + rects[i].r) / 2, cj = (rects[j].l + rects[j].r) / 2;
+          lbl.left += (mi === i ? (ci <= cj ? -1 : 1) : (cj <= ci ? -1 : 1)) * (ox + PAD);
         }
-        lbl.setCoords();
-        rects[mi] = getR(lbl); // update cached rect immediately
+        lbl.setCoords(); rects[mi] = getR(lbl);
       }
     }
-
-    if (!moved) break; // converged — no more overlaps
+    if (!moved) break;
   }
 }
 
@@ -5550,8 +5591,12 @@ function createAnnotLabel(obj) {
   const color   = getAnnotColor(obj);
 
   const FONT1 = 14, FONT2 = 13, FONT3 = 11;
-  const STRIPE = 4, PAD_L = 10, PAD_T = 8, GAP = 4;
+  const STRIPE = 5, PAD_L = 10, PAD_T = 8, GAP = 4, RX = 10;
   const fontOpts = 'IBM Plex Mono, monospace';
+
+  // Glow shadow color (hex → rgba)
+  const hr = parseInt(color.slice(1,3),16), hg = parseInt(color.slice(3,5),16), hb = parseInt(color.slice(5,7),16);
+  const glowColor = `rgba(${hr},${hg},${hb},0.28)`;
 
   // ── Top line (contractor / profese) – always shown ──
   const txtTop = new fabric.Text(labelLineTop(obj), {
@@ -5566,7 +5611,7 @@ function createAnnotLabel(obj) {
     W = txtTop.width + PAD_L * 2 + STRIPE;
     txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
     H = PAD_T + txtTop.height + PAD_T;
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(250,250,252,0.94)', stroke: 'rgba(0,0,0,0.08)', strokeWidth: 1 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop];
   } else {
@@ -5586,7 +5631,7 @@ function createAnnotLabel(obj) {
     if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
     H = curY - GAP + PAD_T;
 
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(255,255,255,0.95)', rx: 3, ry: 3, stroke: 'rgba(0,0,0,0.12)', strokeWidth: 0.5 });
+    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(250,250,252,0.94)', stroke: 'rgba(0,0,0,0.08)', strokeWidth: 1 });
     const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
     items = [bg, stripe, txtTop, txtBot];
     if (txtDates) items.push(txtDates);
@@ -5602,6 +5647,11 @@ function createAnnotLabel(obj) {
     scaleX: s, scaleY: s,
     originX: 'left', originY: 'top'
   });
+
+  // Apple-style rounded corners — clipPath rounds the stripe corners too
+  group.clipPath = new fabric.Rect({ width: W, height: H, rx: RX, ry: RX, originX: 'center', originY: 'center' });
+  // Colored glow + soft drop shadow
+  group.shadow = new fabric.Shadow({ color: glowColor, blur: 22, offsetX: 0, offsetY: 5 });
 
   fabricCanvas.add(group);
   positionLabel(group, obj);
@@ -10316,7 +10366,11 @@ function _applyServerAdded(serverAdded) {
       const toAdd = objects.filter(o => o.annotId && !existing.has(o.annotId));
       if (!toAdd.length) return;
       fabric.util.enlivenObjects(toAdd, (enlivened) => {
-        enlivened.forEach(obj => { fabricCanvas.add(obj); });
+        enlivened.forEach(obj => {
+          fabricCanvas.add(obj);
+          if (obj.annotId) createAnnotLabel(obj); // create label for newly synced annotation
+        });
+        deconflictLabels();
         fabricCanvas.renderAll();
         saveCurrentLevel(); // update appState.levels[active] from canvas
         updateAnnotList();
