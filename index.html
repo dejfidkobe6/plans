@@ -12905,6 +12905,40 @@ async function _pollLiveSync() {
         _applyServerAdded([{ levelId: remActive.id, objects: serverOnlyObjs }]);
         changed = true;
       }
+
+      // Sync edits to existing annotations on active level
+      if (!_hasPendingSave && fabricCanvas) {
+        const remObjMap = new Map();
+        (remActive.fabricJSON?.objects || [])
+          .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor)
+          .forEach(o => remObjMap.set(o.annotId, o));
+        const annotKey = o => [o.profese,o.popisek,o.priorita,o.status,o.prirazeno,o.deadline,o.dateFrom].join('\x00');
+        let activeEdited = false;
+        fabricCanvas.getObjects()
+          .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor && remObjMap.has(o.annotId))
+          .forEach(locObj => {
+            const remObj = remObjMap.get(locObj.annotId);
+            if (annotKey(remObj) === annotKey(locObj)) return;
+            locObj.set({
+              profese:   remObj.profese   ?? locObj.profese,
+              popisek:   remObj.popisek   ?? locObj.popisek,
+              priorita:  remObj.priorita  ?? locObj.priorita,
+              status:    remObj.status    ?? locObj.status,
+              prirazeno: remObj.prirazeno ?? locObj.prirazeno,
+              deadline:  remObj.deadline  ?? locObj.deadline,
+              dateFrom:  remObj.dateFrom  ?? locObj.dateFrom,
+            });
+            applyAnnotColorToCanvas(locObj);
+            updateLabelFor(locObj.annotId);
+            activeEdited = true;
+          });
+        if (activeEdited) {
+          fabricCanvas.renderAll();
+          saveCurrentLevel();
+          changed = true;
+        }
+      }
+
       // Show badge when background was replaced (crop) or annotation count differs (deletions/edits)
       if (bgChanged) {
         _syncPending = true;
