@@ -5751,13 +5751,13 @@ function addAnnotationProperties(obj, type) {
     prirazeno: '',
     status: 'Nový úkol',
     createdAt: new Date().toISOString(),
+    updatedAt: Date.now(),
     lockMovementX: true, lockMovementY: true,
     lockScalingX: true,  lockScalingY: true,
     lockRotation: true,
     hasControls: false,
     hasBorders: true,
-    perPixelTargetFind: true,
-    createdAt: new Date().toISOString()
+    perPixelTargetFind: true
   });
   return obj;
 }
@@ -6864,6 +6864,7 @@ function updateActiveAnnotProp(prop, value) {
   if (!obj || obj.isBackground) return;
 
   obj.set(prop, value);
+  obj.updatedAt = Date.now();
 
   // Update annotation label
   if (prop === 'profese' || prop === 'popisek' || prop === 'deadline' || prop === 'dateFrom') {
@@ -7135,7 +7136,7 @@ function drawGrid() {
 // ============================================================
 // UNDO / REDO
 // ============================================================
-const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground','isPolyHelper'];
+const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper'];
 
 function _canvasJSON() {
   const json = fabricCanvas.toJSON(_JSON_FIELDS);
@@ -7188,7 +7189,7 @@ function copySelected() {
   obj.clone((cloned) => {
     appState.clipboard = cloned;
     showToast('Zkopírováno', 'info');
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom']);
 }
 
 function pasteSelected() {
@@ -7202,7 +7203,7 @@ function pasteSelected() {
     updateAnnotList();
     saveCurrentLevel();
     clearTimeout(_srvTimer); _serverSaveNow();
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom']);
 }
 
 // ============================================================
@@ -10316,8 +10317,8 @@ function saveCurrentLevel() {
   appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
     annotId: o.annotId, profese: o.profese, popisek: o.popisek,
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-    createdAt: o.createdAt || null, deadline: o.deadline || null,
-    dateFrom: o.dateFrom || null
+    createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
+    deadline: o.deadline || null, dateFrom: o.dateFrom || null
   }));
 
   saveState();
@@ -10510,14 +10511,15 @@ async function _serverSaveNow() {
   _saving = true;
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom','isBackground']);
+    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground']);
     _snap.objects = (_snap.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
     appState.levels[appState.activeLevel].fabricJSON = _snap;
     // refresh annotations list for this level
     appState.levels[appState.activeLevel].annotations = _snap.objects.filter(o => o.annotId).map(o => ({
       annotId: o.annotId, profese: o.profese, popisek: o.popisek,
       priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-      createdAt: o.createdAt || null, deadline: o.deadline || null, dateFrom: o.dateFrom || null
+      createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
+      deadline: o.deadline || null, dateFrom: o.dateFrom || null
     }));
   }
   try {
@@ -10595,6 +10597,7 @@ function _applyServerAdded(serverAdded) {
               annotId: obj.annotId, profese: obj.profese || null, popisek: obj.popisek || null,
               priorita: obj.priorita || null, prirazeno: obj.prirazeno || null,
               status: obj.status || null, createdAt: obj.createdAt || null,
+              updatedAt: obj.updatedAt || null,
               deadline: obj.deadline || null, dateFrom: obj.dateFrom || null
             });
           }
@@ -10617,6 +10620,7 @@ function _applyServerAdded(serverAdded) {
           annotId: o.annotId, profese: o.profese || null, popisek: o.popisek || null,
           priorita: o.priorita || null, prirazeno: o.prirazeno || null,
           status: o.status || null, createdAt: o.createdAt || null,
+          updatedAt: o.updatedAt || null,
           deadline: o.deadline || null, dateFrom: o.dateFrom || null
         });
         existingIds.add(o.annotId);
@@ -13115,15 +13119,19 @@ async function _pollLiveSync() {
           .forEach(locObj => {
             const remObj = remObjMap.get(locObj.annotId);
             if (annotKey(remObj) === annotKey(locObj)) return;
+            // Skip if local edit is newer (same account, different device typing concurrently)
+            const remTs = remObj.updatedAt || 0;
+            const locTs = locObj.updatedAt || 0;
+            if (locTs > remTs) return;
             locObj.set({
               profese:   remObj.profese   ?? locObj.profese,
-              // Use || for text fields: empty string from server must not wipe local typed value
               popisek:   remObj.popisek   || locObj.popisek,
               priorita:  remObj.priorita  ?? locObj.priorita,
               status:    remObj.status    ?? locObj.status,
               prirazeno: remObj.prirazeno || locObj.prirazeno,
               deadline:  remObj.deadline  ?? locObj.deadline,
               dateFrom:  remObj.dateFrom  ?? locObj.dateFrom,
+              updatedAt: remObj.updatedAt ?? locObj.updatedAt,
             });
             applyAnnotColorToCanvas(locObj);
             updateLabelFor(locObj.annotId);
@@ -13140,7 +13148,8 @@ async function _pollLiveSync() {
             .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor)
             .map(o => ({ annotId: o.annotId, profese: o.profese, popisek: o.popisek,
               priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-              createdAt: o.createdAt || null, deadline: o.deadline || null, dateFrom: o.dateFrom || null }));
+              createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
+              deadline: o.deadline || null, dateFrom: o.dateFrom || null }));
           changed = true;
           // Refresh right panel if the currently selected annotation was among those updated
           if (selectedUpdated && selObj) onObjectSelected({ target: selObj });
