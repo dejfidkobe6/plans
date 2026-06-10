@@ -9883,6 +9883,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   const tw = (t,fs) => pdf.getStringUnitWidth(csT(t))*fs/PT_MM;
   const fitT = (t,fs,maxW) => { let s=csT(String(t||'')); if(tw(s,fs)<=maxW)return s; while(s.length>1&&tw(s+'...',fs)>maxW)s=s.slice(0,-1); return s+'...'; };
   const kdFmt = iso => { if(!iso)return ''; const p=iso.split('-'); return p.length===3?`${parseInt(p[2])}.${parseInt(p[1])}.`:''; };
+  const writtenFmt = (ts, fallbackIso) => { if (ts) { const d=new Date(ts); return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; } return kdFmt(fallbackIso); };
 
   const [r,g,b] = hexToRgb(prof.color||'#888888');
 
@@ -9901,11 +9902,11 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   const TITLE_H=13, COLH_H=5.5;
   const ROW_FS=5, LH=ROW_FS/PT_MM*1.55;
 
-  // Column positions
+  // Column positions — first column widened to fit "Zapsáno/změněno" header + full date value
   const C_KD   = lx+1;
-  const C_CHAP = lx+lw*0.07;
-  const C_SEC  = lx+lw*0.21;
-  const C_TASK = lx+lw*0.36;
+  const C_CHAP = lx+lw*0.13;
+  const C_SEC  = lx+lw*0.27;
+  const C_TASK = lx+lw*0.41;
   const C_TERM = lx+lw*0.74;
   const C_LOC  = lx+lw*0.86;
   const taskMaxW = C_TERM-C_TASK-1;
@@ -9966,7 +9967,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
     // Column headers
     const chy=ly+TITLE_H+COLH_H-0.8;
     pdf.setFont('helvetica','normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
-    pdf.text('KD',C_KD,chy); pdf.text(csT('Kapitola'),C_CHAP,chy); pdf.text('Sekce',C_SEC,chy);
+    pdf.text(csT('Zapsáno/změněno'),C_KD,chy); pdf.text(csT('Kapitola'),C_CHAP,chy); pdf.text('Sekce',C_SEC,chy);
     pdf.text(csT('Úkol'),C_TASK,chy); pdf.text(csT('Termín'),C_TERM,chy); pdf.text('Lokace',C_LOC,chy);
     pdf.setDrawColor(195,200,188); pdf.setLineWidth(0.2); pdf.line(lx,ly+TITLE_H+COLH_H,lx+lw,ly+TITLE_H+COLH_H);
   };
@@ -9983,7 +9984,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
     const tY=curY+LH*.8;
     if (task.urgent){pdf.setFillColor(255,246,246);pdf.rect(lx,curY,lw,rowH,'F');}
     pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS);
-    pdf.setTextColor(80,90,70); pdf.text(fitT(kdFmt(recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
+    pdf.setTextColor(80,90,70); pdf.text(fitT(writtenFmt(task.writtenAt,recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
     pdf.setTextColor(55,65,45); pdf.text(fitT(csT(chapterTitle),ROW_FS,C_SEC-C_CHAP-0.5),C_CHAP,tY);
     pdf.setTextColor(80,90,70); pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
     const taskFg=task.urgent?[160,40,40]:[40,50,35];
@@ -11845,7 +11846,7 @@ function kdBuildTask(rec, card, task, isLive) {
   const ta = document.createElement('textarea');
   ta.className = 'kd-task-text'; ta.value = task.text || '';
   ta.placeholder = 'Název úkolu...'; ta.rows = 1; ta.readOnly = !isLive;
-  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; if (isLive) { task.text = ta.value; kdSave(); } };
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; if (isLive) { task.text = ta.value; task.writtenAt = Date.now(); kdSave(); } };
   setTimeout(() => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }, 0);
   nameRow.appendChild(ta);
   el.appendChild(nameRow);
@@ -11982,7 +11983,7 @@ function kdAddCard(rec, ch) {
 }
 
 function kdAddTask(rec, card) {
-  const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false };
+  const task = { id: kdGenId(), text: '', sub: null, dateFrom: null, dateTo: null, locations: [], urgent: false, done: false, writtenAt: Date.now() };
   card.tasks.push(task); kdSave(); kdRenderContent();
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const el = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`);
