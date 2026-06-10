@@ -6031,6 +6031,7 @@ function setupEventListeners() {
         updateAnnotList();
         onObjectSelected({ target: line });
         saveCurrentLevel();
+        clearTimeout(_srvTimer); _serverSaveNow();
         setTool('select');
       }
     } else if (appState.tool === 'rect') {
@@ -6958,6 +6959,7 @@ function _markAnnotAsDone(obj) {
   applyHotovoVisibility();
   fabricCanvas.renderAll();
   saveCurrentLevel();
+  clearTimeout(_srvTimer); _serverSaveNow();
   updateAnnotList();
 }
 
@@ -7199,6 +7201,7 @@ function pasteSelected() {
     pushUndoState();
     updateAnnotList();
     saveCurrentLevel();
+    clearTimeout(_srvTimer); _serverSaveNow();
   }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','deadline','dateFrom']);
 }
 
@@ -13057,6 +13060,8 @@ async function _pollLiveSync() {
           .forEach(o => remObjMap.set(o.annotId, o));
         const annotKey = o => [o.profese,o.popisek,o.priorita,o.status,o.prirazeno,o.deadline,o.dateFrom].join('\x00');
         let activeEdited = false;
+        const selObj = fabricCanvas.getActiveObject();
+        let selectedUpdated = false;
         fabricCanvas.getObjects()
           .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor && remObjMap.has(o.annotId))
           .forEach(locObj => {
@@ -13075,11 +13080,21 @@ async function _pollLiveSync() {
             applyAnnotColorToCanvas(locObj);
             updateLabelFor(locObj.annotId);
             activeEdited = true;
+            if (locObj === selObj) selectedUpdated = true;
           });
         if (activeEdited) {
           fabricCanvas.renderAll();
-          saveCurrentLevel();
+          // Update appState annotations in-memory without triggering a server re-save.
+          // The remote edits were already saved by the other user; re-saving would create
+          // an unnecessary round-trip and reset _lastOwnSaveTs, delaying future syncs.
+          appState.levels[appState.activeLevel].annotations = fabricCanvas.getObjects()
+            .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor)
+            .map(o => ({ annotId: o.annotId, profese: o.profese, popisek: o.popisek,
+              priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
+              createdAt: o.createdAt || null, deadline: o.deadline || null, dateFrom: o.dateFrom || null }));
           changed = true;
+          // Refresh right panel if the currently selected annotation was among those updated
+          if (selectedUpdated && selObj) onObjectSelected({ target: selObj });
         }
       }
 
