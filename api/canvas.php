@@ -312,12 +312,22 @@ function _mergeCanvasObjects(array $serverObjs, array $clientObjs): array {
     foreach ($clientObjs as $o) {
         $aid = $o['annotId'] ?? null;
         if ($aid && isset($serverMap[$aid])) {
-            // Preserve server's non-empty text fields when client sends empty —
-            // prevents a stale device (same account) from wiping another device's work.
             $srv = $serverMap[$aid];
-            foreach (['popisek', 'prirazeno'] as $tf) {
-                if (empty($o[$tf]) && !empty($srv[$tf])) $o[$tf] = $srv[$tf];
+            $clientTs = (int)($o['updatedAt']  ?? 0);
+            $serverTs = (int)($srv['updatedAt'] ?? 0);
+            if ($serverTs > $clientTs) {
+                // Server annotation is newer — use server's field values
+                foreach (['popisek', 'prirazeno', 'profese', 'priorita', 'status', 'deadline', 'dateFrom'] as $tf) {
+                    $o[$tf] = $srv[$tf] ?? $o[$tf];
+                }
+                $o['updatedAt'] = $serverTs;
+            } elseif ($clientTs === 0 && $serverTs === 0) {
+                // Legacy (no timestamps): preserve server non-empty text fields
+                foreach (['popisek', 'prirazeno'] as $tf) {
+                    if (empty($o[$tf]) && !empty($srv[$tf])) $o[$tf] = $srv[$tf];
+                }
             }
+            // clientTs >= serverTs and at least one has timestamp: client is newer, keep as-is
         }
         $merged[] = $o;
     }
@@ -349,8 +359,17 @@ function _mergeCanvasAnnotations(array $serverAnnots, array $clientAnnots): arra
         $aid = $a['annotId'] ?? null;
         if ($aid && isset($serverMap[$aid])) {
             $srv = $serverMap[$aid];
-            foreach (['popisek', 'prirazeno'] as $tf) {
-                if (empty($a[$tf]) && !empty($srv[$tf])) $a[$tf] = $srv[$tf];
+            $clientTs = (int)($a['updatedAt']  ?? 0);
+            $serverTs = (int)($srv['updatedAt'] ?? 0);
+            if ($serverTs > $clientTs) {
+                foreach (['popisek', 'prirazeno', 'profese', 'priorita', 'status', 'deadline', 'dateFrom'] as $tf) {
+                    $a[$tf] = $srv[$tf] ?? $a[$tf];
+                }
+                $a['updatedAt'] = $serverTs;
+            } elseif ($clientTs === 0 && $serverTs === 0) {
+                foreach (['popisek', 'prirazeno'] as $tf) {
+                    if (empty($a[$tf]) && !empty($srv[$tf])) $a[$tf] = $srv[$tf];
+                }
             }
         }
         $merged[] = $a;
