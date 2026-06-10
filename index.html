@@ -13132,10 +13132,11 @@ async function _pollLiveSync() {
           });
         if (activeEdited) {
           fabricCanvas.renderAll();
-          // Update appState annotations in-memory without triggering a server re-save.
-          // The remote edits were already saved by the other user; re-saving would create
-          // an unnecessary round-trip and reset _lastOwnSaveTs, delaying future syncs.
-          appState.levels[appState.activeLevel].annotations = fabricCanvas.getObjects()
+          // Snapshot canvas into fabricJSON so level-switch reloads the synced values.
+          // Without this, switchLevel() reloads from stale fabricJSON and reverts popisek.
+          const _snap = _canvasJSON();
+          appState.levels[appState.activeLevel].fabricJSON = _snap;
+          appState.levels[appState.activeLevel].annotations = _snap.objects
             .filter(o => o.annotId && !o.isBackground && !o.annotLabelFor)
             .map(o => ({ annotId: o.annotId, profese: o.profese, popisek: o.popisek,
               priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
