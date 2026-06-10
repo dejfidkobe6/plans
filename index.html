@@ -12982,11 +12982,11 @@ function _isUserTyping() {
 
 async function _pollLiveSync() {
   if (!currentProject || _isProjectLoading || _saving) return;
-  // Skip entire sync cycle while user has a text field focused — prevents
-  // DOM rebuilds and appState overwrites from interrupting active editing.
-  if (_isUserTyping()) return;
-  // KD sync runs every cycle independently of canvas changes
+  // KD sync always runs — it guards its own re-renders against typing internally
   _pollKDSync();
+  // Skip canvas sync while user has a text field focused — prevents
+  // appState overwrites and DOM rebuilds from interrupting active editing.
+  if (_isUserTyping()) return;
   try {
     const { ok, data } = await apiFetch(
       `api/canvas.php?project_id=${currentProject.id}&ts_only=1`
@@ -12997,13 +12997,12 @@ async function _pollLiveSync() {
     if (_lastKnownTs === null) { _lastKnownTs = remoteTs; return; } // init
     if (remoteTs === _lastKnownTs) return;                          // no change
 
-    // Something changed on server
+    // If we saved ourselves <4s ago, this is likely our own save — skip but
+    // do NOT advance _lastKnownTs so we retry the check next cycle.
+    if (Date.now() - _lastOwnSaveTs < 4000) return;
+
+    // Something changed on server — record and process
     _lastKnownTs = remoteTs;
-
-    // If we saved ourselves <6s ago, this is likely our own save – ignore
-    if (Date.now() - _lastOwnSaveTs < 6000) return;
-
-    // Fetch full data and merge inactive levels silently
     const serverData = await _serverLoad(currentProject.id);
     if (!serverData) return;
 
