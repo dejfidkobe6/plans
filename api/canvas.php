@@ -140,7 +140,7 @@ if ($method === 'POST') {
     try {
         // Zamkni řádek – atomická operace (SELECT FOR UPDATE)
         $stmt = $db->prepare(
-            'SELECT state_json, annot_counter FROM plan_canvas_data WHERE project_id = ? FOR UPDATE'
+            'SELECT state_json, profese_json, annot_counter FROM plan_canvas_data WHERE project_id = ? FOR UPDATE'
         );
         $stmt->execute([$projectId]);
         $existingRow = $stmt->fetch();
@@ -148,10 +148,14 @@ if ($method === 'POST') {
         // Načti server stav pro merge
         $serverLevels  = [];
         $serverCounter = 1;
+        $serverProfese = [];
         if ($existingRow && $existingRow['state_json']) {
             $serverState  = json_decode(_decompress($existingRow['state_json']), true);
             $serverLevels = $serverState['levels'] ?? [];
             $serverCounter = (int)($existingRow['annot_counter'] ?? 1);
+        }
+        if ($existingRow && $existingRow['profese_json']) {
+            $serverProfese = json_decode(_decompress($existingRow['profese_json']), true) ?? [];
         }
 
         // Merge každého levelu – zachová anotace přidané jiným uživatelem
@@ -218,9 +222,18 @@ if ($method === 'POST') {
             jsonError('Chyba serializace stavu: ' . json_last_error_msg(), 500);
         }
 
-        $profeseJson = null;
+        // Merge profese: client wins per name, server-only entries preserved.
+        // Prevents a stale client from silently deleting profese added by another user.
+        $mergedProfese = null;
         if ($profese !== null) {
-            $profeseJson = json_encode($profese, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+            $mergedProfese = _mergeProfese($serverProfese, $profese);
+        } elseif (!empty($serverProfese)) {
+            $mergedProfese = $serverProfese; // client sent nothing – keep server data
+        }
+
+        $profeseJson = null;
+        if ($mergedProfese !== null) {
+            $profeseJson = json_encode($mergedProfese, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
             if ($profeseJson === false) $profeseJson = null;
         }
 
@@ -263,6 +276,24 @@ if ($method === 'POST') {
 // server-only items jsou zachovány (přidal jiný uživatel)
 // Returns: [mergedArray, serverOnlyItems]
 // ============================================================
+// Merge profese arrays: client version wins per name (last-write-wins),
+// server-only entries (added by another user) are appended so they are never lost.
+function _mergeProfese(array $server, array $client): array {
+    $clientByName = [];
+    foreach ($client as $p) {
+        $name = $p['name'] ?? null;
+        if ($name !== null) $clientByName[$name] = $p;
+    }
+    $merged = $client; // start with all client entries (client wins for matching names)
+    foreach ($server as $p) {
+        $name = $p['name'] ?? null;
+        if ($name !== null && !isset($clientByName[$name])) {
+            $merged[] = $p; // server-only entry – preserve it
+        }
+    }
+    return $merged;
+}
+
 function _mergeCanvasObjects(array $serverObjs, array $clientObjs): array {
     $clientIds = [];
     foreach ($clientObjs as $o) {

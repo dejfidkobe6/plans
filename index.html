@@ -10423,9 +10423,16 @@ let _saving = false;
 async function _serverSaveNow() {
   // Keep _hasPendingSave = true until save fully completes — prevents _pollLiveSync
   // from overwriting appState with stale server data during in-flight network call.
-  if (!currentProject || _isProjectLoading || _saving || !canEdit()) {
-    _hasPendingSave = false; // bail-out path: safe to clear
+  if (!currentProject || _isProjectLoading || !canEdit()) {
+    _hasPendingSave = false; // bail-out: no project / loading / read-only
     return;
+  }
+  if (_saving) {
+    // A save is already in-flight and was serialised before this call —
+    // schedule a retry so the latest state (e.g. profese edits) is not lost.
+    clearTimeout(_srvTimer);
+    _srvTimer = setTimeout(_serverSaveNow, 1000);
+    return; // _hasPendingSave stays true until the retry completes
   }
   _saving = true;
   // Capture active level canvas into appState before serialising
