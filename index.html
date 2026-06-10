@@ -8652,6 +8652,7 @@ function saveAnnotEdit() {
   ann.prirazeno = document.getElementById('ae-prirazeno').value;
   ann.dateFrom  = document.getElementById('ae-date-from').value;
   ann.deadline  = document.getElementById('ae-deadline').value;
+  ann.updatedAt = Date.now();
   if (ann.dateFrom && ann.deadline && ann.dateFrom > ann.deadline) ann.deadline = ann.dateFrom;
   if (ann.deadline && ann.dateFrom && ann.deadline < ann.dateFrom) ann.dateFrom = ann.deadline;
   document.getElementById('ae-date-from').value = ann.dateFrom || '';
@@ -8663,7 +8664,7 @@ function saveAnnotEdit() {
     if (obj) {
       obj.set({ profese: ann.profese, popisek: ann.popisek, priorita: ann.priorita,
                  status: ann.status, prirazeno: ann.prirazeno, deadline: ann.deadline,
-                 dateFrom: ann.dateFrom });
+                 dateFrom: ann.dateFrom, updatedAt: ann.updatedAt });
       applyAnnotColorToCanvas(obj);
       updateLabelFor(annotId);
       fabricCanvas.renderAll();
@@ -8685,6 +8686,7 @@ function saveAnnotEdit() {
         fabObj.prirazeno = ann.prirazeno;
         fabObj.deadline  = ann.deadline;
         fabObj.dateFrom  = ann.dateFrom;
+        fabObj.updatedAt = ann.updatedAt;
       }
     }
     // Inactive level edit — flush quickly before next poll can overwrite
