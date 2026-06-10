@@ -295,14 +295,32 @@ function _mergeProfese(array $server, array $client): array {
 }
 
 function _mergeCanvasObjects(array $serverObjs, array $clientObjs): array {
+    // Build server map for quick lookup by annotId
+    $serverMap = [];
+    foreach ($serverObjs as $o) {
+        $aid = $o['annotId'] ?? null;
+        if ($aid) $serverMap[$aid] = $o;
+    }
     $clientIds = [];
     foreach ($clientObjs as $o) {
         $aid = $o['annotId'] ?? null;
         if ($aid) $clientIds[$aid] = true;
     }
 
-    $merged     = $clientObjs;
+    $merged = [];
     $serverOnly = [];
+    foreach ($clientObjs as $o) {
+        $aid = $o['annotId'] ?? null;
+        if ($aid && isset($serverMap[$aid])) {
+            // Preserve server's non-empty text fields when client sends empty —
+            // prevents a stale device (same account) from wiping another device's work.
+            $srv = $serverMap[$aid];
+            foreach (['popisek', 'prirazeno'] as $tf) {
+                if (empty($o[$tf]) && !empty($srv[$tf])) $o[$tf] = $srv[$tf];
+            }
+        }
+        $merged[] = $o;
+    }
     foreach ($serverObjs as $o) {
         $aid = $o['annotId'] ?? null;
         if ($aid && !isset($clientIds[$aid])) {
@@ -314,14 +332,29 @@ function _mergeCanvasObjects(array $serverObjs, array $clientObjs): array {
 }
 
 function _mergeCanvasAnnotations(array $serverAnnots, array $clientAnnots): array {
+    $serverMap = [];
+    foreach ($serverAnnots as $a) {
+        $aid = $a['annotId'] ?? null;
+        if ($aid) $serverMap[$aid] = $a;
+    }
     $clientIds = [];
     foreach ($clientAnnots as $a) {
         $aid = $a['annotId'] ?? null;
         if ($aid) $clientIds[$aid] = true;
     }
 
-    $merged     = $clientAnnots;
+    $merged = [];
     $serverOnly = [];
+    foreach ($clientAnnots as $a) {
+        $aid = $a['annotId'] ?? null;
+        if ($aid && isset($serverMap[$aid])) {
+            $srv = $serverMap[$aid];
+            foreach (['popisek', 'prirazeno'] as $tf) {
+                if (empty($a[$tf]) && !empty($srv[$tf])) $a[$tf] = $srv[$tf];
+            }
+        }
+        $merged[] = $a;
+    }
     foreach ($serverAnnots as $a) {
         $aid = $a['annotId'] ?? null;
         if ($aid && !isset($clientIds[$aid])) {

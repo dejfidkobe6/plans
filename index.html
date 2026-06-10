@@ -10584,11 +10584,23 @@ function _applyServerAdded(serverAdded) {
       fabric.util.enlivenObjects(toAdd, (enlivened) => {
         enlivened.forEach(obj => {
           fabricCanvas.add(obj);
-          if (obj.annotId) createAnnotLabel(obj); // create label for newly synced annotation
+          if (obj.annotId) createAnnotLabel(obj);
+          // Update appState.annotations directly — do NOT call saveCurrentLevel() here.
+          // A re-save would send our current canvas state (possibly stale for other fields
+          // like popisek) back to the server, overwriting a co-worker's fresh data.
+          const lvl = appState.levels[levelIdx];
+          if (lvl && obj.annotId) {
+            lvl.annotations = lvl.annotations || [];
+            lvl.annotations.push({
+              annotId: obj.annotId, profese: obj.profese || null, popisek: obj.popisek || null,
+              priorita: obj.priorita || null, prirazeno: obj.prirazeno || null,
+              status: obj.status || null, createdAt: obj.createdAt || null,
+              deadline: obj.deadline || null, dateFrom: obj.dateFrom || null
+            });
+          }
         });
         deconflictLabels();
         fabricCanvas.renderAll();
-        saveCurrentLevel(); // update appState.levels[active] from canvas
         updateAnnotList();
       });
     } else {
@@ -12601,18 +12613,54 @@ async function openProject(proj) {
 
   if (serverData) {
     _lastKnownTs = serverData.updated_at || null;
-    // If localStorage has unsaved changes (dirty flag set before server confirmed them),
-    // prefer localStorage so edits made just before a reload are not lost.
     const _pid = String(proj.id);
     const _lsDirty = localStorage.getItem(LS_PROJECT_DIRTY(_pid)) === '1';
     if (_lsDirty) {
+      // Load localStorage to capture any annotations added locally but not yet saved to server
+      // (e.g. tab was closed before the 2s debounce fired, or network was down).
       loadState();
+      const _localLevels = (appState.levels || []).map(l => ({
+        id: l.id,
+        annotations: (l.annotations || []).slice(),
+        fabricObjs: new Map((l.fabricJSON?.objects || []).map(o => [o.annotId, o]))
+      }));
+
+      // Use server state as the authoritative base — server is newest when another device
+      // has been saving. Prevents stale localStorage from overwriting a co-worker's work.
+      const s = serverData.state;
+      appState.levels      = s.levels       || [];
+      appState.activeLevel = s.activeLevel  || 0;
+      appState.tool        = s.tool         || 'select';
+      appState.showGrid    = s.showGrid     || false;
+      appState.zones3D     = s.zones3D      || [];
+      if (Array.isArray(s.kdLocations)) {
+        kdLocations = s.kdLocations;
+        try { localStorage.setItem(LS_KD_LOCATIONS_KEY(_pid), JSON.stringify(kdLocations)); } catch(e) {}
+      }
       annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
-      // Always prefer server profese — supplier config is shared and server is authoritative
       if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
         appState.profese = serverData.profese;
       }
-      // Push the local state to the server immediately to close the gap
+
+      // Re-add any annotations that were created locally but are absent from server
+      // (the only thing that could be lost if server is taken as base).
+      _localLevels.forEach(loc => {
+        const srv = appState.levels.find(l => l.id === loc.id);
+        if (!srv) return;
+        const srvIds = new Set((srv.annotations || []).map(a => a.annotId));
+        loc.annotations.forEach(a => {
+          if (!a.annotId || srvIds.has(a.annotId)) return;
+          srv.annotations = srv.annotations || [];
+          srv.annotations.push(a);
+          if (srv.fabricJSON) {
+            srv.fabricJSON.objects = srv.fabricJSON.objects || [];
+            const fo = loc.fabricObjs.get(a.annotId);
+            if (fo) srv.fabricJSON.objects.push(fo);
+          }
+        });
+      });
+
+      // Push merged state (server base + local-only additions) to server
       setTimeout(() => { if (!_isProjectLoading) { clearTimeout(_srvTimer); _serverSaveNow(); } }, 800);
     } else {
       const s = serverData.state;
