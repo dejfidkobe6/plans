@@ -5378,6 +5378,7 @@ function finishPolygon() {
   updateAnnotList();
   onObjectSelected({ target: poly });
   saveCurrentLevel();
+  clearTimeout(_srvTimer); _serverSaveNow();
   setTool('select');
   cw.renderAll();
 }
@@ -5407,6 +5408,7 @@ function finishPolyline() {
   updateAnnotList();
   onObjectSelected({ target: poly });
   saveCurrentLevel();
+  clearTimeout(_srvTimer); _serverSaveNow();
   setTool('select');
   cw.renderAll();
 }
@@ -6213,6 +6215,7 @@ function setupEventListeners() {
     }
 
     saveCurrentLevel();
+    clearTimeout(_srvTimer); _serverSaveNow();
     cw.renderAll();
   });
 
@@ -6269,6 +6272,7 @@ function setupEventListeners() {
     pushUndoState();
     updateAnnotList();
     saveCurrentLevel();
+    clearTimeout(_srvTimer); _serverSaveNow();
     cw.setActiveObject(path);
     onObjectSelected({ target: path });
     setTool('select');
@@ -6801,6 +6805,7 @@ function placePinAt(x, y) {
   onObjectSelected({ target: pin });
   setTool('select');
   saveCurrentLevel();
+  clearTimeout(_srvTimer); _serverSaveNow();
   fabricCanvas.renderAll();
 }
 
@@ -6824,6 +6829,7 @@ function placeTextAt(x, y) {
   updateAnnotList();
   onObjectSelected({ target: txt });
   saveCurrentLevel();
+  clearTimeout(_srvTimer); _serverSaveNow();
   fabricCanvas.renderAll();
 }
 
@@ -6890,6 +6896,10 @@ function updateActiveAnnotProp(prop, value) {
 
   saveCurrentLevel();
   updateAnnotList();
+  // Push discrete changes (select/button, not keystroke) immediately so other users see them fast
+  if (prop !== 'popisek' && prop !== 'prirazeno') {
+    clearTimeout(_srvTimer); _serverSaveNow();
+  }
 }
 
 function onObjectSelected(opt) {
@@ -12958,14 +12968,23 @@ async function restoreBackup(idx) {
 setInterval(() => saveBackup(), 60 * 60 * 1000);
 
 // ============================================================
-// LIVE SYNC – poll server every 10s for changes by other users
+// LIVE SYNC – poll server every 2s for changes by other users
 // ============================================================
 let _lastKnownTs   = null;   // server updated_at we last saw
 let _lastOwnSaveTs = 0;      // when WE last saved successfully
 let _syncPending   = false;  // new remote data waiting for user
 
+function _isUserTyping() {
+  const ae = document.activeElement;
+  return ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')
+    && ae.type !== 'checkbox' && ae.type !== 'radio';
+}
+
 async function _pollLiveSync() {
   if (!currentProject || _isProjectLoading || _saving) return;
+  // Skip entire sync cycle while user has a text field focused — prevents
+  // DOM rebuilds and appState overwrites from interrupting active editing.
+  if (_isUserTyping()) return;
   // KD sync runs every cycle independently of canvas changes
   _pollKDSync();
   try {
@@ -13046,10 +13065,11 @@ async function _pollLiveSync() {
             if (annotKey(remObj) === annotKey(locObj)) return;
             locObj.set({
               profese:   remObj.profese   ?? locObj.profese,
-              popisek:   remObj.popisek   ?? locObj.popisek,
+              // Use || for text fields: empty string from server must not wipe local typed value
+              popisek:   remObj.popisek   || locObj.popisek,
               priorita:  remObj.priorita  ?? locObj.priorita,
               status:    remObj.status    ?? locObj.status,
-              prirazeno: remObj.prirazeno ?? locObj.prirazeno,
+              prirazeno: remObj.prirazeno || locObj.prirazeno,
               deadline:  remObj.deadline  ?? locObj.deadline,
               dateFrom:  remObj.dateFrom  ?? locObj.dateFrom,
             });
@@ -13157,7 +13177,7 @@ document.getElementById('status-sync-info').addEventListener('click', async () =
   showToast('Aktivní podlaží obnoveno ze serveru', 'success');
 });
 
-setInterval(_pollLiveSync, 3000);
+setInterval(_pollLiveSync, 2000);
 </script>
 
 <button id="mob-props-open-btn" title="Vlastnosti anotace">
