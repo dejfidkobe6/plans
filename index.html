@@ -4004,7 +4004,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   </div>
   <div id="anotace-filters-bar">
     <div class="tfilter-group">
-      <input type="text" id="afilter-search" class="tfilter-input" placeholder="🔍 Hledat popis, ID, přiřazeného...">
+      <input type="text" id="afilter-search" class="tfilter-input" placeholder="🔍 Hledat popis, firmu, profesi, podlaží...">
     </div>
     <div class="tfilter-group">
       <select id="afilter-level" class="tfilter-select">
@@ -8331,6 +8331,9 @@ function atblCellHTML(key, r) {
     case 'priorita':  { const pc = r.priorita==='Vysoká'?'tcell-prio-high':r.priorita==='Nízká'?'tcell-prio-low':'tcell-prio-mid'; return `<td><span class="tcell-prio ${pc}">${escHtml(r.priorita||'Střední')}</span></td>`; }
     case 'status': {
       const sc = ATBL_STATUS_COLORS[r.status] || { bg: 'var(--card)', border: 'var(--border)', color: 'var(--text)' };
+      if (r.source === 'kd') {
+        return `<td class="tcell-status"><span style="background:${sc.bg};border:1px solid ${sc.border};color:${sc.color};padding:2px 8px;border-radius:4px;font-size:12px;white-space:nowrap">${escHtml(r.status||'Nový úkol')}</span></td>`;
+      }
       const opts = ['Nový úkol','Probíhá','Hotovo','Urgence'].map(s => `<option${s===r.status?' selected':''}>${escHtml(s)}</option>`).join('');
       return `<td class="tcell-status"><select style="background:${sc.bg};border-color:${sc.border};color:${sc.color}" onchange="updateAnnotStatusFromAnotacePage('${escHtml(r.annotId)}',${r.levelIdx},this.value)">${opts}</select></td>`;
     }
@@ -8398,13 +8401,17 @@ function toggleAnotacePage() {
 function populateAnotaceFilters() {
   const lvlSel = document.getElementById('afilter-level');
   const curLvl = lvlSel.value;
-  lvlSel.innerHTML = '<option value="">Všechna podlaží</option>';
+  lvlSel.innerHTML = '<option value="">Všechna podlaží + KD</option>';
   appState.levels.forEach((l, i) => {
     const opt = document.createElement('option');
     opt.value = String(i); opt.textContent = l.name;
     if (curLvl === String(i)) opt.selected = true;
     lvlSel.appendChild(opt);
   });
+  const kdOpt = document.createElement('option');
+  kdOpt.value = 'kd'; kdOpt.textContent = '📋 Kontrolní den';
+  if (curLvl === 'kd') kdOpt.selected = true;
+  lvlSel.appendChild(kdOpt);
   const profSel = document.getElementById('afilter-profese');
   const curProf = profSel.value;
   profSel.innerHTML = '<option value="">Všechny profese</option>';
@@ -8431,10 +8438,16 @@ function getAnotaceFilters() {
 function filterAnotace(rows, f) {
   return rows.filter(r => {
     if (f.search) {
-      const hay = ((r.popisek||'') + ' ' + (r.annotId||'') + ' ' + (r.prirazeno||'')).toLowerCase();
-      if (!hay.includes(f.search)) return false;
+      const hay = [r.popisek, r.annotId, r.prirazeno, r.firma, r.profese, r.levelName]
+        .map(v => (v || '').toLowerCase()).join(' ');
+      const words = f.search.split(/\s+/).filter(Boolean);
+      if (!words.every(w => hay.includes(w))) return false;
     }
-    if (f.levelIdx !== '' && String(r.levelIdx) !== f.levelIdx) return false;
+    if (f.levelIdx === 'kd') {
+      if (r.source !== 'kd') return false;
+    } else if (f.levelIdx !== '') {
+      if (r.source === 'kd' || String(r.levelIdx) !== f.levelIdx) return false;
+    }
     if (f.profese && r.profese !== f.profese) return false;
     if (f.status  && r.status  !== f.status)  return false;
     if (f.prio    && r.priorita !== f.prio)   return false;
@@ -8444,8 +8457,52 @@ function filterAnotace(rows, f) {
   });
 }
 
+function getAllKdTaskRows() {
+  const profeseMap = new Map((appState.profese || []).map(p => [p.name, p]));
+  const rows = [];
+  (kdRecords || []).forEach(rec => {
+    (rec.chapters || []).forEach(ch => {
+      (ch.cards || []).forEach(card => {
+        (card.tasks || []).forEach(task => {
+          const prof = profeseMap.get(task.sub);
+          const locs = (task.locations || []).filter(Boolean).join(', ') || '—';
+          rows.push({
+            annotId:   'KD-' + (task.id || '').slice(-6).toUpperCase(),
+            firma:     prof?.firma || prof?.name || task.sub || '—',
+            profese:   task.sub || '',
+            popisek:   task.text || '',
+            levelName: locs,
+            levelIdx:  null,
+            priorita:  task.urgent ? 'Vysoká' : 'Střední',
+            status:    task.done ? 'Hotovo' : (task.urgent ? 'Urgence' : 'Nový úkol'),
+            prirazeno: '',
+            deadline:  null,
+            createdAt: rec.date || null,
+            source:    'kd',
+            kdRecId:   rec.id,
+            kdTaskId:  task.id
+          });
+        });
+      });
+    });
+  });
+  return rows;
+}
+
+function goToKdFromAnotacePage(kdRecId) {
+  closeAnotacePage();
+  const page = document.getElementById('kd-page');
+  if (!page.classList.contains('visible')) {
+    document.getElementById('kd-btn').click();
+  }
+  kdActiveId = kdRecId;
+  kdRenderPage();
+}
+
 function renderAnotacePage() {
-  const all      = getAllAnnotations();
+  const canvasRows = getAllAnnotations();
+  const kdRows     = getAllKdTaskRows();
+  const all        = [...canvasRows, ...kdRows];
   const filtered = filterAnotace(all, getAnotaceFilters());
   const sorted   = sortAnnotations(filtered, anotaceSort.col, anotaceSort.dir);
 
@@ -8469,11 +8526,14 @@ function renderAnotacePage() {
   empty.style.display = 'none';
 
   tbody.innerHTML = sorted.map(r =>
-    `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx}">
+    `<tr data-annot-id="${escHtml(r.annotId)}" data-level-idx="${r.levelIdx ?? ''}">
       ${atblOrder.map(key => atblCellHTML(key, r)).join('')}
       <td class="tcell-actions">
-        <button class="trow-edit-btn" onclick="openAnnotEditModal('${escHtml(r.annotId)}',${r.levelIdx})">✎ Upravit</button>
-        <button class="trow-goto-btn" onclick="goToAnnotationFromAnotacePage(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>
+        ${r.source === 'kd'
+          ? `<button class="trow-goto-btn" onclick="goToKdFromAnotacePage('${escHtml(r.kdRecId)}')">→ KD</button>`
+          : `<button class="trow-edit-btn" onclick="openAnnotEditModal('${escHtml(r.annotId)}',${r.levelIdx})">✎ Upravit</button>
+             <button class="trow-goto-btn" onclick="goToAnnotationFromAnotacePage(${r.levelIdx},'${escHtml(r.annotId)}')">→ Zobrazit</button>`
+        }
       </td>
     </tr>`
   ).join('');
