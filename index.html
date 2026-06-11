@@ -3821,8 +3821,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
             <div class="field-group">
               <label class="field-label">Termín od / do</label>
               <div style="display:flex;gap:4px;">
-                <input type="date" class="field-input" id="prop-date-from" style="color-scheme:dark;flex:1;" title="Termín od">
-                <input type="date" class="field-input" id="prop-deadline"  style="color-scheme:dark;flex:1;" title="Termín do">
+                <input type="text" class="field-input" id="prop-date-from" autocomplete="off" style="flex:1;" title="Termín od">
+                <input type="text" class="field-input" id="prop-deadline"  autocomplete="off" style="flex:1;" title="Termín do">
               </div>
             </div>
           </div>
@@ -4034,9 +4034,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       </select>
     </div>
     <div class="tfilter-group tfilter-date-group">
-      <input type="date" id="afilter-deadline-from" class="tfilter-date" title="Termín od">
+      <input type="text" id="afilter-deadline-from" class="tfilter-date" autocomplete="off" title="Termín od">
       <span class="tfilter-date-sep">–</span>
-      <input type="date" id="afilter-deadline-to" class="tfilter-date" title="Termín do">
+      <input type="text" id="afilter-deadline-to" class="tfilter-date" autocomplete="off" title="Termín do">
     </div>
     <button id="afilter-reset-btn" class="tfilter-reset" title="Resetovat filtry">✕ Reset</button>
     <button id="anotace-export-csv-btn" class="tfilter-export" title="Exportovat do CSV">↓ CSV</button>
@@ -4096,7 +4096,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <div id="kd-meta-bar" style="display:none">
       <span class="kd-meta-label">Datum</span>
-      <input type="date" id="kd-date-input">
+      <input type="text" id="kd-date-input" autocomplete="off">
       <span class="kd-meta-label">Poznámka</span>
       <input type="text" id="kd-note-input" placeholder="Obecná poznámka k zápisu...">
       <button id="kd-delete-record-btn">Smazat záznam</button>
@@ -4106,9 +4106,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <input type="search" id="kdf-search" placeholder="Hledat úkoly..." style="padding:3px 7px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:11px;font-family:var(--font-main);width:160px;flex-shrink:0;">
         <select id="kdf-sub"><option value="">Dodavatel: vše</option></select>
         <select id="kdf-loc"><option value="">Lokace: vše</option></select>
-        <input type="date" id="kdf-from" title="Termín od">
+        <input type="text" id="kdf-from" autocomplete="off" title="Termín od">
         <span class="kdf-sep">–</span>
-        <input type="date" id="kdf-to" title="Termín do">
+        <input type="text" id="kdf-to" autocomplete="off" title="Termín do">
         <label class="kdf-urgent-label"><input type="checkbox" id="kdf-urgent"> Urgentní</label>
         <label class="kdf-done-label"><input type="checkbox" id="kdf-done"> Hotové</label>
         <label class="kdf-done-label" style="border-left:1px solid var(--border);padding-left:8px;margin-left:2px"><input type="checkbox" id="kdf-sort-sub"> Řadit dle dodavatele</label>
@@ -4268,8 +4268,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <div class="ae-field">
         <label>Termín od / do</label>
         <div style="display:flex;gap:4px;">
-          <input type="date" id="ae-date-from" style="color-scheme:dark;flex:1;" placeholder="od">
-          <input type="date" id="ae-deadline"  style="color-scheme:dark;flex:1;" placeholder="do">
+          <input type="text" id="ae-date-from" autocomplete="off" style="flex:1;" placeholder="od">
+          <input type="text" id="ae-deadline"  autocomplete="off" style="flex:1;" placeholder="do">
         </div>
       </div>
     </div>
@@ -4480,6 +4480,56 @@ let _lastMoveClickTime = 0;
 let partitionStartPt = null;
 
 // ============================================================
+// SHARED DATE PICKER (flatpickr) — unified across whole app
+// ============================================================
+const FP_APP_LOCALE = {
+  firstDayOfWeek: 1,
+  weekdays: {
+    shorthand: ['Ne','Po','Út','St','Čt','Pá','So'],
+    longhand:  ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']
+  },
+  months: {
+    shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'],
+    longhand:  ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']
+  }
+};
+
+function _fpWeekend(_s, _c, _fp, dayEl) {
+  if (dayEl.dateObj) { const d = dayEl.dateObj.getDay(); if (d === 0 || d === 6) dayEl.classList.add('fp-kd-weekend'); }
+}
+
+function initAppDatePicker(el, extraOpts) {
+  if (typeof flatpickr === 'undefined' || !el || el._flatpickr) return null;
+  el.autocomplete = 'off';
+  return flatpickr(el, Object.assign({
+    locale: FP_APP_LOCALE,
+    dateFormat: 'Y-m-d',
+    disableMobile: true,
+    allowInput: true,
+    onDayCreate: _fpWeekend
+  }, extraOpts || {}));
+}
+
+// Set value on a date input and keep flatpickr display in sync.
+function setDateInput(el, val) {
+  if (!el) return;
+  const v = val || '';
+  el.value = v;
+  el._flatpickr?.setDate(v || null, false);
+}
+
+function setupAllDatePickers() {
+  const ids = [
+    'prop-date-from','prop-deadline',
+    'ae-date-from','ae-deadline',
+    'kd-date-input',
+    'afilter-deadline-from','afilter-deadline-to',
+    'kdf-from','kdf-to'
+  ];
+  ids.forEach(id => initAppDatePicker(document.getElementById(id)));
+}
+
+// ============================================================
 // INIT
 // ============================================================
 function init() {
@@ -4514,6 +4564,7 @@ function init() {
   setupAnnotEditModal();
   setupPDFExport();
   kdSetupPage();
+  setupAllDatePickers();
   requestAnimationFrame(autoSaveLoop);
 }
 
@@ -6606,7 +6657,7 @@ function setupEventListeners() {
     const from = document.getElementById('prop-date-from').value;
     const to   = document.getElementById('prop-deadline').value;
     if (from && to && from > to) {
-      document.getElementById('prop-deadline').value = from;
+      setDateInput(document.getElementById('prop-deadline'), from);
       updateActiveAnnotProp('deadline', from);
     }
     updateActiveAnnotProp('dateFrom', from);
@@ -6615,7 +6666,7 @@ function setupEventListeners() {
     const to   = document.getElementById('prop-deadline').value;
     const from = document.getElementById('prop-date-from').value;
     if (to && from && to < from) {
-      document.getElementById('prop-date-from').value = to;
+      setDateInput(document.getElementById('prop-date-from'), to);
       updateActiveAnnotProp('dateFrom', to);
     }
     updateActiveAnnotProp('deadline', to);
@@ -6918,8 +6969,8 @@ function onObjectSelected(opt) {
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
   document.getElementById('prop-prirazeno').value = obj.prirazeno || '';
-  document.getElementById('prop-deadline').value  = obj.deadline  || '';
-  document.getElementById('prop-date-from').value = obj.dateFrom || '';
+  setDateInput(document.getElementById('prop-deadline'),  obj.deadline  || '');
+  setDateInput(document.getElementById('prop-date-from'), obj.dateFrom || '');
   document.getElementById('prop-annot-id').textContent = obj.annotId || '-';
 
   // Priorita buttons
@@ -8625,8 +8676,8 @@ function openAnnotEditModal(annotId, levelIdx) {
   document.getElementById('ae-priorita').value  = ann.priorita  || 'Střední';
   document.getElementById('ae-status').value    = ann.status    || 'Nový úkol';
   document.getElementById('ae-prirazeno').value = ann.prirazeno || '';
-  document.getElementById('ae-deadline').value   = ann.deadline  || '';
-  document.getElementById('ae-date-from').value  = ann.dateFrom  || '';
+  setDateInput(document.getElementById('ae-deadline'),  ann.deadline  || '');
+  setDateInput(document.getElementById('ae-date-from'), ann.dateFrom  || '');
   document.getElementById('annot-edit-title').textContent = 'Upravit anotaci ' + annotId;
   document.getElementById('annot-edit-overlay').classList.add('visible');
   document.getElementById('ae-popisek').focus();
@@ -8655,8 +8706,8 @@ function saveAnnotEdit() {
   ann.updatedAt = Date.now();
   if (ann.dateFrom && ann.deadline && ann.dateFrom > ann.deadline) ann.deadline = ann.dateFrom;
   if (ann.deadline && ann.dateFrom && ann.deadline < ann.dateFrom) ann.dateFrom = ann.deadline;
-  document.getElementById('ae-date-from').value = ann.dateFrom || '';
-  document.getElementById('ae-deadline').value  = ann.deadline  || '';
+  setDateInput(document.getElementById('ae-date-from'), ann.dateFrom || '');
+  setDateInput(document.getElementById('ae-deadline'),  ann.deadline  || '');
 
   // Synchronizuj i s fabric objektem pokud je na aktivní vrstvě
   if (levelIdx === appState.activeLevel) {
@@ -11655,7 +11706,7 @@ function kdRenderContent() {
   scroll.style.display = 'block';
   const _dateEl = document.getElementById('kd-date-input');
   const _noteEl = document.getElementById('kd-note-input');
-  if (document.activeElement !== _dateEl) _dateEl.value = rec.date || '';
+  if (document.activeElement !== _dateEl) setDateInput(_dateEl, rec.date || '');
   if (document.activeElement !== _noteEl) _noteEl.value = rec.note || '';
 
   // Populate filter selects
@@ -11870,7 +11921,7 @@ function kdBuildTask(rec, card, task, isLive) {
 
   // Compact date pair: text shows d.m, click opens flatpickr calendar
   const dp = document.createElement('span'); dp.className = 'kd-task-date-pair';
-  const _fpLocale = { firstDayOfWeek: 1, weekdays: { shorthand: ['Ne','Po','Út','St','Čt','Pá','So'], longhand: ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'] }, months: { shorthand: ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'], longhand: ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'] } };
+  const _fpLocale = FP_APP_LOCALE;
   const mkDateWidget = (isoInit, onCommit) => {
     let iso = isoInit;
     const wrap = document.createElement('span'); wrap.className = 'kd-date-wrap';
@@ -11888,12 +11939,7 @@ function kdBuildTask(rec, card, task, isLive) {
         defaultDate: iso || null,
         positionElement: txt,
         disableMobile: true,
-        onDayCreate: (_s, _c, _fp, dayEl) => {
-          if (dayEl.dateObj) {
-            const d = dayEl.dateObj.getDay();
-            if (d === 0 || d === 6) dayEl.classList.add('fp-kd-weekend');
-          }
-        },
+        onDayCreate: _fpWeekend,
         onChange: (selectedDates, dateStr) => {
           iso = dateStr || null;
           txt.value = kdIsoToDM(iso);
@@ -12649,20 +12695,35 @@ async function openProject(proj) {
         appState.profese = serverData.profese;
       }
 
-      // Re-add any annotations that were created locally but are absent from server
-      // (the only thing that could be lost if server is taken as base).
+      // Re-add annotations created locally but absent from server.
+      // Also apply local field changes that are newer than server (updatedAt comparison)
+      // so a status change (e.g. marking hotovo) isn't lost when server save failed.
       _localLevels.forEach(loc => {
         const srv = appState.levels.find(l => l.id === loc.id);
         if (!srv) return;
-        const srvIds = new Set((srv.annotations || []).map(a => a.annotId));
+        const srvAnnotMap = new Map((srv.annotations || []).map(a => [a.annotId, a]));
+        const srvFabMap   = new Map((srv.fabricJSON?.objects || []).map(o => [o.annotId, o]));
         loc.annotations.forEach(a => {
-          if (!a.annotId || srvIds.has(a.annotId)) return;
-          srv.annotations = srv.annotations || [];
-          srv.annotations.push(a);
-          if (srv.fabricJSON) {
-            srv.fabricJSON.objects = srv.fabricJSON.objects || [];
-            const fo = loc.fabricObjs.get(a.annotId);
-            if (fo) srv.fabricJSON.objects.push(fo);
+          if (!a.annotId) return;
+          if (!srvAnnotMap.has(a.annotId)) {
+            // Locally created annotation not yet on server — add it
+            srv.annotations = srv.annotations || [];
+            srv.annotations.push(a);
+            if (srv.fabricJSON) {
+              srv.fabricJSON.objects = srv.fabricJSON.objects || [];
+              const fo = loc.fabricObjs.get(a.annotId);
+              if (fo) srv.fabricJSON.objects.push(fo);
+            }
+          } else {
+            // Annotation exists on both; apply local fields when local updatedAt is newer
+            const locTs = a.updatedAt || 0;
+            const srvA  = srvAnnotMap.get(a.annotId);
+            const srvTs = srvA.updatedAt || 0;
+            if (locTs > srvTs) {
+              Object.assign(srvA, a);
+              const srvFab = srvFabMap.get(a.annotId);
+              if (srvFab) { const locFab = loc.fabricObjs.get(a.annotId); if (locFab) Object.assign(srvFab, locFab); }
+            }
           }
         });
       });
