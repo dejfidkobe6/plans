@@ -1,11 +1,16 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v3';
+const CACHE = 'besix-plans-v4';
 
 const PRECACHE = [
   './',
   './index.html',
+  './manifest.json',
   './besix_logo_bila.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon-32.png',
   // CDN knihovny – fabric, three.js, pdf.js, jspdf
   'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
