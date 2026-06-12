@@ -3374,6 +3374,57 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 </head>
 <body>
 
+<!-- PWA redirect overlay – shown when opening in a mobile browser instead of the installed app -->
+<div id="pwa-gate" style="display:none;position:fixed;inset:0;z-index:99999;
+  background:#fff;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;font-family:'Barlow Condensed',sans-serif;padding:36px;text-align:center;">
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;box-shadow:0 4px 20px rgba(0,0,0,.12)">
+  <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
+  <div style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
+    Aplikace je nainstalovaná na tvém telefonu.<br>Otevři ji z plochy pro nejlepší zážitek.
+  </div>
+  <button id="pwa-open-btn" style="background:#4A5340;color:#fff;border:none;
+    padding:15px 0;border-radius:12px;font-size:17px;font-weight:600;
+    cursor:pointer;width:100%;max-width:300px;letter-spacing:.3px">
+    Otevřít aplikaci
+  </button>
+  <button id="pwa-browser-btn" style="background:transparent;color:#888;
+    border:1px solid #ddd;padding:13px 0;border-radius:12px;font-size:15px;
+    cursor:pointer;width:100%;max-width:300px">
+    Pokračovat v prohlížeči
+  </button>
+</div>
+<script>
+(function(){
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (standalone) return;
+  var mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!mobile) return;
+  if (sessionStorage.getItem('pwa-skip')) return; // user already chose browser this session
+  var gate = document.getElementById('pwa-gate');
+  gate.style.display = 'flex';
+  document.getElementById('pwa-open-btn').onclick = function() {
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      // On Android: intent URL hands off to the installed PWA/Chrome app
+      var intent = 'intent://' + location.host + location.pathname +
+        '#Intent;scheme=' + location.protocol.replace(':','') +
+        ';action=android.intent.action.VIEW' +
+        ';category=android.intent.category.BROWSABLE' +
+        ';S.browser_fallback_url=' + encodeURIComponent(location.href) + ';end';
+      location.href = intent;
+    } else {
+      // iOS: can't auto-open PWA, guide the user
+      alert('Otevři Safari → Sdílet (☐↑) → Přidat na plochu, pak spusť aplikaci z plochy.');
+    }
+  };
+  document.getElementById('pwa-browser-btn').onclick = function() {
+    sessionStorage.setItem('pwa-skip', '1');
+    gate.style.display = 'none';
+  };
+})();
+</script>
+
 <!-- ============================================================
      AUTH SCREEN
      ============================================================ -->
