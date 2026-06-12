@@ -5638,17 +5638,23 @@ function deconflictLabels() {
     let bestL = cands[0][0], bestT = cands[0][1], bestScore = Infinity;
     for (const [cl, ct] of cands) {
       const cr = { l: cl, t: ct, r: cl + lw, b: ct + lh };
-      const score = placed.reduce((sum, pr) => sum + overlapArea(cr, pr), 0);
+      const overlapScore = placed.reduce((sum, pr) => sum + overlapArea(cr, pr), 0);
+      // Penalise positions far from the annotation (keeps labels close on low-zoom viewports)
+      const dist = Math.hypot(cl + lw / 2 - c.x, ct + lh / 2 - c.y);
+      const score = overlapScore + dist * 0.1;
       if (score < bestScore) { bestScore = score; bestL = cl; bestT = ct; }
-      if (score === 0) break; // found a clear spot
+      if (overlapScore === 0) break; // found a clear spot – candidates are ordered by proximity, so this is the closest one
     }
 
     lbl.left = bestL; lbl.top = bestT; lbl.setCoords();
     placed.push({ l: bestL, t: bestT, r: bestL + lw, b: bestT + lh });
   });
 
-  // Fallback push-apart for any remaining overlaps after greedy placement
+  // Fallback push-apart for any remaining overlaps after greedy placement.
+  // maxPushDist caps how far a label can stray from its annotation center (in canvas units),
+  // preventing labels from flying across the screen on low-zoom / mobile viewports.
   const MAX_ITER = 10;
+  const maxPushDist = 160 / zoom;
   for (let iter = 0; iter < MAX_ITER; iter++) {
     const rects = labels.map(getR);
     let moved = false;
@@ -5663,11 +5669,25 @@ function deconflictLabels() {
         const by = annotMap[labels[j].annotLabelFor]?.getCenterPoint().y || 0;
         const mi = ay >= by ? i : j;
         const lbl = labels[mi];
+        const lblW = (lbl.width  || 80) * (lbl.scaleX || 1);
+        const lblH = (lbl.height || 34) * (lbl.scaleY || 1);
         if (oy <= ox) {
           lbl.top -= (oy + PAD);
         } else {
           const ci = (rects[i].l + rects[i].r) / 2, cj = (rects[j].l + rects[j].r) / 2;
           lbl.left += (mi === i ? (ci <= cj ? -1 : 1) : (cj <= ci ? -1 : 1)) * (ox + PAD);
+        }
+        // Clamp: keep label within maxPushDist canvas units of its annotation center
+        const ann = annotMap[lbl.annotLabelFor];
+        if (ann) {
+          const ac = ann.getCenterPoint();
+          const lc = { x: lbl.left + lblW / 2, y: lbl.top + lblH / 2 };
+          const dist = Math.hypot(lc.x - ac.x, lc.y - ac.y);
+          if (dist > maxPushDist) {
+            const scale = maxPushDist / dist;
+            lbl.left = ac.x + (lc.x - ac.x) * scale - lblW / 2;
+            lbl.top  = ac.y + (lc.y - ac.y) * scale - lblH / 2;
+          }
         }
         lbl.setCoords(); rects[mi] = getR(lbl);
       }
