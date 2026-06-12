@@ -87,8 +87,10 @@ if ($action === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // ============================================================
 if ($action === 'google_redirect') {
     if (!GOOGLE_CLIENT_ID) jsonError('Google OAuth není nakonfigurováno');
-    $state = bin2hex(random_bytes(16));
-    $_SESSION['oauth_state'] = $state;
+    // State is a self-verifying HMAC token (timestamp + signature).
+    // No session storage needed — works across PWA/browser cookie contexts.
+    $ts    = (string)time();
+    $state = $ts . '.' . hash_hmac('sha256', $ts, GOOGLE_CLIENT_SECRET);
     $params = http_build_query([
         'client_id'     => GOOGLE_CLIENT_ID,
         'redirect_uri'  => GOOGLE_REDIRECT_URI,
@@ -104,9 +106,14 @@ if ($action === 'google_redirect') {
 // Google OAuth – callback
 // ============================================================
 if ($action === 'google_callback') {
-    $state = $_GET['state'] ?? '';
-    if (!$state || $state !== ($_SESSION['oauth_state'] ?? '')) jsonError('Neplatný OAuth state');
-    unset($_SESSION['oauth_state']);
+    $state  = $_GET['state'] ?? '';
+    $parts  = explode('.', $state, 2);
+    $valid  = count($parts) === 2
+           && ctype_digit($parts[0])
+           && abs(time() - (int)$parts[0]) < 600  // 10-minute window
+           && hash_equals(hash_hmac('sha256', $parts[0], GOOGLE_CLIENT_SECRET), $parts[1]);
+    if (!$valid) jsonError('Neplatný OAuth state');
+    unset($_SESSION['oauth_state']); // clean up legacy session key if present
 
     $code = $_GET['code'] ?? '';
     if (!$code) jsonError('Chybí OAuth kód');
