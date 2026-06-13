@@ -2953,10 +2953,16 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #mobile-menu-btn { display: flex; }
   #topbar-actions { display: none; }
   #toolbar-right { display: none; }
+  #mobile-dropdown-tools { display: none !important; }
 
   /* Overlay pages – extend to cover full height minus bottom bar */
-  #home-page, #users-page, #anotace-page, #kd-page {
+  #home-page, #users-page, #anotace-page {
     bottom: 54px;
+    z-index: 950;
+  }
+  /* KD page covers full height — has its own bottom bar */
+  #kd-page {
+    bottom: 0 !important;
     z-index: 950;
   }
 
@@ -3005,30 +3011,27 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   .kd-chapter-cards { zoom: 1 !important; }
   /* On mobile, each .kd-card is its own scroll viewport with sticky .kd-card-header */
   .kd-card-headers-bar { display: none !important; }
-  /* Cards row = horizontal snap carousel */
+  /* Cards: vertical stacking, full width */
   .kd-chapter-cards {
     display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    gap: 0 !important;
-    padding: 8px 10px !important;
-    align-items: flex-start !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    scroll-snap-type: none !important;
+    padding: 0 0 8px 0 !important;
+    gap: 8px !important;
   }
-  /* Each card = one snap slide; slightly narrower than container to show peek of next */
   .kd-card {
-    flex: 0 0 calc(100% - 52px) !important;
-    width: calc(100% - 52px) !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
     min-width: 0 !important;
-    max-height: 62vh !important;
+    max-width: 100% !important;
+    max-height: none !important;
     height: auto !important;
-    scroll-snap-align: start;
+    scroll-snap-align: none !important;
     border-radius: 8px !important;
     border: 1px solid var(--border) !important;
-    margin: 0 8px !important;
+    margin: 0 !important;
     overflow-y: auto !important;
   }
   /* Section header sticks to top of the card's own scroll viewport */
@@ -3054,6 +3057,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #kd-note-input { min-width: 0; width: 100%; }
   /* Filter bar scrolls horizontally */
   #kd-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
+  #kd-filter-bar  { display: none !important; }
+  #kd-meta-bar    { display: none !important; }
 
   /* Back buttons – show label, hide × on mobile */
   .mob-back-label { display: inline !important; }
@@ -3171,6 +3176,69 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   .prio-btn { flex: 1; padding: 7px 4px; }
   /* Field inputs bigger tap area */
   .field-input, .field-select, .field-textarea { font-size: 14px; }
+
+  /* KD mobile bottom bar */
+  #kd-mobile-bottom-bar {
+    display: flex;
+    flex-shrink: 0;
+    height: 54px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* KD filter tray (slides in above bottom bar) */
+  #kd-mob-tray {
+    display: none;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #kd-mob-search-row {
+    display: none;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+  }
+  #kdf-search-m {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--font-main);
+    outline: none;
+  }
+  #kd-mob-date-row {
+    display: none;
+    width: 100%;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .kd-mob-date-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+  #kdf-from-m, #kdf-to-m {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-main);
+  }
+  .kd-mob-date-sep { color: var(--text-dim); flex-shrink: 0; }
 }
 
 /* Mobile toggle button – hidden on desktop */
@@ -4191,6 +4259,42 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <div id="kd-cards-scroll" style="display:none"></div>
     </div>
   </div>
+  <!-- KD Mobile Filter Tray (shown above bottom bar) -->
+  <div id="kd-mob-tray">
+    <div id="kd-mob-search-row">
+      <input type="search" id="kdf-search-m" placeholder="Hledat úkoly..." autocomplete="off">
+    </div>
+    <div id="kd-mob-date-row">
+      <span class="kd-mob-date-label">Od</span>
+      <input type="text" id="kdf-from-m" autocomplete="off" placeholder="rrrr-mm-dd">
+      <span class="kd-mob-date-sep">–</span>
+      <span class="kd-mob-date-label">Do</span>
+      <input type="text" id="kdf-to-m" autocomplete="off" placeholder="rrrr-mm-dd">
+    </div>
+  </div>
+  <!-- KD Mobile Bottom Bar -->
+  <div id="kd-mobile-bottom-bar">
+    <button class="mbb-btn" id="kd-mbb-search" onclick="kdMbbToggleSearch()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="mbb-label">Hledat</span>
+    </button>
+    <button class="mbb-btn" id="kd-mbb-sort" onclick="kdMbbToggleSort()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+      <span class="mbb-label">Řadit</span>
+    </button>
+    <button class="mbb-btn" id="kd-mbb-done" onclick="kdMbbToggleDone()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="20 6 9 17 4 12"/></svg>
+      <span class="mbb-label">Hotové</span>
+    </button>
+    <button class="mbb-btn" id="kd-mbb-dates" onclick="kdMbbToggleDates()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span class="mbb-label">Termín</span>
+    </button>
+    <button class="mbb-btn" id="kd-mbb-clear" onclick="kdMbbClear()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <span class="mbb-label">Vymazat</span>
+    </button>
+  </div>
 </div>
 
 <!-- Sub-selector popover (KD) -->
@@ -4593,7 +4697,8 @@ function setupAllDatePickers() {
     'ae-date-from','ae-deadline',
     'kd-date-input',
     'afilter-deadline-from','afilter-deadline-to',
-    'kdf-from','kdf-to'
+    'kdf-from','kdf-to',
+    'kdf-from-m','kdf-to-m'
   ];
   ids.forEach(id => initAppDatePicker(document.getElementById(id)));
 }
@@ -11789,15 +11894,19 @@ function kdRenderContent() {
   const rec = displayRecords.find(r => r.id === kdActiveId);
 
   if (!rec) {
-    meta.style.display  = 'none';
+    if (meta) meta.style.display  = 'none';
     if (fbar) fbar.style.display = 'none';
+    const mobBarNone = document.getElementById('kd-mobile-bottom-bar');
+    if (mobBarNone) mobBarNone.style.display = 'none';
     empty.style.display = 'flex';
     scroll.style.display = 'none';
     return;
   }
 
-  meta.style.display  = 'flex';
+  if (meta) meta.style.display  = 'flex';
   if (fbar) fbar.style.display = 'flex';
+  const mobBar = document.getElementById('kd-mobile-bottom-bar');
+  if (mobBar) mobBar.style.display = 'flex';
   empty.style.display = 'none';
   scroll.style.display = 'block';
   const _dateEl = document.getElementById('kd-date-input');
@@ -12190,6 +12299,59 @@ function kdLoadBackupPreview(bk) {
   kdRenderContent();
 }
 
+// ── KD Mobile Bottom Bar helpers ─────────────────────────────────────────
+function _kdMbbOpenTray(mode) {
+  const tray   = document.getElementById('kd-mob-tray');
+  const sRow   = document.getElementById('kd-mob-search-row');
+  const dRow   = document.getElementById('kd-mob-date-row');
+  const sBtnEl = document.getElementById('kd-mbb-search');
+  const dBtnEl = document.getElementById('kd-mbb-dates');
+  const searchOpen = tray.style.display !== 'none' && sRow.style.display !== 'none';
+  const datesOpen  = tray.style.display !== 'none' && dRow.style.display !== 'none';
+  if (mode === 'search') {
+    const opening = !searchOpen;
+    sRow.style.display  = opening ? 'flex' : 'none';
+    dRow.style.display  = 'none';
+    tray.style.display  = opening ? 'flex' : 'none';
+    sBtnEl?.classList.toggle('active', opening);
+    dBtnEl?.classList.remove('active');
+    if (opening) setTimeout(() => document.getElementById('kdf-search-m')?.focus(), 60);
+  } else if (mode === 'dates') {
+    const opening = !datesOpen;
+    dRow.style.display  = opening ? 'flex' : 'none';
+    sRow.style.display  = 'none';
+    tray.style.display  = opening ? 'flex' : 'none';
+    dBtnEl?.classList.toggle('active', opening);
+    sBtnEl?.classList.remove('active');
+  }
+}
+function kdMbbToggleSearch() { _kdMbbOpenTray('search'); }
+function kdMbbToggleDates()  { _kdMbbOpenTray('dates');  }
+function kdMbbToggleSort() {
+  _kdFilter.sortBySub = !_kdFilter.sortBySub;
+  document.getElementById('kdf-sort-sub').checked = _kdFilter.sortBySub;
+  document.getElementById('kd-mbb-sort')?.classList.toggle('active', _kdFilter.sortBySub);
+  kdRenderContent();
+}
+function kdMbbToggleDone() {
+  _kdFilter.showDone = !_kdFilter.showDone;
+  document.getElementById('kdf-done').checked = _kdFilter.showDone;
+  document.getElementById('kd-mbb-done')?.classList.toggle('active', _kdFilter.showDone);
+  const btn = document.getElementById('kd-toggle-done-btn');
+  if (btn) btn.style.opacity = _kdFilter.showDone ? '1' : '0.5';
+  kdRenderContent();
+}
+function kdMbbClear() {
+  document.getElementById('kdf-reset').click();
+  ['kd-mbb-search','kd-mbb-sort','kd-mbb-done','kd-mbb-dates'].forEach(id =>
+    document.getElementById(id)?.classList.remove('active'));
+  const tray = document.getElementById('kd-mob-tray');
+  if (tray) tray.style.display = 'none';
+  const sm = document.getElementById('kdf-search-m'); if (sm) sm.value = '';
+  setDateInput(document.getElementById('kdf-from-m'), '');
+  setDateInput(document.getElementById('kdf-to-m'), '');
+}
+
 function kdLoadLive() {
   _kdViewingBackup = null;
   kdRenderSidebar();
@@ -12299,6 +12461,22 @@ function kdSetupPage() {
   document.getElementById('kdf-reset').addEventListener('click', () => {
     _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, search: '' };
     const ss = document.getElementById('kdf-sort-sub'); if (ss) ss.checked = false;
+    kdRenderContent();
+  });
+  // Mobile KD filter tray listeners
+  document.getElementById('kdf-search-m').addEventListener('input', e => {
+    _kdFilter.search = e.target.value.trim();
+    document.getElementById('kdf-search').value = _kdFilter.search;
+    kdRenderContent();
+  });
+  document.getElementById('kdf-from-m').addEventListener('change', e => {
+    _kdFilter.dateFrom = e.target.value || null;
+    setDateInput(document.getElementById('kdf-from'), e.target.value);
+    kdRenderContent();
+  });
+  document.getElementById('kdf-to-m').addEventListener('change', e => {
+    _kdFilter.dateTo = e.target.value || null;
+    setDateInput(document.getElementById('kdf-to'), e.target.value);
     kdRenderContent();
   });
   document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
