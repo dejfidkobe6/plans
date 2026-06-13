@@ -3059,6 +3059,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #kd-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
   #kd-filter-bar  { display: none !important; }
   #kd-meta-bar    { display: none !important; }
+  #kd-new-record-btn  { display: none !important; }
+  #kd-toggle-done-btn { display: none !important; }
 
   /* Back buttons – show label, hide × on mobile */
   .mob-back-label { display: inline !important; }
@@ -3239,6 +3241,54 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     font-family: var(--font-main);
   }
   .kd-mob-date-sep { color: var(--text-dim); flex-shrink: 0; }
+  #kd-mob-sort-row {
+    display: none;
+    width: 100%;
+    gap: 8px;
+  }
+  .kd-mob-sort-opt {
+    flex: 1;
+    padding: 7px 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-main);
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .kd-mob-sort-opt.active {
+    background: var(--olive);
+    color: #fff;
+    border-color: var(--olive);
+  }
+  /* Floating "Hotovo" button above keyboard */
+  #kd-kbd-done {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    display: none;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 6px 14px;
+    z-index: 99998;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  #kd-kbd-done-btn {
+    padding: 7px 22px;
+    border-radius: 8px;
+    border: none;
+    background: var(--olive);
+    color: #fff;
+    font-size: 14px;
+    font-family: var(--font-main);
+    cursor: pointer;
+    font-weight: 500;
+  }
 }
 
 /* Mobile toggle button – hidden on desktop */
@@ -4263,6 +4313,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div id="kd-mob-tray">
     <div id="kd-mob-search-row">
       <input type="search" id="kdf-search-m" placeholder="Hledat úkoly..." autocomplete="off">
+    </div>
+    <div id="kd-mob-sort-row">
+      <button class="kd-mob-sort-opt" id="kd-sort-opt-none"  onclick="kdMbbSetSort('')">Výchozí</button>
+      <button class="kd-mob-sort-opt" id="kd-sort-opt-sub"   onclick="kdMbbSetSort('sub')">Dodavatel</button>
+      <button class="kd-mob-sort-opt" id="kd-sort-opt-date"  onclick="kdMbbSetSort('date')">Datum</button>
+      <button class="kd-mob-sort-opt" id="kd-sort-opt-prio"  onclick="kdMbbSetSort('prio')">Priorita</button>
     </div>
     <div id="kd-mob-date-row">
       <span class="kd-mob-date-label">Od</span>
@@ -11390,7 +11446,7 @@ let _kdLastBackupCheck = null;
 let _kdBackupTimer = null;
 let _kdCardWidth = 420; // px — per-card drag resize base
 let _kdZoom = 1.0;      // CSS zoom applied to entire cards area (Ctrl+scroll)
-let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, search: '' };
+let _kdFilter = { sub: null, location: null, dateFrom: null, dateTo: null, urgent: false, showDone: false, sortBySub: false, sortMode: '', search: '' };
 
 function kdGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -12070,13 +12126,26 @@ function kdBuildCardTasks(cardEl, rec, card, cntEl, isLive) {
   list.innerHTML = '';
   const tasks = card.tasks || [];
   const visible = tasks.filter(t => kdTaskVisible(t));
-  if (_kdFilter.sortBySub) {
+  const _sortMode = _kdFilter.sortMode || (_kdFilter.sortBySub ? 'sub' : '');
+  if (_sortMode === 'sub') {
     const subName = s => { const p = (appState.profese||[]).find(x=>x.name===s); return (p?.firma||p?.name||s||'').toLowerCase(); };
     visible.sort((a, b) => {
       const au = a.urgent ? 0 : 1, bu = b.urgent ? 0 : 1;
       if (au !== bu) return au - bu;
       return subName(a.sub).localeCompare(subName(b.sub), 'cs');
     });
+  } else if (_sortMode === 'date') {
+    visible.sort((a, b) => {
+      const au = a.urgent ? 0 : 1, bu = b.urgent ? 0 : 1;
+      if (au !== bu) return au - bu;
+      const ad = a.dateTo || a.dateFrom || '', bd = b.dateTo || b.dateFrom || '';
+      if (!ad && !bd) return 0;
+      if (!ad) return 1;
+      if (!bd) return -1;
+      return ad.localeCompare(bd);
+    });
+  } else if (_sortMode === 'prio') {
+    visible.sort((a, b) => (a.urgent ? 0 : 1) - (b.urgent ? 0 : 1));
   }
   visible.forEach(task => list.appendChild(kdBuildTask(rec, card, task, isLive !== false)));
   const cnt = cntEl || cardEl.querySelector('.kd-card-count');
@@ -12301,36 +12370,58 @@ function kdLoadBackupPreview(bk) {
 
 // ── KD Mobile Bottom Bar helpers ─────────────────────────────────────────
 function _kdMbbOpenTray(mode) {
-  const tray   = document.getElementById('kd-mob-tray');
-  const sRow   = document.getElementById('kd-mob-search-row');
-  const dRow   = document.getElementById('kd-mob-date-row');
-  const sBtnEl = document.getElementById('kd-mbb-search');
-  const dBtnEl = document.getElementById('kd-mbb-dates');
+  const tray    = document.getElementById('kd-mob-tray');
+  const sRow    = document.getElementById('kd-mob-search-row');
+  const dRow    = document.getElementById('kd-mob-date-row');
+  const sortRow = document.getElementById('kd-mob-sort-row');
+  const sBtnEl  = document.getElementById('kd-mbb-search');
+  const dBtnEl  = document.getElementById('kd-mbb-dates');
+  const rtBtnEl = document.getElementById('kd-mbb-sort');
   const searchOpen = tray.style.display !== 'none' && sRow.style.display !== 'none';
   const datesOpen  = tray.style.display !== 'none' && dRow.style.display !== 'none';
+  const sortOpen   = tray.style.display !== 'none' && sortRow && sortRow.style.display !== 'none';
   if (mode === 'search') {
     const opening = !searchOpen;
-    sRow.style.display  = opening ? 'flex' : 'none';
-    dRow.style.display  = 'none';
-    tray.style.display  = opening ? 'flex' : 'none';
+    sRow.style.display    = opening ? 'flex' : 'none';
+    dRow.style.display    = 'none';
+    if (sortRow) sortRow.style.display = 'none';
+    tray.style.display    = opening ? 'flex' : 'none';
     sBtnEl?.classList.toggle('active', opening);
     dBtnEl?.classList.remove('active');
+    rtBtnEl?.classList.toggle('active', !!_kdFilter.sortMode);
     if (opening) setTimeout(() => document.getElementById('kdf-search-m')?.focus(), 60);
   } else if (mode === 'dates') {
     const opening = !datesOpen;
-    dRow.style.display  = opening ? 'flex' : 'none';
-    sRow.style.display  = 'none';
-    tray.style.display  = opening ? 'flex' : 'none';
+    dRow.style.display    = opening ? 'flex' : 'none';
+    sRow.style.display    = 'none';
+    if (sortRow) sortRow.style.display = 'none';
+    tray.style.display    = opening ? 'flex' : 'none';
     dBtnEl?.classList.toggle('active', opening);
     sBtnEl?.classList.remove('active');
+    rtBtnEl?.classList.toggle('active', !!_kdFilter.sortMode);
+  } else if (mode === 'sort') {
+    const opening = !sortOpen;
+    if (sortRow) sortRow.style.display = opening ? 'flex' : 'none';
+    sRow.style.display    = 'none';
+    dRow.style.display    = 'none';
+    tray.style.display    = opening ? 'flex' : 'none';
+    rtBtnEl?.classList.toggle('active', opening || !!_kdFilter.sortMode);
+    sBtnEl?.classList.remove('active');
+    dBtnEl?.classList.remove('active');
   }
 }
 function kdMbbToggleSearch() { _kdMbbOpenTray('search'); }
 function kdMbbToggleDates()  { _kdMbbOpenTray('dates');  }
-function kdMbbToggleSort() {
-  _kdFilter.sortBySub = !_kdFilter.sortBySub;
-  document.getElementById('kdf-sort-sub').checked = _kdFilter.sortBySub;
-  document.getElementById('kd-mbb-sort')?.classList.toggle('active', _kdFilter.sortBySub);
+function kdMbbToggleSort()   { _kdMbbOpenTray('sort');   }
+function kdMbbSetSort(mode) {
+  _kdFilter.sortMode  = mode;
+  _kdFilter.sortBySub = (mode === 'sub');
+  document.getElementById('kdf-sort-sub').checked = (mode === 'sub');
+  ['none','sub','date','prio'].forEach(m => {
+    const el = document.getElementById('kd-sort-opt-' + m);
+    if (el) el.classList.toggle('active', (m === 'none' ? '' : m) === mode);
+  });
+  document.getElementById('kd-mbb-sort')?.classList.toggle('active', !!mode);
   kdRenderContent();
 }
 function kdMbbToggleDone() {
@@ -12343,8 +12434,10 @@ function kdMbbToggleDone() {
 }
 function kdMbbClear() {
   document.getElementById('kdf-reset').click();
+  _kdFilter.sortMode = '';
   ['kd-mbb-search','kd-mbb-sort','kd-mbb-done','kd-mbb-dates'].forEach(id =>
     document.getElementById(id)?.classList.remove('active'));
+  ['none','sub','date','prio'].forEach(m => document.getElementById('kd-sort-opt-' + m)?.classList.remove('active'));
   const tray = document.getElementById('kd-mob-tray');
   if (tray) tray.style.display = 'none';
   const sm = document.getElementById('kdf-search-m'); if (sm) sm.value = '';
@@ -13639,6 +13732,56 @@ setInterval(_pollLiveSync, 2000);
     document.addEventListener('DOMContentLoaded', initAll);
   } else {
     initAll();
+  }
+})();
+</script>
+
+<!-- Floating "Hotovo" button – appears above keyboard on mobile when editing a task -->
+<div id="kd-kbd-done">
+  <button id="kd-kbd-done-btn">Uložit ✓</button>
+</div>
+<script>
+(function() {
+  if (!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return;
+  const bar = document.getElementById('kd-kbd-done');
+  const btn = document.getElementById('kd-kbd-done-btn');
+  if (!bar || !btn) return;
+
+  let _hideTimer = null;
+
+  function show() {
+    clearTimeout(_hideTimer);
+    bar.style.display = 'flex';
+    reposition();
+  }
+  function hide() {
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(() => { bar.style.display = 'none'; }, 200);
+  }
+
+  btn.addEventListener('touchstart', () => clearTimeout(_hideTimer), { passive: true });
+  btn.addEventListener('click', () => {
+    document.activeElement?.blur();
+    bar.style.display = 'none';
+  });
+
+  document.addEventListener('focusin', e => {
+    if (e.target.classList.contains('kd-task-text')) show();
+  });
+  document.addEventListener('focusout', e => {
+    if (e.target.classList.contains('kd-task-text')) hide();
+  });
+
+  function reposition() {
+    if (!window.visualViewport || bar.style.display === 'none') return;
+    const vv = window.visualViewport;
+    const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    bar.style.bottom = kbH + 'px';
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', reposition);
+    window.visualViewport.addEventListener('scroll', reposition);
   }
 })();
 </script>
