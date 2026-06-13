@@ -3265,6 +3265,30 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     color: #fff;
     border-color: var(--olive);
   }
+  /* Floating "Hotovo" button above keyboard */
+  #kd-kbd-done {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    display: none;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 6px 14px;
+    z-index: 99998;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  #kd-kbd-done-btn {
+    padding: 7px 22px;
+    border-radius: 8px;
+    border: none;
+    background: var(--olive);
+    color: #fff;
+    font-size: 14px;
+    font-family: var(--font-main);
+    cursor: pointer;
+    font-weight: 500;
+  }
 }
 
 /* Mobile toggle button – hidden on desktop */
@@ -13708,6 +13732,56 @@ setInterval(_pollLiveSync, 2000);
     document.addEventListener('DOMContentLoaded', initAll);
   } else {
     initAll();
+  }
+})();
+</script>
+
+<!-- Floating "Hotovo" button – appears above keyboard on mobile when editing a task -->
+<div id="kd-kbd-done">
+  <button id="kd-kbd-done-btn">Hotovo ✓</button>
+</div>
+<script>
+(function() {
+  if (!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return;
+  const bar = document.getElementById('kd-kbd-done');
+  const btn = document.getElementById('kd-kbd-done-btn');
+  if (!bar || !btn) return;
+
+  let _hideTimer = null;
+
+  function show() {
+    clearTimeout(_hideTimer);
+    bar.style.display = 'flex';
+    reposition();
+  }
+  function hide() {
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(() => { bar.style.display = 'none'; }, 200);
+  }
+
+  btn.addEventListener('touchstart', () => clearTimeout(_hideTimer), { passive: true });
+  btn.addEventListener('click', () => {
+    document.activeElement?.blur();
+    bar.style.display = 'none';
+  });
+
+  document.addEventListener('focusin', e => {
+    if (e.target.classList.contains('kd-task-text')) show();
+  });
+  document.addEventListener('focusout', e => {
+    if (e.target.classList.contains('kd-task-text')) hide();
+  });
+
+  function reposition() {
+    if (!window.visualViewport || bar.style.display === 'none') return;
+    const vv = window.visualViewport;
+    const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    bar.style.bottom = kbH + 'px';
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', reposition);
+    window.visualViewport.addEventListener('scroll', reposition);
   }
 })();
 </script>
