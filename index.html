@@ -3265,30 +3265,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     color: #fff;
     border-color: var(--olive);
   }
-  /* Floating "Hotovo" button above keyboard */
-  #kd-kbd-done {
-    position: fixed;
-    left: 0; right: 0;
-    bottom: 0;
-    display: none;
-    background: var(--panel);
-    border-top: 1px solid var(--border);
-    padding: 6px 14px;
-    z-index: 99998;
-    justify-content: flex-end;
-    align-items: center;
-  }
-  #kd-kbd-done-btn {
-    padding: 7px 22px;
-    border-radius: 8px;
-    border: none;
-    background: var(--olive);
-    color: #fff;
-    font-size: 14px;
-    font-family: var(--font-main);
-    cursor: pointer;
-    font-weight: 500;
-  }
 }
 
 /* Mobile toggle button – hidden on desktop */
@@ -3488,6 +3464,30 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 /* Flatpickr – víkend šedivé podbarvení */
 .fp-kd-weekend { background: rgba(0,0,0,0.07) !important; color: #888 !important; border-radius: 3px; }
 .flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
+/* Floating "Uložit" bar — appears above keyboard when any text field is focused */
+#kd-kbd-done {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  display: none;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 6px 14px;
+  z-index: 99998;
+  justify-content: flex-end;
+  align-items: center;
+}
+#kd-kbd-done-btn {
+  padding: 7px 22px;
+  border-radius: 8px;
+  border: none;
+  background: var(--olive);
+  color: #fff;
+  font-size: 14px;
+  font-family: var(--font-main);
+  cursor: pointer;
+  font-weight: 500;
+}
 </style>
 </head>
 <body>
@@ -13736,51 +13736,99 @@ setInterval(_pollLiveSync, 2000);
 })();
 </script>
 
-<!-- Floating "Hotovo" button – appears above keyboard on mobile when editing a task -->
+<!-- Floating "Uložit" bar – appears when any text field is focused -->
 <div id="kd-kbd-done">
   <button id="kd-kbd-done-btn">Uložit ✓</button>
 </div>
 <script>
 (function() {
-  if (!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return;
+  const isMob = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   const bar = document.getElementById('kd-kbd-done');
   const btn = document.getElementById('kd-kbd-done-btn');
   if (!bar || !btn) return;
 
-  let _hideTimer = null;
+  // Which elements trigger the bar
+  function isTextField(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === 'TEXTAREA') return true;
+    if (tag === 'INPUT') {
+      const t = (el.type || 'text').toLowerCase();
+      return /^(text|search|email|tel|url|number|password)$/.test(t);
+    }
+    if (el.contentEditable === 'true') return true;
+    return false;
+  }
 
-  function show() {
+  let _hideTimer = null;
+  let _focusedEl = null;
+
+  function show(el) {
     clearTimeout(_hideTimer);
+    _focusedEl = el;
     bar.style.display = 'flex';
     reposition();
+    if (isMob) scrollIntoVisible(el);
   }
+
   function hide() {
     clearTimeout(_hideTimer);
-    _hideTimer = setTimeout(() => { bar.style.display = 'none'; }, 200);
+    _hideTimer = setTimeout(() => {
+      bar.style.display = 'none';
+      _focusedEl = null;
+    }, 200);
+  }
+
+  // Scroll the focused element above the keyboard + bar
+  function scrollIntoVisible(el) {
+    if (!el || !window.visualViewport) return;
+    setTimeout(() => {
+      const vv = window.visualViewport;
+      const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const barH = bar.offsetHeight || 44;
+      const margin = 12;
+      const rect = el.getBoundingClientRect();
+      // Bottom of visible area = viewport top + vv.height - barH - margin
+      const visibleBottom = vv.offsetTop + vv.height - barH - margin;
+      if (rect.bottom > visibleBottom) {
+        const extra = rect.bottom - visibleBottom;
+        window.scrollBy({ top: extra, behavior: 'smooth' });
+      } else if (rect.top < 60) {
+        window.scrollBy({ top: rect.top - 60, behavior: 'smooth' });
+      }
+    }, 350); // after keyboard animation
+  }
+
+  function reposition() {
+    if (bar.style.display === 'none') return;
+    if (isMob && window.visualViewport) {
+      const vv = window.visualViewport;
+      const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      bar.style.bottom = kbH + 'px';
+    } else {
+      bar.style.bottom = '0';
+    }
   }
 
   btn.addEventListener('touchstart', () => clearTimeout(_hideTimer), { passive: true });
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); clearTimeout(_hideTimer); });
   btn.addEventListener('click', () => {
     document.activeElement?.blur();
     bar.style.display = 'none';
   });
 
   document.addEventListener('focusin', e => {
-    if (e.target.classList.contains('kd-task-text')) show();
+    if (isTextField(e.target) && e.target !== btn) show(e.target);
   });
   document.addEventListener('focusout', e => {
-    if (e.target.classList.contains('kd-task-text')) hide();
+    if (isTextField(e.target)) hide();
   });
 
-  function reposition() {
-    if (!window.visualViewport || bar.style.display === 'none') return;
-    const vv = window.visualViewport;
-    const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    bar.style.bottom = kbH + 'px';
-  }
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', reposition);
+  if (isMob && window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      reposition();
+      if (_focusedEl && bar.style.display !== 'none') scrollIntoVisible(_focusedEl);
+    });
     window.visualViewport.addEventListener('scroll', reposition);
   }
 })();
