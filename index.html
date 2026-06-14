@@ -4339,11 +4339,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     </div>
     <div class="tfilter-group">
       <select id="afilter-status" class="tfilter-select">
+        <option value="!hotovo" selected>Bez hotových</option>
         <option value="">Všechny stavy</option>
         <option value="Nový úkol">Nový úkol</option>
         <option value="Probíhá">Probíhá</option>
-        <option value="Hotovo">Hotovo</option>
         <option value="Urgence">Urgence</option>
+        <option value="Hotovo">Hotovo</option>
       </select>
     </div>
     <div class="tfilter-group">
@@ -4354,11 +4355,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <option value="Nízká">Nízká</option>
       </select>
     </div>
-    <div class="tfilter-group tfilter-date-group">
-      <input type="text" id="afilter-deadline-from" class="tfilter-date" autocomplete="off" title="Termín od">
-      <span class="tfilter-date-sep">–</span>
-      <input type="text" id="afilter-deadline-to" class="tfilter-date" autocomplete="off" title="Termín do">
-    </div>
+    <input type="hidden" id="afilter-deadline-from">
+    <input type="hidden" id="afilter-deadline-to">
     <button id="afilter-reset-btn" class="tfilter-reset" title="Resetovat filtry">✕ Reset</button>
     <button id="anotace-export-csv-btn" class="tfilter-export" title="Exportovat do CSV">↓ CSV</button>
   </div>
@@ -4454,13 +4452,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <button class="kd-mob-sort-opt" id="kd-sort-opt-date"  onclick="kdMbbSetSort('date')">Datum</button>
       <button class="kd-mob-sort-opt" id="kd-sort-opt-prio"  onclick="kdMbbSetSort('prio')">Priorita</button>
     </div>
-    <div id="kd-mob-date-row">
-      <span class="kd-mob-date-label">Od</span>
-      <input type="text" id="kdf-from-m" autocomplete="off" placeholder="rrrr-mm-dd">
-      <span class="kd-mob-date-sep">–</span>
-      <span class="kd-mob-date-label">Do</span>
-      <input type="text" id="kdf-to-m" autocomplete="off" placeholder="rrrr-mm-dd">
-    </div>
+    <input type="hidden" id="kdf-from-m">
+    <input type="hidden" id="kdf-to-m">
   </div>
   <!-- KD Mobile Bottom Bar -->
   <div id="kd-mobile-bottom-bar">
@@ -4475,10 +4468,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="mbb-btn" id="kd-mbb-done" onclick="kdMbbToggleDone()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="20 6 9 17 4 12"/></svg>
       <span class="mbb-label">Hotové</span>
-    </button>
-    <button class="mbb-btn" id="kd-mbb-dates" onclick="kdMbbToggleDates()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span class="mbb-label">Termín</span>
     </button>
     <button class="mbb-btn" id="kd-mbb-clear" onclick="kdMbbClear()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -4887,8 +4876,7 @@ function setupAllDatePickers() {
     'ae-date-from','ae-deadline',
     'kd-date-input',
     'afilter-deadline-from','afilter-deadline-to',
-    'kdf-from','kdf-to',
-    'kdf-from-m','kdf-to-m'
+    'kdf-from','kdf-to'
   ];
   ids.forEach(id => initAppDatePicker(document.getElementById(id)));
 }
@@ -8956,10 +8944,9 @@ function filterAnotace(rows, f) {
       if (r.source === 'kd' || String(r.levelIdx) !== f.levelIdx) return false;
     }
     if (f.profese && r.profese !== f.profese) return false;
-    if (f.status  && r.status  !== f.status)  return false;
+    if (f.status === '!hotovo') { if (r.status === 'Hotovo') return false; }
+    else if (f.status) { if (r.status !== f.status) return false; }
     if (f.prio    && r.priorita !== f.prio)   return false;
-    if (f.dlFrom  && r.deadline && r.deadline < f.dlFrom) return false;
-    if (f.dlTo    && r.deadline && r.deadline > f.dlTo)   return false;
     return true;
   });
 }
@@ -10767,11 +10754,13 @@ function setupAnotacePage() {
   document.getElementById('anotace-btn').addEventListener('click', toggleAnotacePage);
   document.getElementById('close-anotace-btn').addEventListener('click', closeAnotacePage);
   document.getElementById('afilter-reset-btn').addEventListener('click', () => {
-    ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio','afilter-deadline-from','afilter-deadline-to']
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['afilter-search','afilter-level','afilter-profese','afilter-prio'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const st = document.getElementById('afilter-status'); if (st) st.value = '!hotovo';
     renderAnotacePage();
   });
-  ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio','afilter-deadline-from','afilter-deadline-to']
+  ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio']
     .forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', renderAnotacePage);
@@ -12562,46 +12551,29 @@ function kdLoadBackupPreview(bk) {
 function _kdMbbOpenTray(mode) {
   const tray    = document.getElementById('kd-mob-tray');
   const sRow    = document.getElementById('kd-mob-search-row');
-  const dRow    = document.getElementById('kd-mob-date-row');
   const sortRow = document.getElementById('kd-mob-sort-row');
   const sBtnEl  = document.getElementById('kd-mbb-search');
-  const dBtnEl  = document.getElementById('kd-mbb-dates');
   const rtBtnEl = document.getElementById('kd-mbb-sort');
   const searchOpen = tray.style.display !== 'none' && sRow.style.display !== 'none';
-  const datesOpen  = tray.style.display !== 'none' && dRow.style.display !== 'none';
   const sortOpen   = tray.style.display !== 'none' && sortRow && sortRow.style.display !== 'none';
   if (mode === 'search') {
     const opening = !searchOpen;
     sRow.style.display    = opening ? 'flex' : 'none';
-    dRow.style.display    = 'none';
     if (sortRow) sortRow.style.display = 'none';
     tray.style.display    = opening ? 'flex' : 'none';
     sBtnEl?.classList.toggle('active', opening);
-    dBtnEl?.classList.remove('active');
     rtBtnEl?.classList.toggle('active', !!_kdFilter.sortMode);
     if (opening) setTimeout(() => document.getElementById('kdf-search-m')?.focus(), 60);
-  } else if (mode === 'dates') {
-    const opening = !datesOpen;
-    dRow.style.display    = opening ? 'flex' : 'none';
-    sRow.style.display    = 'none';
-    if (sortRow) sortRow.style.display = 'none';
-    tray.style.display    = opening ? 'flex' : 'none';
-    dBtnEl?.classList.toggle('active', opening);
-    sBtnEl?.classList.remove('active');
-    rtBtnEl?.classList.toggle('active', !!_kdFilter.sortMode);
   } else if (mode === 'sort') {
     const opening = !sortOpen;
     if (sortRow) sortRow.style.display = opening ? 'flex' : 'none';
     sRow.style.display    = 'none';
-    dRow.style.display    = 'none';
     tray.style.display    = opening ? 'flex' : 'none';
     rtBtnEl?.classList.toggle('active', opening || !!_kdFilter.sortMode);
     sBtnEl?.classList.remove('active');
-    dBtnEl?.classList.remove('active');
   }
 }
 function kdMbbToggleSearch() { _kdMbbOpenTray('search'); }
-function kdMbbToggleDates()  { _kdMbbOpenTray('dates');  }
 function kdMbbToggleSort()   { _kdMbbOpenTray('sort');   }
 function kdMbbSetSort(mode) {
   _kdFilter.sortMode  = mode;
@@ -12625,7 +12597,7 @@ function kdMbbToggleDone() {
 function kdMbbClear() {
   document.getElementById('kdf-reset').click();
   _kdFilter.sortMode = '';
-  ['kd-mbb-search','kd-mbb-sort','kd-mbb-done','kd-mbb-dates'].forEach(id =>
+  ['kd-mbb-search','kd-mbb-sort','kd-mbb-done'].forEach(id =>
     document.getElementById(id)?.classList.remove('active'));
   ['none','sub','date','prio'].forEach(m => document.getElementById('kd-sort-opt-' + m)?.classList.remove('active'));
   const tray = document.getElementById('kd-mob-tray');
@@ -12750,16 +12722,6 @@ function kdSetupPage() {
   document.getElementById('kdf-search-m').addEventListener('input', e => {
     _kdFilter.search = e.target.value.trim();
     document.getElementById('kdf-search').value = _kdFilter.search;
-    kdRenderContent();
-  });
-  document.getElementById('kdf-from-m').addEventListener('change', e => {
-    _kdFilter.dateFrom = e.target.value || null;
-    setDateInput(document.getElementById('kdf-from'), e.target.value);
-    kdRenderContent();
-  });
-  document.getElementById('kdf-to-m').addEventListener('change', e => {
-    _kdFilter.dateTo = e.target.value || null;
-    setDateInput(document.getElementById('kdf-to'), e.target.value);
     kdRenderContent();
   });
   document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
