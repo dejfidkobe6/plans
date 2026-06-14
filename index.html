@@ -2952,9 +2952,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
    ============================================================ */
 @media (max-width: 768px) {
   /* Show hamburger, hide desktop action buttons & toolbar-right */
-  #mobile-menu-btn { display: flex; }
+  #mobile-menu-btn { display: flex; margin-left: auto; border-left: 1px solid var(--border); border-right: none; }
   #topbar-actions { display: none; }
   #toolbar-right { display: none; }
+  #topbar-user-info { display: none !important; }
   #mobile-dropdown-tools { display: none !important; }
 
   /* Overlay pages – extend to cover full height minus bottom bar */
@@ -3310,6 +3311,24 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     font-family: var(--font-main);
   }
   .kd-mob-date-sep { color: var(--text-dim); flex-shrink: 0; }
+  /* Back bar – shown instead of level dropdown when overlay page is open */
+  #mob-back-bar {
+    display: none;
+    align-items: center;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    height: 42px;
+    flex-shrink: 0;
+  }
+  #mob-back-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 16px;
+    height: 100%;
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 500;
+    color: var(--text-bright);
+    font-family: var(--font-main);
+  }
   #kd-mob-sort-row {
     display: none;
     width: 100%;
@@ -3834,6 +3853,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div id="level-dd-list"></div>
 </div>
 
+<!-- BACK BAR – mobile only, shown when overlay page is open -->
+<div id="mob-back-bar">
+  <button id="mob-back-btn" onclick="closeMobileOverlay()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
+    Návrat
+  </button>
+</div>
+
 <!-- MOBILE DROPDOWN MENU -->
 <div id="mobile-dropdown">
   <div id="mobile-dropdown-actions">
@@ -3856,6 +3883,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <button class="mob-action-btn" onclick="toggleKDPage();toggleMobileMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
       Kontrolní den
+    </button>
+    <button class="mob-action-btn" onclick="showProjectScreen();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Projekt
+    </button>
+    <button class="mob-action-btn" style="color:#EF4444;border-color:rgba(239,68,68,0.3)" onclick="doLogout();toggleMobileMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Odhlásit
     </button>
   </div>
   <div id="mobile-dropdown-tools">
@@ -8826,12 +8861,14 @@ function openAnotacePage() {
   renderAnotacePage();
   document.getElementById('anotace-page').classList.add('visible');
   document.getElementById('anotace-btn').classList.add('active');
+  updateMobileNavBar();
 }
 
 function closeAnotacePage() {
   document.getElementById('anotace-page').classList.remove('visible');
   document.getElementById('anotace-btn').classList.remove('active');
   kdCloseAllPops();
+  updateMobileNavBar();
 }
 
 function toggleAnotacePage() {
@@ -11928,6 +11965,7 @@ function toggleKDPage() {
     kdCheckMissedBackup();
     kdRenderPage();
   }
+  updateMobileNavBar();
 }
 
 function closeKDPage() {
@@ -11936,6 +11974,7 @@ function closeKDPage() {
   if (page && page.classList.contains('visible')) {
     page.classList.remove('visible'); btn && btn.classList.remove('active');
     kdCloseAllPops();
+    updateMobileNavBar();
   }
 }
 
@@ -12739,6 +12778,7 @@ function toggleHomePage(forceState) {
       hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
     }
   }
+  updateMobileNavBar();
 }
 
 function toggleUsersPage(forceState) {
@@ -12758,6 +12798,25 @@ function toggleUsersPage(forceState) {
       up.classList.add('visible'); btn.classList.add('active'); loadMembers();
     }
   }
+  updateMobileNavBar();
+}
+
+function updateMobileNavBar() {
+  const overlayIds = ['kd-page','users-page','anotace-page','home-page'];
+  const anyOpen = overlayIds.some(id => document.getElementById(id)?.classList.contains('visible'));
+  const dd  = document.getElementById('level-dropdown');
+  const bk  = document.getElementById('mob-back-bar');
+  const mbb = document.getElementById('mobile-bottom-bar');
+  if (dd)  dd.style.display  = anyOpen ? 'none' : '';
+  if (bk)  bk.style.display  = anyOpen ? 'flex' : 'none';
+  if (mbb) mbb.style.display = anyOpen ? 'none' : '';
+}
+
+function closeMobileOverlay() {
+  closeKDPage();
+  closeAnotacePage();
+  toggleUsersPage(false);
+  toggleHomePage(false);
 }
 
 // ============================================================
