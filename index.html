@@ -3127,73 +3127,60 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #level-bar { display: none !important; }
   /* Drawing edit btn hidden on mobile (not editable on mobile) */
   #drawing-edit-btn { display: none !important; }
-  /* Mobile floor picker – centered floating button above bottom bar */
-  #mob-floor-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    position: absolute;
-    bottom: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-    padding: 9px 18px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    color: var(--text-bright);
-    font-family: var(--font-main);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-    white-space: nowrap;
-  }
-  /* Level dropdown visible on mobile */
+  /* Mobile floor picker – replaced by #level-dropdown floating pill */
+  #mob-floor-btn { display: none !important; }
+  /* Level dropdown visible on mobile – floating pill button */
   #level-dropdown {
     display: flex;
-    position: relative;
+    position: fixed;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 75%;
+    max-width: 320px;
     flex-direction: column;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    z-index: 105;
+    background: none;
+    border: none;
+    z-index: 200;
   }
   #level-dd-trigger {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex: 1;
-    padding: 0 14px;
-    height: 42px;
-    background: none;
+    gap: 10px;
+    padding: 10px 18px;
+    height: auto;
+    background: rgba(74,83,64,0.8);
     border: none;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-bright);
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
     font-family: var(--font-main);
     text-align: left;
     width: 100%;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.3);
   }
-  #level-dd-icon { font-size: 13px; flex-shrink: 0; }
+  #level-dd-icon { font-size: 14px; flex-shrink: 0; }
   #level-dd-name { flex: 1; }
   .level-dd-chevron {
     flex-shrink: 0;
-    color: var(--text-dim);
+    color: rgba(255,255,255,0.8);
     transition: transform 0.2s;
   }
   #level-dropdown.open .level-dd-chevron { transform: rotate(180deg); }
   #level-dd-list {
     display: none;
     position: absolute;
-    top: 100%; left: 0; right: 0;
+    top: calc(100% + 6px); left: 0; right: 0;
     background: var(--panel);
-    border-bottom: 2px solid var(--olive);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     z-index: 200;
     max-height: 55vh;
     overflow-y: auto;
+    overflow-x: hidden;
   }
   #level-dropdown.open #level-dd-list { display: block; }
   .level-dd-item {
