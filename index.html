@@ -2955,16 +2955,36 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #mobile-menu-btn { display: flex; margin-left: auto; border-left: 1px solid var(--border); border-right: none; }
   #topbar-actions { display: none; }
   #toolbar-right { display: none; }
+  /* Hamburger dropdown floats above all overlay pages */
+  #mobile-dropdown {
+    position: fixed;
+    top: 48px;
+    left: 0; right: 0;
+    z-index: 9999;
+  }
   #topbar-user-info { display: none !important; }
   #mobile-dropdown-tools { display: none !important; }
 
-  /* Overlay pages – extend to cover full height minus bottom bar */
+  /* Ensure topbar always stays on top and is clickable */
+  #top-bar { position: relative; z-index: 10000; }
+
+  /* Back bar: fixed above all overlay pages */
+  #mob-back-bar {
+    position: fixed;
+    top: 48px; left: 0; right: 0;
+    z-index: 9998;
+    height: 42px;
+  }
+
+  /* Overlay pages – start below topbar(48) + back bar(42) = 90px, fill to bottom */
   #home-page, #users-page, #anotace-page {
-    bottom: 54px;
+    top: 90px !important;
+    bottom: 0 !important;
     z-index: 950;
   }
   /* KD page covers full height — has its own bottom bar */
   #kd-page {
+    top: 90px !important;
     bottom: 0 !important;
     z-index: 950;
   }
@@ -3562,10 +3582,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 /* Flatpickr – víkend šedivé podbarvení */
 .fp-kd-weekend { background: rgba(0,0,0,0.07) !important; color: #888 !important; border-radius: 3px; }
 .flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
-/* Level dropdown – desktop hidden, mobile shown */
-#level-dropdown { display: none; }
-/* Mobile floor picker button – desktop hidden */
-#mob-floor-btn { display: none; }
+/* Level dropdown and mobile floor btn – hidden on desktop */
+@media (min-width: 769px) {
+  #level-dropdown { display: none; }
+  #mob-floor-btn  { display: none; }
+}
 /* Floating "Uložit" bar — appears above keyboard when any text field is focused */
 #kd-kbd-done {
   position: fixed;
