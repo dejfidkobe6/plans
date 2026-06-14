@@ -2955,6 +2955,13 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #mobile-menu-btn { display: flex; margin-left: auto; border-left: 1px solid var(--border); border-right: none; }
   #topbar-actions { display: none; }
   #toolbar-right { display: none; }
+  /* Hamburger dropdown floats above all overlay pages */
+  #mobile-dropdown {
+    position: fixed;
+    top: 48px;
+    left: 0; right: 0;
+    z-index: 9999;
+  }
   #topbar-user-info { display: none !important; }
   #mobile-dropdown-tools { display: none !important; }
 
