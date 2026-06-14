@@ -2965,13 +2965,26 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #topbar-user-info { display: none !important; }
   #mobile-dropdown-tools { display: none !important; }
 
-  /* Overlay pages – extend to cover full height minus bottom bar */
+  /* Ensure topbar always stays on top and is clickable */
+  #top-bar { position: relative; z-index: 10000; }
+
+  /* Back bar: fixed above all overlay pages */
+  #mob-back-bar {
+    position: fixed;
+    top: 48px; left: 0; right: 0;
+    z-index: 9998;
+    height: 42px;
+  }
+
+  /* Overlay pages – start below topbar(48) + back bar(42) = 90px, fill to bottom */
   #home-page, #users-page, #anotace-page {
-    bottom: 54px;
+    top: 90px !important;
+    bottom: 0 !important;
     z-index: 950;
   }
   /* KD page covers full height — has its own bottom bar */
   #kd-page {
+    top: 90px !important;
     bottom: 0 !important;
     z-index: 950;
   }
