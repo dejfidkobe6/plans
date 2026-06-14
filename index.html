@@ -3562,10 +3562,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 /* Flatpickr – víkend šedivé podbarvení */
 .fp-kd-weekend { background: rgba(0,0,0,0.07) !important; color: #888 !important; border-radius: 3px; }
 .flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
-/* Level dropdown – desktop hidden, mobile shown */
-#level-dropdown { display: none; }
-/* Mobile floor picker button – desktop hidden */
-#mob-floor-btn { display: none; }
+/* Level dropdown and mobile floor btn – hidden on desktop */
+@media (min-width: 769px) {
+  #level-dropdown { display: none; }
+  #mob-floor-btn  { display: none; }
+}
 /* Floating "Uložit" bar — appears above keyboard when any text field is focused */
 #kd-kbd-done {
   position: fixed;
