@@ -3069,23 +3069,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   .mob-back-label { display: inline !important; }
   .mob-back-x     { display: none !important; }
 
-  /* Close/back buttons – auto width, pill style on mobile */
+  /* Close/back buttons – hidden on mobile (replaced by #mob-back-bar) */
   #close-anotace-btn, #close-users-btn, #kd-close-btn, #close-home-btn {
-    width: auto !important;
-    height: 36px !important;
-    padding: 0 14px !important;
-    gap: 6px;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    border-radius: 8px !important;
-    background: var(--card) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0 !important;
-    cursor: pointer;
+    display: none !important;
   }
 
   /* Anotace header – stat row shrinks so back button is always visible */
