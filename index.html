@@ -3038,8 +3038,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   .kd-chapter-cards {
     display: flex !important;
     flex-direction: column !important;
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
+    overflow: visible !important;
     scroll-snap-type: none !important;
     padding: 0 0 8px 0 !important;
     gap: 8px !important;
@@ -3055,13 +3054,13 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     border-radius: 8px !important;
     border: 1px solid var(--border) !important;
     margin: 0 !important;
-    overflow-y: auto !important;
+    overflow: visible !important;
   }
-  /* Section header sticks to top of the card's own scroll viewport */
+  /* Section header sticks below chapter header while scrolling through section tasks */
   .kd-card-header {
     position: sticky !important;
-    top: 0 !important;
-    z-index: 4;
+    top: 40px !important;
+    z-index: 5;
     background: var(--panel) !important;
     border-radius: 8px 8px 0 0 !important;
   }
@@ -3075,9 +3074,30 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   .kd-task-controls-row { flex-wrap: wrap; }
   /* Task text always full width */
   .kd-task-text { width: 100%; }
-  /* Meta bar wraps on mobile */
-  #kd-meta-bar { flex-wrap: wrap; gap: 6px; }
-  #kd-note-input { min-width: 0; width: 100%; }
+  /* Mobile top search bar – replaces date row */
+  #kd-mob-top-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    height: 46px;
+    background: rgba(74,83,64,0.88);
+    flex-shrink: 0;
+  }
+  #kdf-search-top {
+    flex: 1;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 8px;
+    color: #fff;
+    padding: 7px 12px;
+    font-size: 15px;
+    font-family: var(--font-main);
+    outline: none;
+    -webkit-appearance: none;
+  }
+  #kdf-search-top::placeholder { color: rgba(255,255,255,0.5); }
+  #kdf-search-top::-webkit-search-cancel-button { filter: invert(1) opacity(0.7); }
   /* Filter bar scrolls horizontally */
   #kd-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
   #kd-filter-bar  { display: none !important; }
@@ -3569,10 +3589,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 /* Flatpickr – víkend šedivé podbarvení */
 .fp-kd-weekend { background: rgba(0,0,0,0.07) !important; color: #888 !important; border-radius: 3px; }
 .flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
-/* Level dropdown and mobile floor btn – hidden on desktop */
+/* Level dropdown and mobile-only elements – hidden on desktop */
 @media (min-width: 769px) {
-  #level-dropdown { display: none; }
-  #mob-floor-btn  { display: none; }
+  #level-dropdown      { display: none; }
+  #mob-floor-btn       { display: none; }
+  #kd-mob-top-search   { display: none; }
 }
 /* Floating "Uložit" bar — appears above keyboard when any text field is focused */
 #kd-kbd-done {
@@ -3749,7 +3770,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 
 <!-- TOP BAR -->
 <div id="top-bar">
-  <a id="logo" href="https://www.besix.cz" target="_blank" rel="noopener noreferrer">
+  <a id="logo" href="https://besix.cz/" target="_blank" rel="noopener noreferrer">
     <img src="besix_logo_bila.png" alt="BeSix">
     <div class="logo-plans" id="logo-project-name">PLANS</div>
   </a>
@@ -4427,6 +4448,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <span class="kd-meta-label">Poznámka</span>
       <input type="text" id="kd-note-input" placeholder="Obecná poznámka k zápisu...">
       <button id="kd-delete-record-btn">Smazat záznam</button>
+    </div>
+    <!-- Mobile-only permanent search bar (replaces date row) -->
+    <div id="kd-mob-top-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" width="17" height="17" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="kdf-search-top" placeholder="Hledat úkoly…" autocomplete="off">
     </div>
     <div id="kd-body">
       <div id="kd-filter-bar" style="display:none">
@@ -12019,7 +12045,7 @@ function kdTaskVisible(task) {
   if (_kdFilter.dateFrom && task.dateTo && task.dateTo < _kdFilter.dateFrom) return false;
   if (_kdFilter.dateTo && task.dateFrom && task.dateFrom > _kdFilter.dateTo) return false;
   if (_kdFilter.search) {
-    const q = _normStr(_kdFilter.search);
+    const terms = _normStr(_kdFilter.search).split(/\s+/).filter(Boolean);
     const profObj = (appState.profese || []).find(p => p.name === task.sub);
     const haystack = [
       task.text || '',
@@ -12029,7 +12055,7 @@ function kdTaskVisible(task) {
       ...getProfEmails(profObj),
       ...(task.locations || []),
     ].map(_normStr).join(' ');
-    if (!haystack.includes(q)) return false;
+    if (!terms.every(t => haystack.includes(t))) return false;
   }
   return true;
 }
@@ -12611,6 +12637,7 @@ function kdMbbClear() {
   const tray = document.getElementById('kd-mob-tray');
   if (tray) tray.style.display = 'none';
   const sm = document.getElementById('kdf-search-m'); if (sm) sm.value = '';
+  const st = document.getElementById('kdf-search-top'); if (st) st.value = '';
   setDateInput(document.getElementById('kdf-from-m'), '');
   setDateInput(document.getElementById('kdf-to-m'), '');
 }
@@ -12730,6 +12757,14 @@ function kdSetupPage() {
   document.getElementById('kdf-search-m').addEventListener('input', e => {
     _kdFilter.search = e.target.value.trim();
     document.getElementById('kdf-search').value = _kdFilter.search;
+    const st = document.getElementById('kdf-search-top'); if (st) st.value = _kdFilter.search;
+    kdRenderContent();
+  });
+  // Mobile top search bar (multi-text: space-separated terms all must match)
+  document.getElementById('kdf-search-top')?.addEventListener('input', e => {
+    _kdFilter.search = e.target.value.trim();
+    const ds = document.getElementById('kdf-search'); if (ds) ds.value = _kdFilter.search;
+    const dm = document.getElementById('kdf-search-m'); if (dm) dm.value = _kdFilter.search;
     kdRenderContent();
   });
   document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
