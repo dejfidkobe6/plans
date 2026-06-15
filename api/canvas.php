@@ -340,6 +340,17 @@ if ($method === 'POST') {
         $mergedState['levels']  = $mergedLevels;
         $newCounter             = max($counter, $serverCounter);
 
+        // Clean up annotations for levels that no longer exist in any user's state
+        $activeLevelIds = array_filter(array_column($mergedLevels, 'id'));
+        if (!empty($activeLevelIds) && !empty($srvAnnotMap)) {
+            $orphanLids = array_diff(array_keys($srvAnnotMap), $activeLevelIds);
+            if (!empty($orphanLids)) {
+                $ph = implode(',', array_fill(0, count($orphanLids), '?'));
+                $db->prepare("DELETE FROM plan_annotations WHERE project_id = ? AND level_id IN ($ph)")
+                   ->execute(array_merge([$projectId], array_values($orphanLids)));
+            }
+        }
+
         $stateJson = json_encode($mergedState, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
         if ($stateJson === false || $stateJson === 'null') {
             $db->rollBack();
