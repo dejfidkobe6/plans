@@ -3638,8 +3638,15 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   gap:20px;font-family:'Barlow Condensed',sans-serif;padding:36px;text-align:center;">
   <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
-  <div style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
+  <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
     Aplikace je nainstalovaná na tvém telefonu.<br>Otevři ji z plochy pro nejlepší zážitek.
+  </div>
+  <!-- iOS install hint (hidden by default, shown on iOS) -->
+  <div id="pwa-ios-hint" style="display:none;font-size:14px;color:#4A5340;background:#f0f2ee;
+    border-radius:10px;padding:12px 16px;max-width:300px;line-height:1.6;text-align:left;">
+    1. Klepni na <strong>Sdílet</strong> (☐↑) v Safari<br>
+    2. Zvol <strong>Přidat na plochu</strong><br>
+    3. Spusť aplikaci z plochy
   </div>
   <button id="pwa-open-btn" style="background:#4A5340;color:#fff;border:none;
     padding:15px 0;border-radius:12px;font-size:17px;font-weight:600;
@@ -3658,24 +3665,54 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   if (standalone) return;
   var mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (!mobile) return;
-  if (sessionStorage.getItem('pwa-skip')) return; // user already chose browser this session
+  if (sessionStorage.getItem('pwa-skip')) return;
+
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   var gate = document.getElementById('pwa-gate');
+  var desc = document.getElementById('pwa-desc');
+  var openBtn = document.getElementById('pwa-open-btn');
+  var iosHint = document.getElementById('pwa-ios-hint');
+  var deferredPrompt = null;
+
+  // iOS: show install guidance immediately
+  if (isIOS) {
+    desc.innerHTML = 'Přidej aplikaci na plochu pro nejlepší zážitek.';
+    openBtn.textContent = 'Jak nainstalovat';
+    openBtn.onclick = function() {
+      iosHint.style.display = iosHint.style.display === 'none' ? 'block' : 'none';
+    };
+  } else {
+    // Android: default to "open" (assume installed); switch to "install" if prompt fires
+    openBtn.onclick = function() { tryOpenAndroid(); };
+  }
+
+  // Android Chrome fires this only when app is NOT installed and meets PWA criteria
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    desc.innerHTML = 'Nainstaluj aplikaci pro rychlý přístup přímo z plochy.';
+    openBtn.textContent = 'Nainstalovat aplikaci';
+    openBtn.onclick = function() {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(r) {
+        if (r.outcome === 'accepted') gate.style.display = 'none';
+        deferredPrompt = null;
+      });
+    };
+  });
+
+  function tryOpenAndroid() {
+    var intent = 'intent://' + location.host + location.pathname +
+      '#Intent;scheme=' + location.protocol.replace(':','') +
+      ';action=android.intent.action.VIEW' +
+      ';category=android.intent.category.BROWSABLE' +
+      ';S.browser_fallback_url=' + encodeURIComponent(location.href) + ';end';
+    location.href = intent;
+  }
+
   gate.style.display = 'flex';
-  document.getElementById('pwa-open-btn').onclick = function() {
-    var isAndroid = /Android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      // On Android: intent URL hands off to the installed PWA/Chrome app
-      var intent = 'intent://' + location.host + location.pathname +
-        '#Intent;scheme=' + location.protocol.replace(':','') +
-        ';action=android.intent.action.VIEW' +
-        ';category=android.intent.category.BROWSABLE' +
-        ';S.browser_fallback_url=' + encodeURIComponent(location.href) + ';end';
-      location.href = intent;
-    } else {
-      // iOS: can't auto-open PWA, guide the user
-      alert('Otevři Safari → Sdílet (☐↑) → Přidat na plochu, pak spusť aplikaci z plochy.');
-    }
-  };
+
   document.getElementById('pwa-browser-btn').onclick = function() {
     sessionStorage.setItem('pwa-skip', '1');
     gate.style.display = 'none';
