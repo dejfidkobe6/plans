@@ -6413,7 +6413,9 @@ function applyHotovoVisibility() {
   fabricCanvas.getObjects().forEach(o => {
     if (!o.annotId || o.isBackground || o.annotLabelFor) return;
     const shouldBeVisible = o.status !== 'Hotovo' || showHotovo;
-    o.visible = shouldBeVisible;
+    o.visible    = shouldBeVisible;
+    o.selectable = shouldBeVisible;
+    o.evented    = shouldBeVisible;
     const lbl = findLabel(o.annotId);
     if (lbl) lbl.visible = shouldBeVisible;
   });
