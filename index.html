@@ -6064,7 +6064,7 @@ function positionLabel(label, obj) {
 // then fall back to push-apart for any remaining overlaps.
 function deconflictLabels() {
   if (!fabricCanvas) return;
-  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
+  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor && o.visible !== false);
   if (labels.length < 2) return;
 
   const zoom = fabricCanvas.getZoom();
