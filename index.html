@@ -6064,7 +6064,7 @@ function positionLabel(label, obj) {
 // then fall back to push-apart for any remaining overlaps.
 function deconflictLabels() {
   if (!fabricCanvas) return;
-  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
+  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor && o.visible !== false);
   if (labels.length < 2) return;
 
   const zoom = fabricCanvas.getZoom();
@@ -6413,7 +6413,9 @@ function applyHotovoVisibility() {
   fabricCanvas.getObjects().forEach(o => {
     if (!o.annotId || o.isBackground || o.annotLabelFor) return;
     const shouldBeVisible = o.status !== 'Hotovo' || showHotovo;
-    o.visible = shouldBeVisible;
+    o.visible    = shouldBeVisible;
+    o.selectable = shouldBeVisible;
+    o.evented    = shouldBeVisible;
     const lbl = findLabel(o.annotId);
     if (lbl) lbl.visible = shouldBeVisible;
   });
