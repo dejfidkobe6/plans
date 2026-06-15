@@ -11033,7 +11033,6 @@ function _buildStateObj() {
     tool: appState.tool,
     showGrid: appState.showGrid,
     zones3D: appState.zones3D,
-    kdRecords: kdRecords,
     kdLocations: kdLocations
   };
 }
@@ -11205,6 +11204,40 @@ async function _serverLoad(projectId) {
     }
   } catch(e) {}
   return null;
+}
+
+// ---- Profese load from dedicated table ----
+async function _profServerLoad(projectId) {
+  try {
+    const { ok, data } = await apiFetch(`api/profese.php?project_id=${projectId}`);
+    if (ok && Array.isArray(data.profese)) return data.profese;
+  } catch(e) {}
+  return null;
+}
+
+// Save profese to dedicated table. Pass deletedNames for explicit removals.
+async function _saveProfese(deletedNames = []) {
+  if (!currentProject || !canEdit()) return;
+  try {
+    const formBody = 'data=' + encodeURIComponent(JSON.stringify({
+      profese: appState.profese,
+      deleted: deletedNames,
+    }));
+    const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody,
+    });
+    // Merge back: server may have added entries from concurrent users
+    if (ok && Array.isArray(data.profese)) {
+      const localNames = new Set(appState.profese.map(p => p.name));
+      let added = false;
+      data.profese.forEach(sp => {
+        if (!localNames.has(sp.name)) { appState.profese.push(sp); added = true; }
+      });
+      if (added) { rebuildProfeseSelects(); renderProfeseList(); }
+    }
+  } catch(e) { console.error('[profese] save error:', e); }
 }
 
 function loadState() {
@@ -11473,6 +11506,7 @@ function renderProfeseList() {
       const idx = parseInt(btn.dataset.idx);
       appState.profese[idx].exportPinned = !appState.profese[idx].exportPinned;
       saveState();
+      _saveProfese(); // dedicated profese table
       renderProfeseList();
     });
   });
@@ -11511,6 +11545,7 @@ function renderProfeseList() {
       _flushSave();
       clearTimeout(_srvTimer);
       _serverSaveNow();
+      _saveProfese(); // dedicated profese table — faster, independent of canvas save
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
@@ -11530,10 +11565,12 @@ function renderProfeseList() {
       }
       const confirmed = await showModal('Smazat profesi', `Opravdu smazat profesi "${prof.name}"?`);
       if (!confirmed) return;
+      const deletedName = prof.name;
       appState.profese.splice(idx, 1);
       _flushSave();
       clearTimeout(_srvTimer);
       _serverSaveNow();
+      _saveProfese([deletedName]); // explicit delete from dedicated profese table
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
@@ -11557,6 +11594,7 @@ function addNewProfese() {
   _flushSave();
   clearTimeout(_srvTimer);
   _serverSaveNow();
+  _saveProfese(); // dedicated profese table
   rebuildProfeseSelects();
   renderProfeseList();
   // Open edit form for the newly added item
@@ -13301,9 +13339,10 @@ async function openProject(proj) {
 
   // Načti canvas data ze serveru (primární) nebo z localStorage (záloha)
   // Načti KD data z dedikovaného endpointu paralelně
-  const [serverData, kdServerRecords] = await Promise.all([
+  const [serverData, kdServerRecords, profServerData] = await Promise.all([
     _serverLoad(proj.id),
     _kdServerLoad(proj.id),
+    _profServerLoad(proj.id),
   ]);
 
   if (serverData) {
@@ -13333,8 +13372,10 @@ async function openProject(proj) {
         try { localStorage.setItem(LS_KD_LOCATIONS_KEY(_pid), JSON.stringify(kdLocations)); } catch(e) {}
       }
       annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
-      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
-        appState.profese = serverData.profese;
+      if (profServerData && profServerData.length > 0) {
+        appState.profese = profServerData;
+      } else if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
+        appState.profese = serverData.profese; // backward compat fallback
       }
 
       // Re-add annotations created locally but absent from server.
@@ -13384,8 +13425,10 @@ async function openProject(proj) {
         try { localStorage.setItem(LS_KD_LOCATIONS_KEY(_pid), JSON.stringify(kdLocations)); } catch(e) {}
       }
       annotIdCounter        = serverData.counter || 1;
-      if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
-        appState.profese = serverData.profese;
+      if (profServerData && profServerData.length > 0) {
+        appState.profese = profServerData;
+      } else if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
+        appState.profese = serverData.profese; // backward compat fallback
       }
     }
     rebuildProfeseSelects();
@@ -13408,7 +13451,9 @@ async function openProject(proj) {
     });
     return recs;
   };
-  _kdLastKdTs = kdServerRecords?.updatedAt || null;
+  _kdLastKdTs  = kdServerRecords?.updatedAt || null;
+  _lastProfTs  = null; // reset so _pollProfeseSync initialises on first cycle
+  _profPollCounter = 0;
   if (kdServerRecords?.records?.length > 0) {
     kdRecords = _kdMigrate(kdServerRecords.records);
     try { localStorage.setItem(LS_KD_KEY(String(proj.id)), JSON.stringify(kdRecords)); } catch(e) {}
@@ -13743,8 +13788,9 @@ function _isUserTyping() {
 
 async function _pollLiveSync() {
   if (!currentProject || _isProjectLoading || _saving) return;
-  // KD sync always runs — it guards its own re-renders against typing internally
+  // KD and profese sync always run independently of canvas sync
   _pollKDSync();
+  _pollProfeseSync();
   // Skip canvas sync while user has a text field focused — prevents
   // appState overwrites and DOM rebuilds from interrupting active editing.
   if (_isUserTyping()) return;
@@ -13880,7 +13926,7 @@ async function _pollLiveSync() {
 
     if (changed) updateAnnotList();
 
-    // Sync profese (supplier colors/data) when another user changed them
+    // Sync profese from canvas backup (catches changes saved together with canvas)
     if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
         && !_hasPendingSave) {
       const remStr = JSON.stringify(serverData.profese);
@@ -13897,6 +13943,35 @@ async function _pollLiveSync() {
     }
 
   } catch(e) { /* network error – skip silently */ }
+}
+
+// Sync profese from dedicated plan_profese table (catches direct profese saves that don't
+// accompany a canvas save – e.g. another user edits profese while you have no canvas changes).
+let _lastProfTs = null;
+let _profPollCounter = 0;
+async function _pollProfeseSync() {
+  if (!currentProject || _hasPendingSave) return;
+  _profPollCounter++;
+  if (_profPollCounter % 12 !== 0) return; // run every ~60 s (12 × 5 s poll interval)
+  try {
+    const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}&ts_only=1`);
+    if (!ok || !data.updated_at) return;
+    if (_lastProfTs !== null && data.updated_at === _lastProfTs) return;
+    const prevTs = _lastProfTs;
+    _lastProfTs = data.updated_at;
+    if (prevTs === null) return; // first call — just record timestamp, don't sync
+
+    const { ok: ok2, data: data2 } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
+    if (!ok2 || !Array.isArray(data2.profese) || !data2.profese.length) return;
+    if (JSON.stringify(data2.profese) === JSON.stringify(appState.profese)) return;
+    appState.profese = data2.profese;
+    try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(data2.profese)); } catch(e) {}
+    rebuildProfeseSelects();
+    if (fabricCanvas) {
+      fabricCanvas.getObjects().filter(o => o.annotId).forEach(o => applyAnnotColorToCanvas(o));
+      fabricCanvas.renderAll();
+    }
+  } catch(e) { /* ignore */ }
 }
 
 async function _pollKDSync() {
