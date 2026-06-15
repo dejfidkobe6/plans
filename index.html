@@ -3598,9 +3598,11 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .flatpickr-day.fp-kd-weekend.selected, .flatpickr-day.fp-kd-weekend.today { color: #fff !important; }
 /* Level dropdown and mobile-only elements – hidden on desktop */
 @media (min-width: 769px) {
-  #level-dropdown      { display: none; }
-  #mob-floor-btn       { display: none; }
-  #kd-mob-top-search   { display: none; }
+  #level-dropdown        { display: none; }
+  #mob-floor-btn         { display: none; }
+  #kd-mob-top-search     { display: none; }
+  #kd-mobile-bottom-bar  { display: none; }
+  #kd-mob-tray           { display: none; }
 }
 /* Floating "Uložit" bar — appears above keyboard when any text field is focused */
 #kd-kbd-done {
@@ -12182,7 +12184,7 @@ function kdRenderContent() {
   if (meta) meta.style.display = (window.innerWidth > 768) ? 'flex' : 'none';
   if (fbar) fbar.style.display = 'flex';
   const mobBar = document.getElementById('kd-mobile-bottom-bar');
-  if (mobBar) mobBar.style.display = 'flex';
+  if (mobBar) mobBar.style.display = (window.innerWidth <= 768) ? 'flex' : 'none';
   empty.style.display = 'none';
   scroll.style.display = 'block';
   const _dateEl = document.getElementById('kd-date-input');
