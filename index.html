@@ -7457,6 +7457,15 @@ function updateActiveAnnotProp(prop, value) {
 
   saveCurrentLevel();
   updateAnnotList();
+  // Refresh full annotation table if it's open
+  if (document.getElementById('anotace-page').classList.contains('visible')) {
+    if (prop === 'popisek' || prop === 'prirazeno') {
+      clearTimeout(_anotacePageRefreshTimer);
+      _anotacePageRefreshTimer = setTimeout(renderAnotacePage, 400);
+    } else {
+      renderAnotacePage();
+    }
+  }
   // Push discrete changes (select/button, not keystroke) immediately so other users see them fast
   if (prop !== 'popisek' && prop !== 'prirazeno') {
     clearTimeout(_srvTimer); _serverSaveNow();
@@ -11049,7 +11058,8 @@ function _flushSave() {
 }
 
 // ---- Server save (debounce 2 s) ----
-let _srvTimer        = null;
+let _srvTimer               = null;
+let _anotacePageRefreshTimer = null;
 let _hasPendingSave  = false; // true while debounce is queued or save is in-flight
 function _serverSave() {
   if (_isProjectLoading) return; // don't schedule during async canvas load
