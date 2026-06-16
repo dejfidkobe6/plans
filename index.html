@@ -6064,7 +6064,9 @@ function positionLabel(label, obj) {
 // then fall back to push-apart for any remaining overlaps.
 function deconflictLabels() {
   if (!fabricCanvas) return;
-  const labels = fabricCanvas.getObjects().filter(o => o.annotLabelFor && o.visible !== false);
+  // Single getObjects() call shared between label list and annotMap
+  const allObjs = fabricCanvas.getObjects();
+  const labels = allObjs.filter(o => o.annotLabelFor && o.visible !== false);
   if (labels.length < 2) return;
 
   const zoom = fabricCanvas.getZoom();
@@ -6082,30 +6084,39 @@ function deconflictLabels() {
     return (ox > 0 && oy > 0) ? ox * oy : 0;
   };
 
-  // Build map: annotId → annotation object
+  // Build map: annotId → annotation object (reuse allObjs)
   const annotMap = {};
-  fabricCanvas.getObjects().filter(o => o.annotId).forEach(a => annotMap[a.annotId] = a);
+  allObjs.forEach(a => { if (a.annotId) annotMap[a.annotId] = a; });
 
-  // Sort labels top-to-bottom by annotation centre-y
-  const sorted = [...labels].sort((a, b) => {
-    const ay = annotMap[a.annotLabelFor]?.getCenterPoint().y || 0;
-    const by = annotMap[b.annotLabelFor]?.getCenterPoint().y || 0;
-    return ay - by;
+  // Pre-cache center points and bounding rects — avoid repeated getCenterPoint() calls
+  const centerCache = {};
+  const bboxCache   = {};
+  labels.forEach(lbl => {
+    const id = lbl.annotLabelFor;
+    if (id && annotMap[id] && !centerCache[id]) {
+      centerCache[id] = annotMap[id].getCenterPoint();
+      bboxCache[id]   = annotMap[id].getBoundingRect(true);
+    }
   });
+
+  // Sort labels top-to-bottom by annotation centre-y (use cache)
+  const sorted = [...labels].sort((a, b) =>
+    (centerCache[a.annotLabelFor]?.y || 0) - (centerCache[b.annotLabelFor]?.y || 0)
+  );
 
   // Greedy placement: for each label try 8 positions and pick the overlap-free one
   // closest to the annotation. If all overlap, pick the one with least total area.
   const placed = []; // [{l,t,r,b}] of already-placed labels
 
   sorted.forEach(lbl => {
-    const ann = annotMap[lbl.annotLabelFor];
-    if (!ann) { placed.push(getR(lbl)); return; }
+    const id  = lbl.annotLabelFor;
+    const c   = centerCache[id];
+    const ab  = bboxCache[id];
+    if (!c || !ab) { placed.push(getR(lbl)); return; }
 
     const s  = lbl.scaleX || 1;
     const lw = (lbl.width  || 80) * s;
     const lh = (lbl.height || 34) * s;
-    const c  = ann.getCenterPoint();
-    const ab = ann.getBoundingRect(true); // {left, top, width, height}
 
     // Candidate positions [labelLeft, labelTop] in preference order
     const cands = [
@@ -6149,8 +6160,8 @@ function deconflictLabels() {
         const oy = Math.min(ri.b, rj.b) - Math.max(ri.t, rj.t);
         if (ox <= 0 || oy <= 0) continue;
         moved = true;
-        const ay = annotMap[labels[i].annotLabelFor]?.getCenterPoint().y || 0;
-        const by = annotMap[labels[j].annotLabelFor]?.getCenterPoint().y || 0;
+        const ay = centerCache[labels[i].annotLabelFor]?.y || 0;
+        const by = centerCache[labels[j].annotLabelFor]?.y || 0;
         const mi = ay >= by ? i : j;
         const lbl = labels[mi];
         const lblW = (lbl.width  || 80) * (lbl.scaleX || 1);
@@ -6162,9 +6173,8 @@ function deconflictLabels() {
           lbl.left += (mi === i ? (ci <= cj ? -1 : 1) : (cj <= ci ? -1 : 1)) * (ox + PAD);
         }
         // Clamp: keep label within maxPushDist canvas units of its annotation center
-        const ann = annotMap[lbl.annotLabelFor];
-        if (ann) {
-          const ac = ann.getCenterPoint();
+        const ac = centerCache[lbl.annotLabelFor];
+        if (ac) {
           const lc = { x: lbl.left + lblW / 2, y: lbl.top + lblH / 2 };
           const dist = Math.hypot(lc.x - ac.x, lc.y - ac.y);
           if (dist > maxPushDist) {
@@ -6270,9 +6280,11 @@ function updateAllLabelScales() {
     return;
   }
 
-  fabricCanvas.getObjects().forEach(o => {
+  const _allObjs = fabricCanvas.getObjects();
+  const _annotById = new Map(_allObjs.filter(o => o.annotId).map(o => [o.annotId, o]));
+  _allObjs.forEach(o => {
     if (!o.annotLabelFor) return;
-    const annot = fabricCanvas.getObjects().find(a => a.annotId === o.annotLabelFor);
+    const annot = _annotById.get(o.annotLabelFor);
     if (annot) positionLabel(o, annot);
   });
   deconflictLabels();
@@ -6866,6 +6878,13 @@ function setupEventListeners() {
     saveCurrentLevel();
   });
 
+  // rAF throttle for label repositioning during zoom (wheel + pinch both use this)
+  let _labelRaf = null;
+  function _scheduleLabels() {
+    if (_labelRaf) return;
+    _labelRaf = requestAnimationFrame(() => { _labelRaf = null; updateAllLabelScales(); });
+  }
+
   // Wheel zoom
   wrapper.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -6873,10 +6892,9 @@ function setupEventListeners() {
     let zoom = cw.getZoom();
     zoom *= 0.999 ** delta;
     zoom = Math.min(Math.max(zoom, 0.05), 20);
-    const pointer = cw.getPointer(e, true);
     cw.zoomToPoint({ x: e.offsetX, y: e.offsetY }, zoom);
     updateZoomDisplay();
-    updateAllLabelScales();
+    _scheduleLabels();
     cw.renderAll();
   }, { passive: false });
 
@@ -6974,7 +6992,7 @@ function setupEventListeners() {
       ];
       cw.setViewportTransform(vpt);
       updateZoomDisplay();
-      updateAllLabelScales();
+      _scheduleLabels();
       cw.renderAll();
     }
   }, { passive: false });
@@ -7541,11 +7559,9 @@ function getAnnotObjects() {
   return fabricCanvas.getObjects().filter(o => o.annotId && !o.isBackground && !o.annotLabelFor);
 }
 
+let _annotListFingerprint = '';
 function updateAnnotList() {
-  const container = document.getElementById('annot-list');
-  container.innerHTML = '';
   const activeObj = fabricCanvas.getActiveObject();
-
   const objects = getAnnotObjects();
   const filtered = objects.filter(o => {
     if (filterProfese && o.profese !== filterProfese) return false;
@@ -7554,6 +7570,15 @@ function updateAnnotList() {
     return true;
   });
 
+  // Skip full DOM rebuild if nothing visible has changed
+  const fp = (activeObj?.annotId || '') + '|' + filtered.map(o =>
+    o.annotId + o.popisek + o.profese + o.status + (o.updatedAt || '')
+  ).join(',');
+  if (fp === _annotListFingerprint) return;
+  _annotListFingerprint = fp;
+
+  const container = document.getElementById('annot-list');
+  container.innerHTML = '';
   document.getElementById('annot-total-count').textContent = objects.length;
 
   if (filtered.length === 0) {
@@ -10851,11 +10876,16 @@ function setupAnotacePage() {
     const st = document.getElementById('afilter-status'); if (st) st.value = '!hotovo';
     renderAnotacePage();
   });
+  let _renderAnotaceTimer = null;
+  const _debouncedRenderAnotacePage = () => {
+    clearTimeout(_renderAnotaceTimer);
+    _renderAnotaceTimer = setTimeout(renderAnotacePage, 250);
+  };
   ['afilter-search','afilter-level','afilter-profese','afilter-status','afilter-prio']
     .forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', renderAnotacePage);
-      if (el) el.addEventListener('change', renderAnotacePage);
+      if (el) el.addEventListener('input', _debouncedRenderAnotacePage);
+      if (el) el.addEventListener('change', renderAnotacePage); // select change = immediate
     });
   document.getElementById('anotace-export-csv-btn').addEventListener('click', exportAnotaceCSV);
   document.addEventListener('keydown', (e) => {
