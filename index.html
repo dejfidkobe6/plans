@@ -9635,8 +9635,8 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         // White area overdraw from stripe edge → right side
         pdf.setFillColor(255, 255, 255);
         pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
-        // Rounded border on top (masks sharp right corners of white rect)
-        pdf.setDrawColor(210, 215, 210); pdf.setLineWidth(0.08);
+        // Rounded border on top in profese color (jemný lem)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.18);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
 
         const tx = px + LBL_STR + PAD_H;
