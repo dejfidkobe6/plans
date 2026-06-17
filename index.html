@@ -9563,7 +9563,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
         const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
         const firmaRaw = getFirmaDisplay(o.profese);
-        const popRaw   = o.popisek ? String(o.popisek).split('\n')[0].trim() : '';
+        const popRaw   = o.annotId || '';
 
         // Annotation center & bounding box in PDF mm
         const type = (o.type||'').toLowerCase();
@@ -9628,10 +9628,12 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // Dark rounded background
-        pdf.setFillColor(18, 18, 18);
-        pdf.roundedRect(px, py, lw, lh, 0.45, 0.45, 'F');
-        // Colored left stripe (rect on top — sharp right edge blends into dark bg)
+        // White rounded background with light border
+        pdf.setFillColor(255, 255, 255);
+        pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
+        pdf.setDrawColor(210, 215, 210); pdf.setLineWidth(0.08);
+        pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
+        // Colored left stripe
         pdf.setFillColor(r, g, b);
         pdf.rect(px, py, LBL_STR, lh, 'F');
 
@@ -9641,11 +9643,11 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
         pdf.setTextColor(r, g, b);
         pdf.text(firmaText, tx, ty1);
-        // Line 2: popisek — normal, light grey
+        // Line 2: annotation ID — normal, dark grey
         if (popText) {
           const ty2 = ty1 + GAP_LN + LINE_H2;
           pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
-          pdf.setTextColor(175, 175, 175);
+          pdf.setTextColor(85, 90, 80);
           pdf.text(popText, tx, ty2);
         }
       });
