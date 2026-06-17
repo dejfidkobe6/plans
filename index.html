@@ -9501,6 +9501,30 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
             pdf.lines(lines, pp[0][0], pp[0][1], [1,1], type==='polygon'?'FD':'S', type==='polygon');
           }
 
+        } else if (type === 'path' && o.annotType === 'pin') {
+          // Pin: teardrop (circle head r=6 centred 9 units above tip, inner hole r=2.5)
+          // originX:'center', originY:'bottom' → tip at canvas (o.left, o.top)
+          const oSX = o.scaleX||1, oSY = o.scaleY||1;
+          const tipX  = toX(o.left);
+          const tipY  = toY(o.top);
+          const hcX   = toX(o.left);
+          const hcY   = toY(o.top - 9  * oSY);
+          const headR = toMX(6   * oSX);
+          const holeR = toMX(2.5 * oSX);
+          const tpLX  = toX(o.left - 4 * oSX);
+          const tpRX  = toX(o.left + 4 * oSX);
+          const tpY   = toY(o.top - 4.5 * oSY);
+          // Solid-fill teardrop: circle head + triangular tail
+          pdf.setFillColor(r, g, b);
+          pdf.circle(hcX, hcY, headR, 'F');
+          pdf.lines([[tipX-tpLX, tipY-tpY],[tpRX-tipX, tpY-tipY]], tpLX, tpY, [1,1], 'F', true);
+          // Stroke the head
+          pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.22);
+          pdf.circle(hcX, hcY, headR, 'D');
+          // White inner hole (evenodd equivalent)
+          pdf.setFillColor(255, 255, 255);
+          pdf.circle(hcX, hcY, holeR, 'F');
+
         } else {
           // Fallback: filled circle at object centre
           const fw = (o.width||30)*(o.scaleX||1), fh = (o.height||30)*(o.scaleY||1);
@@ -9590,6 +9614,12 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
             aw=toMX((mxX-mnX)*sx2); ah=toMY((mxY-mnY)*sy2);
             acx=toX(bbl)+aw/2; acy=toY(bbt)+ah/2;
           }
+        } else if (type === 'path' && o.annotType === 'pin') {
+          // Pin label anchored at head centre (not the bounding-box centre)
+          const oSX2=o.scaleX||1, oSY2=o.scaleY||1;
+          const headR2=toMX(6*oSX2);
+          acx=toX(o.left); acy=toY(o.top - 9*oSY2);
+          aw=headR2*2; ah=headR2*2;
         } else {
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
           aw=toMX(fw); ah=toMY(fh);
