@@ -9663,14 +9663,26 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // Full colored roundedRect first → gives rounded left corners on the stripe
+        // Bezier constant for quarter-circle approximation
+        const _rc = 0.9, _kc = _rc * 0.5523;
+        // Left stripe: rounded left corners, straight right edge
         pdf.setFillColor(r, g, b);
-        pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
-        // White area overdraw: three rects that avoid the right-side rounded corners
+        pdf.lines([
+          [-(LBL_STR - _rc), 0],
+          [-_kc, 0, -_rc, _rc-_kc, -_rc, _rc],
+          [0, lh - 2*_rc],
+          [0, _kc, _rc-_kc, _rc, _rc, _rc],
+          [LBL_STR - _rc, 0],
+        ], px + LBL_STR, py, [1,1], 'F', true);
+        // White area: straight left edge, rounded right corners
         pdf.setFillColor(255, 255, 255);
-        pdf.rect(px + LBL_STR, py + 0.9, lw - LBL_STR, lh - 1.8, 'F');
-        pdf.rect(px + LBL_STR, py, lw - LBL_STR - 0.9, 0.9, 'F');
-        pdf.rect(px + LBL_STR, py + lh - 0.9, lw - LBL_STR - 0.9, 0.9, 'F');
+        pdf.lines([
+          [lw - LBL_STR - _rc, 0],
+          [_kc, 0, _rc, _rc-_kc, _rc, _rc],
+          [0, lh - 2*_rc],
+          [0, _kc, _kc-_rc, _rc, -_rc, _rc],
+          [-(lw - LBL_STR - _rc), 0],
+        ], px + LBL_STR, py, [1,1], 'F', true);
         // Rounded border on top in profese color (jemný lem)
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.18);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
