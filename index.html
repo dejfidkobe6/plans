@@ -9629,14 +9629,15 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // White rounded background with light border
-        pdf.setFillColor(255, 255, 255);
+        // Full colored roundedRect first → gives rounded left corners on the stripe
+        pdf.setFillColor(r, g, b);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
+        // White area overdraw from stripe edge → right side
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
+        // Rounded border on top (masks sharp right corners of white rect)
         pdf.setDrawColor(210, 215, 210); pdf.setLineWidth(0.08);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
-        // Colored left stripe
-        pdf.setFillColor(r, g, b);
-        pdf.rect(px, py, LBL_STR, lh, 'F');
 
         const tx = px + LBL_STR + PAD_H;
         // Line 1: firma — bold, profese color
