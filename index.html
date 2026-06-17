@@ -9458,6 +9458,10 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
              (includeHotovo || o.status !== 'Hotovo')
       );
       const FILL_A  = 0.28; // blend profese color with white — light tint on blueprint
+      const _mkGS = opts => { try { return new (window.jspdf.GState)(opts); } catch(e) { return null; } };
+      const _gsTrans = _mkGS({opacity: 0.8, 'stroke-opacity': 0.8});
+      const _gsReset = _mkGS({opacity: 1.0, 'stroke-opacity': 1.0});
+      if (_gsTrans) pdf.setGState(_gsTrans);
 
       annotObjs.forEach(o => {
         const [r,g,b] = hexToRgb((appState.profese||[]).find(p=>p.name===o.profese)?.color || o.stroke || '#4a8f3f');
@@ -9662,9 +9666,11 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         // Full colored roundedRect first → gives rounded left corners on the stripe
         pdf.setFillColor(r, g, b);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
-        // White area overdraw from stripe edge → right side
+        // White area overdraw: three rects that avoid the right-side rounded corners
         pdf.setFillColor(255, 255, 255);
-        pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
+        pdf.rect(px + LBL_STR, py + 0.9, lw - LBL_STR, lh - 1.8, 'F');
+        pdf.rect(px + LBL_STR, py, lw - LBL_STR - 0.9, 0.9, 'F');
+        pdf.rect(px + LBL_STR, py + lh - 0.9, lw - LBL_STR - 0.9, 0.9, 'F');
         // Rounded border on top in profese color (jemný lem)
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.18);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
@@ -9683,6 +9689,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.text(popText, tx, ty2);
         }
       });
+      if (_gsReset) pdf.setGState(_gsReset);
 
       resolve();
     };
