@@ -4761,7 +4761,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <div class="pdf-section-title">Obsah exportu</div>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-drawing" checked> Zahrnout výkres s vyznačenými anotacemi</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-list" checked> Zahrnout seznam anotací</label>
-        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd" checked> Zahrnout záznamy z kontrolního dne</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd"> Zahrnout záznamy z kontrolního dne</label>
+        <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-kd-filter" checked> Zahrnout filtr dodavatelů</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-dochazka" checked> Zahrnout docházkový list</label>
         <label class="pdf-check-label"><input type="checkbox" id="pdf-opt-hotovo"> Zahrnout hotové/splněné úkoly</label>
       </div>
@@ -9628,14 +9629,15 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // White rounded background with light border
-        pdf.setFillColor(255, 255, 255);
+        // Full colored roundedRect first → gives rounded left corners on the stripe
+        pdf.setFillColor(r, g, b);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
+        // White area overdraw from stripe edge → right side
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
+        // Rounded border on top (masks sharp right corners of white rect)
         pdf.setDrawColor(210, 215, 210); pdf.setLineWidth(0.08);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
-        // Colored left stripe
-        pdf.setFillColor(r, g, b);
-        pdf.rect(px, py, LBL_STR, lh, 'F');
 
         const tx = px + LBL_STR + PAD_H;
         // Line 1: firma — bold, profese color
@@ -10700,8 +10702,9 @@ async function doExportPDF() {
   const includeDrawing  = document.getElementById('pdf-opt-drawing').checked;
   const includeList     = document.getElementById('pdf-opt-list').checked;
   const includeKD       = document.getElementById('pdf-opt-kd').checked;
+  const includeKDFilter = document.getElementById('pdf-opt-kd-filter')?.checked ?? false;
   const includeDochazka = document.getElementById('pdf-opt-dochazka')?.checked ?? false;
-  if (!includeDrawing && !includeList && !includeKD && !includeDochazka) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
+  if (!includeDrawing && !includeList && !includeKD && !includeKDFilter && !includeDochazka) { showToast('Vyber alespoň jeden typ obsahu', 'error'); return; }
 
   const levelIdxs = [...document.querySelectorAll('.pdf-level-check:checked')].map(e => parseInt(e.value));
   if (levelIdxs.length === 0 && (includeDrawing || includeList)) { showToast('Vyber alespoň jedno patro', 'error'); return; }
@@ -10755,26 +10758,32 @@ async function doExportPDF() {
       drawDochazkaPDF(pdf, recForDoc, _pdfLogo, PW, PH);
     }
 
-    // Prepare KD data once so both sections share references
+    // Prepare KD data once so all KD sections share references
     let _kdSorted = null, _kdProfList = null, _kdAllAnnots = null, _kdNavPageNum = null, _kdOverviewStart = null;
     const _kdSubPageNums = {};
 
-    // ── KD filter: nav page + overview (before drawings) ─────────────────────
-    if (includeKD && kdRecords.length > 0) {
-      _kdSorted     = [...kdRecords].sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
-      _kdProfList   = appState.profese || [];
-      _kdAllAnnots  = getAllAnnotations();
+    if ((includeKD || includeKDFilter)) {
+      _kdSorted   = kdRecords.length > 0
+        ? [...kdRecords].sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0)
+        : [];
+      _kdProfList  = appState.profese || [];
+      _kdAllAnnots = getAllAnnotations();
+    }
 
-      // Reserve blank nav/filter page (filled in after all sub-pages are known)
+    // ── KD filter: reserve nav page (filled in after per-sub pages) ───────────
+    if (includeKDFilter && _kdProfList) {
       if (!first) pdf.addPage();
       first = false;
       _kdNavPageNum = pdf.getNumberOfPages();
+    }
 
-      // Full overview — all subcontractors (KD records in detail)
+    // ── KD records: all tasks by chapter/section ──────────────────────────────
+    if (includeKD && _kdSorted?.length) {
       for (const rec of _kdSorted) {
         const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
         if (!hasVis) continue;
-        pdf.addPage();
+        if (!first) pdf.addPage();
+        first = false;
         if (!_kdOverviewStart) _kdOverviewStart = pdf.getNumberOfPages();
         drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
       }
@@ -10859,21 +10868,23 @@ async function doExportPDF() {
       }
     }
 
-    // ── Per-subcontractor pages (after drawings) ──────────────────────────────
-    if (includeKD && _kdSorted) {
+    // ── Per-subcontractor filter pages (after drawings) ───────────────────────
+    if (includeKDFilter && _kdProfList) {
       for (const prof of _kdProfList) {
-        const profAnnots = _kdAllAnnots.filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
-        const hasTasks = _kdSorted.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
+        const profAnnots = (_kdAllAnnots||[]).filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
+        const hasTasks = (_kdSorted||[]).some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
         if (!hasTasks && !profAnnots.length) continue;
         pdf.addPage();
         _kdSubPageNums[prof.name] = pdf.getNumberOfPages();
-        drawKDSubPageToPDF(pdf, prof, _kdSorted, profAnnots, _pdfLogo, PW, PH, inclHotovo, _kdNavPageNum);
+        drawKDSubPageToPDF(pdf, prof, _kdSorted||[], profAnnots, _pdfLogo, PW, PH, inclHotovo, _kdNavPageNum);
       }
 
-      // Now go back and draw the nav/filter page (page numbers are now all known)
-      pdf.setPage(_kdNavPageNum);
-      drawKDNavPage(pdf, _kdProfList, _kdSorted, _kdAllAnnots, _pdfLogo, PW, PH, _kdOverviewStart, _kdSubPageNums, inclHotovo);
-      pdf.setPage(pdf.getNumberOfPages());
+      // Fill in the reserved nav page (all page numbers now known)
+      if (_kdNavPageNum) {
+        pdf.setPage(_kdNavPageNum);
+        drawKDNavPage(pdf, _kdProfList, _kdSorted||[], _kdAllAnnots||[], _pdfLogo, PW, PH, _kdOverviewStart, _kdSubPageNums, inclHotovo);
+        pdf.setPage(pdf.getNumberOfPages());
+      }
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
