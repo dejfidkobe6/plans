@@ -10436,7 +10436,7 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
 }
 
 // ── KD in-PDF filter: navigation page ─────────────────────────────────────────
-function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, subPageNums, inclDone) {
+function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, overviewPage, subPageNums, inclDone) {
   const csT = s => csText(String(s || ''));
   const PT_MM = 72 / 25.4;
   const tw = (t, fs) => pdf.getStringUnitWidth(csT(t)) * fs / PT_MM;
@@ -10469,12 +10469,13 @@ function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, 
 
   let curY = ly + TH + 5;
 
-  // Task counter helper
+  // Task counter helper — KD tasks + canvas annotations
   const countTasks = subName => {
     let n=0;
     kdRecords.forEach(rec=>(rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(c=>(c.tasks||[]).forEach(t=>{
       if((inclDone||!t.done)&&(subName===null||t.sub===subName))n++;
     }))));
+    n += (allAnnots||[]).filter(a=>(inclDone||a.status!=='Hotovo')&&(subName===null||a.profese===subName)).length;
     return n;
   };
 
@@ -10752,43 +10753,29 @@ async function doExportPDF() {
       drawDochazkaPDF(pdf, recForDoc, _pdfLogo, PW, PH);
     }
 
-    // ── KD pages (after attendance, before drawings) ─────────────────────────
-    if (includeKD && kdRecords.length > 0) {
-      const sortedKdRecs = [...kdRecords]
-        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
-      const profList = appState.profese || [];
-      const allAnnots = getAllAnnotations();
+    // Prepare KD data once so both sections share references
+    let _kdSorted = null, _kdProfList = null, _kdAllAnnots = null, _kdNavPageNum = null, _kdOverviewStart = null;
+    const _kdSubPageNums = {};
 
-      // Reserve blank nav/filter page (filled in after we know all page numbers)
+    // ── KD filter: nav page + overview (before drawings) ─────────────────────
+    if (includeKD && kdRecords.length > 0) {
+      _kdSorted     = [...kdRecords].sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
+      _kdProfList   = appState.profese || [];
+      _kdAllAnnots  = getAllAnnotations();
+
+      // Reserve blank nav/filter page (filled in after all sub-pages are known)
       if (!first) pdf.addPage();
       first = false;
-      const navPageNum = pdf.getNumberOfPages();
+      _kdNavPageNum = pdf.getNumberOfPages();
 
-      // Full overview — all subcontractors
-      let overviewStart = null;
-      for (const rec of sortedKdRecs) {
+      // Full overview — all subcontractors (KD records in detail)
+      for (const rec of _kdSorted) {
         const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
         if (!hasVis) continue;
         pdf.addPage();
-        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
+        if (!_kdOverviewStart) _kdOverviewStart = pdf.getNumberOfPages();
         drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
       }
-
-      // Per-subcontractor filtered pages (KD tasks + canvas annotations)
-      const subPageNums = {};
-      for (const prof of profList) {
-        const profAnnots = allAnnots.filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
-        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
-        if (!hasTasks && !profAnnots.length) continue;
-        pdf.addPage();
-        subPageNums[prof.name] = pdf.getNumberOfPages();
-        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, profAnnots, _pdfLogo, PW, PH, inclHotovo, navPageNum);
-      }
-
-      // Now go back and draw the nav/filter page
-      pdf.setPage(navPageNum);
-      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
-      pdf.setPage(pdf.getNumberOfPages());
     }
 
     // ── Level drawing pages ───────────────────────────────────────────────────
@@ -10868,6 +10855,23 @@ async function doExportPDF() {
       } else if (includeList) {
         drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
       }
+    }
+
+    // ── Per-subcontractor pages (after drawings) ──────────────────────────────
+    if (includeKD && _kdSorted) {
+      for (const prof of _kdProfList) {
+        const profAnnots = _kdAllAnnots.filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
+        const hasTasks = _kdSorted.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
+        if (!hasTasks && !profAnnots.length) continue;
+        pdf.addPage();
+        _kdSubPageNums[prof.name] = pdf.getNumberOfPages();
+        drawKDSubPageToPDF(pdf, prof, _kdSorted, profAnnots, _pdfLogo, PW, PH, inclHotovo, _kdNavPageNum);
+      }
+
+      // Now go back and draw the nav/filter page (page numbers are now all known)
+      pdf.setPage(_kdNavPageNum);
+      drawKDNavPage(pdf, _kdProfList, _kdSorted, _kdAllAnnots, _pdfLogo, PW, PH, _kdOverviewStart, _kdSubPageNums, inclHotovo);
+      pdf.setPage(pdf.getNumberOfPages());
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
