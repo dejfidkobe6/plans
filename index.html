@@ -9663,27 +9663,26 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // Bezier constant for quarter-circle approximation
+        // Clip drawing to rounded rect shape, then fill stripe + white as plain rects
+        pdf.saveGraphicsState();
         const _rc = 0.9, _kc = _rc * 0.5523;
-        // Left stripe: rounded left corners, straight right edge
+        pdf.moveTo(px + _rc, py);
+        pdf.lineTo(px + lw - _rc, py);
+        pdf.curveTo(px + lw - _rc + _kc, py,  px + lw, py + _rc - _kc,  px + lw, py + _rc);
+        pdf.lineTo(px + lw, py + lh - _rc);
+        pdf.curveTo(px + lw, py + lh - _rc + _kc,  px + lw - _rc + _kc, py + lh,  px + lw - _rc, py + lh);
+        pdf.lineTo(px + _rc, py + lh);
+        pdf.curveTo(px + _rc - _kc, py + lh,  px, py + lh - _rc + _kc,  px, py + lh - _rc);
+        pdf.lineTo(px, py + _rc);
+        pdf.curveTo(px, py + _rc - _kc,  px + _rc - _kc, py,  px + _rc, py);
+        pdf.closePath();
+        pdf.clip();
         pdf.setFillColor(r, g, b);
-        pdf.lines([
-          [-(LBL_STR - _rc), 0],
-          [-_kc, 0, -_rc, _rc-_kc, -_rc, _rc],
-          [0, lh - 2*_rc],
-          [0, _kc, _rc-_kc, _rc, _rc, _rc],
-          [LBL_STR - _rc, 0],
-        ], px + LBL_STR, py, [1,1], 'F', true);
-        // White area: straight left edge, rounded right corners
+        pdf.rect(px, py, LBL_STR, lh, 'F');
         pdf.setFillColor(255, 255, 255);
-        pdf.lines([
-          [lw - LBL_STR - _rc, 0],
-          [_kc, 0, _rc, _rc-_kc, _rc, _rc],
-          [0, lh - 2*_rc],
-          [0, _kc, _kc-_rc, _rc, -_rc, _rc],
-          [-(lw - LBL_STR - _rc), 0],
-        ], px + LBL_STR, py, [1,1], 'F', true);
-        // Rounded border on top in profese color (jemný lem)
+        pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
+        pdf.restoreGraphicsState();
+        // Rounded border drawn outside clip scope
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.18);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
 
