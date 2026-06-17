@@ -9470,116 +9470,146 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         }
       });
 
-      // ── Annotation labels: annotId + firma, guaranteed non-overlap ──────────
-      const PT_MM  = 72 / 25.4;
-      const LBL_FS = 3.5;                        // pt
-      const LBL_H  = LBL_FS / PT_MM * 1.55;     // mm — single-line height
-      const LBL_STR = 1.0;                       // mm — colored left stripe
-      const LBL_XP  = 0.55;                      // mm — padding after stripe / right edge
+      // ── Annotation labels: firma (bold) + popisek (small) — matches app style ──
+      const PT_MM   = 72 / 25.4;
+      const LBL_FS1 = 3.8;                        // pt — firma bold (line 1)
+      const LBL_FS2 = 3.2;                        // pt — popisek (line 2)
+      const LINE_H1 = LBL_FS1 / PT_MM * 1.35;    // mm
+      const LINE_H2 = LBL_FS2 / PT_MM * 1.35;    // mm
+      const LBL_STR = 1.2;                        // mm — colored left stripe
+      const PAD_H   = 0.7;                        // mm — horizontal padding
+      const PAD_V   = 0.65;                       // mm — vertical padding
+      const GAP_LN  = 0.45;                       // mm — between lines
+      const PLACE_G = 1.8;                        // mm — label-to-annotation gap
 
-      const lblOvlp = (a,b) => !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
       const lPlaced = [];
 
-      // Find a non-overlapping position using spiral search; returns {x,y} or null
-      function findLblPos(acx, acy, lw) {
-        const angles = [270, 0, 90, 180, 315, 45, 225, 135, 300, 60, 240, 120];
-        for (let rad = 1; rad <= 40; rad += 1.5) {
-          for (const deg of angles) {
-            const a = deg * Math.PI / 180;
-            const tx = acx + Math.cos(a) * rad - lw / 2;
-            const ty = acy + Math.sin(a) * rad - LBL_H / 2;
-            if (!lPlaced.some(p => lblOvlp({x:tx, y:ty, w:lw, h:LBL_H}, p))) {
-              return {x:tx, y:ty};
-            }
-          }
+      // 8-candidate placement matching deconflictLabels in the canvas
+      const placeLblPos = (acx, acy, aw, ah, lw, lh) => {
+        const G = PLACE_G;
+        const cands = [
+          [acx - lw/2,          acy - ah/2 - lh - G],
+          [acx + aw/2 + G,      acy - lh/2],
+          [acx - aw/2 - lw - G, acy - lh/2],
+          [acx - lw/2,          acy + ah/2 + G],
+          [acx + aw/2 + G,      acy - ah/2 - lh - G],
+          [acx - aw/2 - lw - G, acy - ah/2 - lh - G],
+          [acx + aw/2 + G,      acy + ah/2 + G],
+          [acx - aw/2 - lw - G, acy + ah/2 + G],
+        ];
+        let best = cands[0], bestS = Infinity;
+        for (const [cx, cy] of cands) {
+          const ov = lPlaced.reduce((s, p) => {
+            const ox = Math.min(cx+lw, p.x+p.w) - Math.max(cx, p.x);
+            const oy = Math.min(cy+lh, p.y+p.h) - Math.max(cy, p.y);
+            return s + (ox>0&&oy>0 ? ox*oy : 0);
+          }, 0);
+          const sc = ov + Math.hypot(cx+lw/2-acx, cy+lh/2-acy) * 0.1;
+          if (sc < bestS) { bestS = sc; best = [cx, cy]; }
+          if (ov === 0) break;
         }
-        return null;
-      }
+        return best;
+      };
+
+      // Truncate text to fit maxW mm at given pt size
+      const fitPDF = (text, fspt, maxW) => {
+        let s = String(text || '');
+        const msr = t => pdf.getStringUnitWidth(t) * fspt / PT_MM;
+        if (msr(s) <= maxW) return s;
+        while (s.length > 1 && msr(s + '…') > maxW) s = s.slice(0, -1);
+        return s + '…';
+      };
 
       annotObjs.forEach(o => {
         if (!o.annotId) return;
         const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
         const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
-        const idText    = String(o.annotId);
-        const firmaText = getFirmaDisplay(o.profese);
+        const firmaRaw = getFirmaDisplay(o.profese);
+        const popRaw   = o.popisek ? String(o.popisek).split('\n')[0].trim() : '';
 
-        // Measure text widths
-        pdf.setFont('helvetica', 'bold');   pdf.setFontSize(LBL_FS);
-        const wId    = pdf.getStringUnitWidth(idText)    * LBL_FS / PT_MM;
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS * 0.86);
-        const wFirma = pdf.getStringUnitWidth(' ' + firmaText) * (LBL_FS * 0.86) / PT_MM;
-        const lw = LBL_STR + LBL_XP + wId + wFirma + LBL_XP;
-
-        // Annotation center in PDF coords
+        // Annotation center & bounding box in PDF mm
         const type = (o.type||'').toLowerCase();
         const oCX  = (o.originX||'left') === 'center';
         const oCY  = (o.originY||'top')  === 'center';
-        let ox, oy, ow, oh;
+        let acx, acy, aw, ah;
         if (type === 'ellipse') {
           const rx=(o.rx||20)*(o.scaleX||1), ry=(o.ry||20)*(o.scaleY||1);
-          ox=toX(oCX?o.left-rx:o.left); oy=toY(oCY?o.top-ry:o.top); ow=toMX(rx*2); oh=toMY(ry*2);
+          acx=toX(oCX?o.left:o.left+rx); acy=toY(oCY?o.top:o.top+ry);
+          aw=toMX(rx*2); ah=toMY(ry*2);
         } else if (type === 'polygon' || type === 'polyline') {
           const pts2=o.points||[], sx2=o.scaleX||1, sy2=o.scaleY||1;
           const mnX=pts2.reduce((m,p)=>Math.min(m,p.x),Infinity), mxX=pts2.reduce((m,p)=>Math.max(m,p.x),-Infinity);
           const mnY=pts2.reduce((m,p)=>Math.min(m,p.y),Infinity), mxY=pts2.reduce((m,p)=>Math.max(m,p.y),-Infinity);
           const bbl=oCX?o.left-(o.width||mxX-mnX)*sx2/2:o.left, bbt=oCY?o.top-(o.height||mxY-mnY)*sy2/2:o.top;
           if (type === 'polyline' && pts2.length >= 2) {
-            // Midpoint along path (mirrors _polylineMidpoint in the canvas)
-            const cp = pts2.map(p=>({x: bbl+sx2*(p.x-mnX), y: bbt+sy2*(p.y-mnY)}));
+            const cp=pts2.map(p=>({x:bbl+sx2*(p.x-mnX),y:bbt+sy2*(p.y-mnY)}));
             let tot=0; for(let i=1;i<cp.length;i++) tot+=Math.hypot(cp[i].x-cp[i-1].x,cp[i].y-cp[i-1].y);
             let rem=tot/2, mx=cp[cp.length-1].x, my=cp[cp.length-1].y;
-            for(let i=1;i<cp.length;i++){
-              const ddx=cp[i].x-cp[i-1].x,ddy=cp[i].y-cp[i-1].y,seg=Math.hypot(ddx,ddy);
-              if(rem<=seg){const t=seg>0?rem/seg:0;mx=cp[i-1].x+t*ddx;my=cp[i-1].y+t*ddy;break;}
-              rem-=seg;
-            }
-            ox=toX(mx); oy=toY(my); ow=0; oh=0;
+            for(let i=1;i<cp.length;i++){const ddx=cp[i].x-cp[i-1].x,ddy=cp[i].y-cp[i-1].y,seg=Math.hypot(ddx,ddy);if(rem<=seg){const t=seg>0?rem/seg:0;mx=cp[i-1].x+t*ddx;my=cp[i-1].y+t*ddy;break;}rem-=seg;}
+            acx=toX(mx); acy=toY(my); aw=0; ah=0;
           } else {
-            ox=toX(bbl); oy=toY(bbt); ow=toMX((mxX-mnX)*sx2); oh=toMY((mxY-mnY)*sy2);
+            aw=toMX((mxX-mnX)*sx2); ah=toMY((mxY-mnY)*sy2);
+            acx=toX(bbl)+aw/2; acy=toY(bbt)+ah/2;
           }
         } else {
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
-          ox=toX(oCX?o.left-fw/2:o.left); oy=toY(oCY?o.top-fh/2:o.top); ow=toMX(fw); oh=toMY(fh);
+          aw=toMX(fw); ah=toMY(fh);
+          acx=toX(oCX?o.left:o.left+fw/2); acy=toY(oCY?o.top:o.top+fh/2);
         }
-        const acx = ox + ow / 2, acy = oy + oh / 2;
 
-        const pos = findLblPos(acx, acy, lw);
-        if (!pos) return; // no room — skip rather than overlap
-        lPlaced.push({x:pos.x, y:pos.y, w:lw, h:LBL_H});
+        // Measure and clamp text to max 38mm label width
+        const MAX_TW = 38;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
+        const firmaText = fitPDF(firmaRaw, LBL_FS1, MAX_TW);
+        const wFirma = pdf.getStringUnitWidth(firmaText) * LBL_FS1 / PT_MM;
 
-        // Leader line when label is placed away from annotation
-        const lblCx = pos.x + lw / 2, lblCy = pos.y + LBL_H / 2;
-        const dist = Math.hypot(lblCx - acx, lblCy - acy);
-        if (dist > lw * 0.6 + 2) {
+        let popText = '', wPop = 0;
+        if (popRaw) {
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          popText = fitPDF(popRaw, LBL_FS2, MAX_TW);
+          wPop = pdf.getStringUnitWidth(popText) * LBL_FS2 / PT_MM;
+        }
+
+        const lw = LBL_STR + PAD_H + Math.max(wFirma, wPop, 4) + PAD_H;
+        const lh = popText
+          ? PAD_V + LINE_H1 + GAP_LN + LINE_H2 + PAD_V
+          : PAD_V + LINE_H1 + PAD_V;
+
+        const [px, py] = placeLblPos(acx, acy, aw, ah, lw, lh);
+        lPlaced.push({x:px, y:py, w:lw, h:lh});
+
+        // Leader line when label center is far from annotation center
+        const lblCx = px + lw/2, lblCy = py + lh/2;
+        if (Math.hypot(lblCx - acx, lblCy - acy) > Math.max(aw, lw) * 0.5 + 2) {
           pdf.setDrawColor(r, g, b);
           pdf.setLineWidth(0.12);
           pdf.setLineDashPattern([0.4, 0.5], 0);
-          // Line from annotation center to nearest edge of label
-          const ex = Math.max(pos.x, Math.min(pos.x+lw, acx));
-          const ey = Math.max(pos.y, Math.min(pos.y+LBL_H, acy));
+          const ex = Math.max(px, Math.min(px+lw, acx));
+          const ey = Math.max(py, Math.min(py+lh, acy));
           pdf.line(acx, acy, ex, ey);
           pdf.setLineDashPattern([], 0);
         }
 
-        // Dark background
+        // Dark rounded background
         pdf.setFillColor(18, 18, 18);
-        pdf.roundedRect(pos.x, pos.y, lw, LBL_H, 0.25, 0.25, 'F');
-        // Colored left stripe
+        pdf.roundedRect(px, py, lw, lh, 0.45, 0.45, 'F');
+        // Colored left stripe (rect on top — sharp right edge blends into dark bg)
         pdf.setFillColor(r, g, b);
-        pdf.rect(pos.x, pos.y, LBL_STR, LBL_H, 'F');
+        pdf.rect(px, py, LBL_STR, lh, 'F');
 
-        const tx = pos.x + LBL_STR + LBL_XP;
-        const ty = pos.y + LBL_H * 0.72;
-        // annotId — bold, colored
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(LBL_FS);
+        const tx = px + LBL_STR + PAD_H;
+        // Line 1: firma — bold, profese color
+        const ty1 = py + PAD_V + LINE_H1 * 0.82;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
         pdf.setTextColor(r, g, b);
-        pdf.text(idText, tx, ty);
-        // firma — normal, white
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(LBL_FS * 0.86);
-        pdf.setTextColor(210, 210, 210);
-        pdf.text(' ' + firmaText, tx + wId, ty);
+        pdf.text(firmaText, tx, ty1);
+        // Line 2: popisek — normal, light grey
+        if (popText) {
+          const ty2 = ty1 + GAP_LN + LINE_H2;
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          pdf.setTextColor(175, 175, 175);
+          pdf.text(popText, tx, ty2);
+        }
       });
 
       resolve();
@@ -10479,7 +10509,7 @@ function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, 
 }
 
 // ── KD in-PDF filter: single-subcontractor page(s) ────────────────────────────
-function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, navPageNum) {
+function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH, inclDone, navPageNum) {
   const csT = s => csText(String(s || ''));
   const PT_MM = 72/25.4;
   const tw = (t,fs) => pdf.getStringUnitWidth(csT(t))*fs/PT_MM;
@@ -10494,9 +10524,20 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   [...kdRecords].sort((a,z)=>(z.date||'')>(a.date||'')?-1:(z.date||'')<(a.date||'')?1:0).forEach(rec=>{
     (rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(card=>{
       (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.sub===prof.name).forEach(task=>{
-        entries.push({recDate:rec.date||'',chapterTitle:ch.title||'',sectionTitle:card.title||'',task});
+        entries.push({recDate:rec.date||'',chapterTitle:ch.title||'',sectionTitle:card.title||'',task,isAnnot:false});
       });
     }));
+  });
+  // Append canvas annotations as rows
+  (annotEntries||[]).forEach(a => {
+    const dateFmt = ts => { if(!ts)return ''; const d=new Date(ts); return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; };
+    entries.push({
+      recDate: dateFmt(a.updatedAt||a.createdAt),
+      chapterTitle: a.levelName||'',
+      sectionTitle: csT('Výkres'),
+      task: { text: a.popisek||'', urgent: a.status==='Urgence', done: a.status==='Hotovo', writtenAt: a.updatedAt||a.createdAt },
+      isAnnot: true, annotId: a.annotId
+    });
   });
   if (!entries.length) return;
 
@@ -10577,26 +10618,36 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   drawPageHeader(); drawFrame(true);
   let curY=ROWS_START, isFirst=true;
 
-  for (const {recDate,chapterTitle,sectionTitle,task} of entries) {
+  for (const {recDate,chapterTitle,sectionTitle,task,isAnnot,annotId} of entries) {
     const lines=getLines(task.text);
     const rowH=Math.max(LH+LH*.4,LH*lines.length+LH*.4);
     if (curY+rowH>pageBottom) {
       pdf.addPage(); drawPageHeader(); drawFrame(false); curY=ROWS_START; isFirst=false;
     }
     const tY=curY+LH*.8;
-    if (task.urgent){pdf.setFillColor(255,246,246);pdf.rect(lx,curY,lw,rowH,'F');}
+    if (isAnnot) {
+      pdf.setFillColor(245,247,252); pdf.rect(lx,curY,lw,rowH,'F');
+    } else if (task.urgent) {
+      pdf.setFillColor(255,246,246); pdf.rect(lx,curY,lw,rowH,'F');
+    }
     pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS);
     pdf.setTextColor(80,90,70); pdf.text(fitT(writtenFmt(task.writtenAt,recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
     pdf.setTextColor(55,65,45); pdf.text(fitT(csT(chapterTitle),ROW_FS,C_SEC-C_CHAP-0.5),C_CHAP,tY);
-    pdf.setTextColor(80,90,70); pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
-    const taskFg=task.urgent?[160,40,40]:[40,50,35];
+    if(isAnnot){pdf.setTextColor(90,110,150);}else{pdf.setTextColor(80,90,70);}
+    pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
+    const taskFg=task.urgent&&!isAnnot?[160,40,40]:[40,50,35];
     pdf.setTextColor(...taskFg);
     lines.forEach((line,li)=>{const ty=curY+LH*li+LH*.8;if(ty>curY+rowH-.1)return;pdfTextWithLinks(pdf,line,C_TASK,ty,ROW_FS,taskFg);});
-    const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
-    const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
     const sFS=Math.max(3,ROW_FS-1);
-    pdf.setFontSize(sFS); pdf.setTextColor(90,105,75); pdf.text(fitT(ts,sFS,C_LOC-C_TERM-0.5),C_TERM,tY);
-    pdf.setTextColor(100,115,120); pdf.text(fitT((task.locations||[]).join(', '),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    if (isAnnot) {
+      pdf.setFontSize(sFS); pdf.setTextColor(130,140,160);
+      pdf.text(fitT(csT(annotId||''),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    } else {
+      const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
+      const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
+      pdf.setFontSize(sFS); pdf.setTextColor(90,105,75); pdf.text(fitT(ts,sFS,C_LOC-C_TERM-0.5),C_TERM,tY);
+      pdf.setTextColor(100,115,120); pdf.text(fitT((task.locations||[]).join(', '),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    }
     pdf.setDrawColor(210,215,205); pdf.setLineWidth(0.1); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
     curY+=rowH;
   }
@@ -10663,6 +10714,46 @@ async function doExportPDF() {
       drawDochazkaPDF(pdf, recForDoc, _pdfLogo, PW, PH);
     }
 
+    // ── KD pages (after attendance, before drawings) ─────────────────────────
+    if (includeKD && kdRecords.length > 0) {
+      const sortedKdRecs = [...kdRecords]
+        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
+      const profList = appState.profese || [];
+      const allAnnots = getAllAnnotations();
+
+      // Reserve blank nav/filter page (filled in after we know all page numbers)
+      if (!first) pdf.addPage();
+      first = false;
+      const navPageNum = pdf.getNumberOfPages();
+
+      // Full overview — all subcontractors
+      let overviewStart = null;
+      for (const rec of sortedKdRecs) {
+        const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
+        if (!hasVis) continue;
+        pdf.addPage();
+        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
+        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
+      }
+
+      // Per-subcontractor filtered pages (KD tasks + canvas annotations)
+      const subPageNums = {};
+      for (const prof of profList) {
+        const profAnnots = allAnnots.filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
+        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
+        if (!hasTasks && !profAnnots.length) continue;
+        pdf.addPage();
+        subPageNums[prof.name] = pdf.getNumberOfPages();
+        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, profAnnots, _pdfLogo, PW, PH, inclHotovo, navPageNum);
+      }
+
+      // Now go back and draw the nav/filter page
+      pdf.setPage(navPageNum);
+      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
+      pdf.setPage(pdf.getNumberOfPages());
+    }
+
+    // ── Level drawing pages ───────────────────────────────────────────────────
     for (const idx of levelIdxs) {
       const level = appState.levels[idx];
       if (!level) continue;
@@ -10739,43 +10830,6 @@ async function doExportPDF() {
       } else if (includeList) {
         drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
       }
-    }
-
-    // ── KD pages ─────────────────────────────────────────────────────────────
-    if (includeKD && kdRecords.length > 0) {
-      const sortedKdRecs = [...kdRecords]
-        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
-      const profList = appState.profese || [];
-
-      // Reserve blank nav/filter page (filled in after we know all page numbers)
-      if (!first) pdf.addPage();
-      first = false;
-      const navPageNum = pdf.getNumberOfPages();
-
-      // Full overview — all subcontractors
-      let overviewStart = null;
-      for (const rec of sortedKdRecs) {
-        const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
-        if (!hasVis) continue;
-        pdf.addPage();
-        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
-        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
-      }
-
-      // Per-subcontractor filtered pages
-      const subPageNums = {};
-      for (const prof of profList) {
-        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
-        if (!hasTasks) continue;
-        pdf.addPage();
-        subPageNums[prof.name] = pdf.getNumberOfPages();
-        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, _pdfLogo, PW, PH, inclHotovo, navPageNum);
-      }
-
-      // Now go back and draw the nav/filter page
-      pdf.setPage(navPageNum);
-      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
-      pdf.setPage(pdf.getNumberOfPages());
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
