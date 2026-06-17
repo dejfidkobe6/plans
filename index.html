@@ -1341,7 +1341,7 @@ option { background: var(--card); color: var(--text); }
 .tab-type-custom::after { background: var(--text-dim) !important; }
 
 /* HOME / SUBDODAVATELE BUTTON */
-#subddodavatele-btn {
+#vykres-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1355,6 +1355,28 @@ option { background: var(--card); color: var(--text); }
   font-weight: 600;
   cursor: pointer;
   border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#vykres-btn:hover { background: rgba(74,83,64,0.5); color: var(--text-bright); }
+#vykres-btn.active { background: rgba(74,83,64,0.6); color: var(--text-bright); }
+#vykres-btn svg { width: 16px; height: 16px; }
+
+#subddodavatele-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  border: none;
+  background: rgba(74,83,64,0.25);
+  color: var(--olive-light);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   border-right: 1px solid var(--border);
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0;
@@ -1452,12 +1474,13 @@ option { background: var(--card); color: var(--text); }
   color: var(--text-bright); white-space: nowrap;
 }
 #kd-close-btn {
-  width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0;
+  height: 28px; padding: 0 10px; border-radius: 4px; flex-shrink: 0;
   background: transparent; border: 1px solid var(--border);
-  color: var(--text-dim); cursor: pointer; font-size: 15px;
-  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); cursor: pointer; font-size: 13px; font-family: var(--font-main);
+  display: flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-#kd-close-btn:hover { background: var(--card); color: var(--text-bright); }
+#kd-close-btn:hover { background: var(--card); color: var(--text-bright); border-color: var(--text-dim); }
 #kd-new-record-btn {
   margin: 10px 10px 6px; padding: 6px 10px; border-radius: 5px; font-size: 11px;
   background: rgba(74,83,64,0.12); border: 1px solid var(--border);
@@ -1967,14 +1990,14 @@ option { background: var(--card); color: var(--text); }
   font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
 }
 #close-anotace-btn {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-dim); font-size: 22px;
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; transition: background 0.15s, color 0.15s;
+  background: none; border: 1px solid var(--border); cursor: pointer;
+  color: var(--text-dim); font-size: 13px; font-family: var(--font-main);
+  height: 30px; padding: 0 12px;
+  display: flex; align-items: center; gap: 5px;
+  border-radius: 5px; transition: background 0.15s, color 0.15s, border-color 0.15s;
   margin-left: auto; flex-shrink: 0;
 }
-#close-anotace-btn:hover { background: var(--card); color: var(--text-bright); }
+#close-anotace-btn:hover { background: var(--card); color: var(--text-bright); border-color: var(--text-dim); }
 #anotace-filters-bar {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   padding: 10px 20px; border-bottom: 1px solid var(--border);
@@ -2120,17 +2143,17 @@ option { background: var(--card); color: var(--text); }
   gap: 16px;
 }
 #close-home-btn {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-dim); font-size: 22px;
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; transition: background 0.15s, color 0.15s;
+  background: none; border: 1px solid var(--border); cursor: pointer;
+  color: var(--text-dim); font-size: 13px; font-family: var(--font-main);
+  height: 30px; padding: 0 12px;
+  display: flex; align-items: center; gap: 5px;
+  border-radius: 5px; transition: background 0.15s, color 0.15s, border-color 0.15s;
   flex-shrink: 0;
 }
-#close-home-btn:hover { background: var(--card); color: var(--text-bright); }
-/* Mobile back label — hidden on desktop, shown on mobile */
-.mob-back-label { display: none; font-size: 13px; font-weight: 600; white-space: nowrap; }
-.mob-back-x { display: inline; }
+#close-home-btn:hover { background: var(--card); color: var(--text-bright); border-color: var(--text-dim); }
+/* Desktop back buttons — show text label, hide × */
+.mob-back-label { display: inline; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.mob-back-x { display: none; }
 #home-page-header h1 {
   font-size: 20px;
   font-weight: 600;
@@ -2708,10 +2731,14 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   flex: 1;
 }
 #close-users-btn {
-  background: none; border: none; color: var(--text-dim);
-  font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  font-size: 13px; font-family: var(--font-main); cursor: pointer;
+  height: 30px; padding: 0 12px;
+  display: flex; align-items: center; gap: 5px;
+  border-radius: 5px; transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
 }
-#close-users-btn:hover { color: var(--text-bright); }
+#close-users-btn:hover { background: var(--card); color: var(--text-bright); border-color: var(--text-dim); }
 #users-page-body {
   flex: 1; overflow-y: auto; padding: 24px 32px;
   max-width: 800px; width: 100%;
@@ -3435,6 +3462,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 
 /* Medium screens – hide text labels on action buttons */
 @media (max-width: 1100px) {
+  #vykres-btn span,
   #subddodavatele-btn span,
   #anotace-btn span,
   #users-mgmt-btn span,
@@ -3603,6 +3631,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #kd-mob-top-search     { display: none; }
   #kd-mobile-bottom-bar  { display: none; }
   #kd-mob-tray           { display: none; }
+  #mob-back-bar          { display: none !important; }
 }
 /* Floating "Uložit" bar — appears above keyboard when any text field is focused */
 #kd-kbd-done {
@@ -3821,25 +3850,29 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     <div class="logo-plans" id="logo-project-name">PLANS</div>
   </a>
   <div id="topbar-actions">
+  <button id="vykres-btn" class="active" title="Výkresy podlaží">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="3" width="20" height="18" rx="1"/><path d="M2 9h20M9 9v12"/></svg>
+    <span>Výkresy</span>
+  </button>
   <button id="subddodavatele-btn" title="Subdodavatelé projektu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    Subdodavatelé
+    <span>Subdodavatelé</span>
   </button>
   <button id="anotace-btn" title="Všechny anotace">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-    Anotace
+    <span>Anotace</span>
   </button>
   <button id="users-mgmt-btn" title="Správa uživatelů">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    Uživatelé
+    <span>Uživatelé</span>
   </button>
   <button id="pdf-export-btn" title="Export do PDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
-    Export
+    <span>Export</span>
   </button>
   <button id="kd-btn" title="Záznamy z kontrolního dne">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
-    Kontrolní den
+    <span>Kontrolní den</span>
   </button>
   </div>
   <div id="toolbar-right">
@@ -4353,7 +4386,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         Napsat všem
       </a>
-      <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
+      <button id="close-home-btn" onclick="toggleHomePage(false)" title="Zpět na výkres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg><span class="mob-back-label">Výkres</span><span class="mob-back-x">×</span></button>
     </div>
     <div id="prof-grid"></div>
   </div>
@@ -4368,7 +4401,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Správa uživatelů
     </div>
-    <button id="close-users-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
+    <button id="close-users-btn" title="Zpět na výkres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg><span class="mob-back-label">Výkres</span><span class="mob-back-x">×</span></button>
   </div>
   <div id="users-page-body">
     <div id="members-section">
@@ -4396,7 +4429,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
       Anotace
     </div>
     <div id="anotace-stats-row"></div>
-    <button id="close-anotace-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
+    <button id="close-anotace-btn" title="Zpět na výkres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg><span class="mob-back-label">Výkres</span><span class="mob-back-x">×</span></button>
   </div>
   <div id="anotace-filters-bar">
     <div class="tfilter-group">
@@ -4450,7 +4483,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div id="kd-sidebar">
     <div id="kd-sidebar-top">
       <span class="kd-page-title">Kontrolní den</span>
-      <button id="kd-close-btn" title="Zavřít"><span class="mob-back-label">← Výkres</span><span class="mob-back-x">×</span></button>
+      <button id="kd-close-btn" title="Zpět na výkres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg><span class="mob-back-label">Výkres</span><span class="mob-back-x">×</span></button>
     </div>
     <button id="kd-new-record-btn">+ Nový záznam</button>
     <button id="kd-toggle-done-btn" title="Zobrazit/skrýt splněné úkoly" style="font-size:11px;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);cursor:pointer;white-space:nowrap;width:100%;margin-bottom:4px;">✓ Hotové úkoly</button>
@@ -7229,6 +7262,15 @@ function setupEventListeners() {
   document.getElementById('modal-confirm').addEventListener('click', () => resolveModal(true));
   document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target === document.getElementById('modal-overlay')) resolveModal(false); });
 
+  // Výkresy – close all overlays, return to canvas
+  document.getElementById('vykres-btn').addEventListener('click', () => {
+    closeAnotacePage();
+    toggleHomePage(false);
+    toggleUsersPage(false);
+    closeKDPage();
+    closePDFExport();
+  });
+
   // Subdodavatele home page toggle
   document.getElementById('subddodavatele-btn').addEventListener('click', () => toggleHomePage());
 
@@ -9321,10 +9363,12 @@ function openPDFExport() {
   ).join('');
 
   document.getElementById('pdf-export-overlay').classList.add('visible');
+  updateMobileNavBar();
 }
 
 function closePDFExport() {
   document.getElementById('pdf-export-overlay').classList.remove('visible');
+  updateMobileNavBar();
 }
 
 // ── Helpers for vector PDF export ──────────────────────────────────────────
@@ -9464,116 +9508,146 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         }
       });
 
-      // ── Annotation labels: annotId + firma, guaranteed non-overlap ──────────
-      const PT_MM  = 72 / 25.4;
-      const LBL_FS = 3.5;                        // pt
-      const LBL_H  = LBL_FS / PT_MM * 1.55;     // mm — single-line height
-      const LBL_STR = 1.0;                       // mm — colored left stripe
-      const LBL_XP  = 0.55;                      // mm — padding after stripe / right edge
+      // ── Annotation labels: firma (bold) + popisek (small) — matches app style ──
+      const PT_MM   = 72 / 25.4;
+      const LBL_FS1 = 3.8;                        // pt — firma bold (line 1)
+      const LBL_FS2 = 3.2;                        // pt — popisek (line 2)
+      const LINE_H1 = LBL_FS1 / PT_MM * 1.35;    // mm
+      const LINE_H2 = LBL_FS2 / PT_MM * 1.35;    // mm
+      const LBL_STR = 1.2;                        // mm — colored left stripe
+      const PAD_H   = 0.7;                        // mm — horizontal padding
+      const PAD_V   = 0.65;                       // mm — vertical padding
+      const GAP_LN  = 0.45;                       // mm — between lines
+      const PLACE_G = 1.8;                        // mm — label-to-annotation gap
 
-      const lblOvlp = (a,b) => !(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
       const lPlaced = [];
 
-      // Find a non-overlapping position using spiral search; returns {x,y} or null
-      function findLblPos(acx, acy, lw) {
-        const angles = [270, 0, 90, 180, 315, 45, 225, 135, 300, 60, 240, 120];
-        for (let rad = 1; rad <= 40; rad += 1.5) {
-          for (const deg of angles) {
-            const a = deg * Math.PI / 180;
-            const tx = acx + Math.cos(a) * rad - lw / 2;
-            const ty = acy + Math.sin(a) * rad - LBL_H / 2;
-            if (!lPlaced.some(p => lblOvlp({x:tx, y:ty, w:lw, h:LBL_H}, p))) {
-              return {x:tx, y:ty};
-            }
-          }
+      // 8-candidate placement matching deconflictLabels in the canvas
+      const placeLblPos = (acx, acy, aw, ah, lw, lh) => {
+        const G = PLACE_G;
+        const cands = [
+          [acx - lw/2,          acy - ah/2 - lh - G],
+          [acx + aw/2 + G,      acy - lh/2],
+          [acx - aw/2 - lw - G, acy - lh/2],
+          [acx - lw/2,          acy + ah/2 + G],
+          [acx + aw/2 + G,      acy - ah/2 - lh - G],
+          [acx - aw/2 - lw - G, acy - ah/2 - lh - G],
+          [acx + aw/2 + G,      acy + ah/2 + G],
+          [acx - aw/2 - lw - G, acy + ah/2 + G],
+        ];
+        let best = cands[0], bestS = Infinity;
+        for (const [cx, cy] of cands) {
+          const ov = lPlaced.reduce((s, p) => {
+            const ox = Math.min(cx+lw, p.x+p.w) - Math.max(cx, p.x);
+            const oy = Math.min(cy+lh, p.y+p.h) - Math.max(cy, p.y);
+            return s + (ox>0&&oy>0 ? ox*oy : 0);
+          }, 0);
+          const sc = ov + Math.hypot(cx+lw/2-acx, cy+lh/2-acy) * 0.1;
+          if (sc < bestS) { bestS = sc; best = [cx, cy]; }
+          if (ov === 0) break;
         }
-        return null;
-      }
+        return best;
+      };
+
+      // Truncate text to fit maxW mm at given pt size
+      const fitPDF = (text, fspt, maxW) => {
+        let s = String(text || '');
+        const msr = t => pdf.getStringUnitWidth(t) * fspt / PT_MM;
+        if (msr(s) <= maxW) return s;
+        while (s.length > 1 && msr(s + '…') > maxW) s = s.slice(0, -1);
+        return s + '…';
+      };
 
       annotObjs.forEach(o => {
         if (!o.annotId) return;
         const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
         const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
-        const idText    = String(o.annotId);
-        const firmaText = getFirmaDisplay(o.profese);
+        const firmaRaw = getFirmaDisplay(o.profese);
+        const popRaw   = o.popisek ? String(o.popisek).split('\n')[0].trim() : '';
 
-        // Measure text widths
-        pdf.setFont('helvetica', 'bold');   pdf.setFontSize(LBL_FS);
-        const wId    = pdf.getStringUnitWidth(idText)    * LBL_FS / PT_MM;
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS * 0.86);
-        const wFirma = pdf.getStringUnitWidth(' ' + firmaText) * (LBL_FS * 0.86) / PT_MM;
-        const lw = LBL_STR + LBL_XP + wId + wFirma + LBL_XP;
-
-        // Annotation center in PDF coords
+        // Annotation center & bounding box in PDF mm
         const type = (o.type||'').toLowerCase();
         const oCX  = (o.originX||'left') === 'center';
         const oCY  = (o.originY||'top')  === 'center';
-        let ox, oy, ow, oh;
+        let acx, acy, aw, ah;
         if (type === 'ellipse') {
           const rx=(o.rx||20)*(o.scaleX||1), ry=(o.ry||20)*(o.scaleY||1);
-          ox=toX(oCX?o.left-rx:o.left); oy=toY(oCY?o.top-ry:o.top); ow=toMX(rx*2); oh=toMY(ry*2);
+          acx=toX(oCX?o.left:o.left+rx); acy=toY(oCY?o.top:o.top+ry);
+          aw=toMX(rx*2); ah=toMY(ry*2);
         } else if (type === 'polygon' || type === 'polyline') {
           const pts2=o.points||[], sx2=o.scaleX||1, sy2=o.scaleY||1;
           const mnX=pts2.reduce((m,p)=>Math.min(m,p.x),Infinity), mxX=pts2.reduce((m,p)=>Math.max(m,p.x),-Infinity);
           const mnY=pts2.reduce((m,p)=>Math.min(m,p.y),Infinity), mxY=pts2.reduce((m,p)=>Math.max(m,p.y),-Infinity);
           const bbl=oCX?o.left-(o.width||mxX-mnX)*sx2/2:o.left, bbt=oCY?o.top-(o.height||mxY-mnY)*sy2/2:o.top;
           if (type === 'polyline' && pts2.length >= 2) {
-            // Midpoint along path (mirrors _polylineMidpoint in the canvas)
-            const cp = pts2.map(p=>({x: bbl+sx2*(p.x-mnX), y: bbt+sy2*(p.y-mnY)}));
+            const cp=pts2.map(p=>({x:bbl+sx2*(p.x-mnX),y:bbt+sy2*(p.y-mnY)}));
             let tot=0; for(let i=1;i<cp.length;i++) tot+=Math.hypot(cp[i].x-cp[i-1].x,cp[i].y-cp[i-1].y);
             let rem=tot/2, mx=cp[cp.length-1].x, my=cp[cp.length-1].y;
-            for(let i=1;i<cp.length;i++){
-              const ddx=cp[i].x-cp[i-1].x,ddy=cp[i].y-cp[i-1].y,seg=Math.hypot(ddx,ddy);
-              if(rem<=seg){const t=seg>0?rem/seg:0;mx=cp[i-1].x+t*ddx;my=cp[i-1].y+t*ddy;break;}
-              rem-=seg;
-            }
-            ox=toX(mx); oy=toY(my); ow=0; oh=0;
+            for(let i=1;i<cp.length;i++){const ddx=cp[i].x-cp[i-1].x,ddy=cp[i].y-cp[i-1].y,seg=Math.hypot(ddx,ddy);if(rem<=seg){const t=seg>0?rem/seg:0;mx=cp[i-1].x+t*ddx;my=cp[i-1].y+t*ddy;break;}rem-=seg;}
+            acx=toX(mx); acy=toY(my); aw=0; ah=0;
           } else {
-            ox=toX(bbl); oy=toY(bbt); ow=toMX((mxX-mnX)*sx2); oh=toMY((mxY-mnY)*sy2);
+            aw=toMX((mxX-mnX)*sx2); ah=toMY((mxY-mnY)*sy2);
+            acx=toX(bbl)+aw/2; acy=toY(bbt)+ah/2;
           }
         } else {
           const fw=(o.width||40)*(o.scaleX||1), fh=(o.height||40)*(o.scaleY||1);
-          ox=toX(oCX?o.left-fw/2:o.left); oy=toY(oCY?o.top-fh/2:o.top); ow=toMX(fw); oh=toMY(fh);
+          aw=toMX(fw); ah=toMY(fh);
+          acx=toX(oCX?o.left:o.left+fw/2); acy=toY(oCY?o.top:o.top+fh/2);
         }
-        const acx = ox + ow / 2, acy = oy + oh / 2;
 
-        const pos = findLblPos(acx, acy, lw);
-        if (!pos) return; // no room — skip rather than overlap
-        lPlaced.push({x:pos.x, y:pos.y, w:lw, h:LBL_H});
+        // Measure and clamp text to max 38mm label width
+        const MAX_TW = 38;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
+        const firmaText = fitPDF(firmaRaw, LBL_FS1, MAX_TW);
+        const wFirma = pdf.getStringUnitWidth(firmaText) * LBL_FS1 / PT_MM;
 
-        // Leader line when label is placed away from annotation
-        const lblCx = pos.x + lw / 2, lblCy = pos.y + LBL_H / 2;
-        const dist = Math.hypot(lblCx - acx, lblCy - acy);
-        if (dist > lw * 0.6 + 2) {
+        let popText = '', wPop = 0;
+        if (popRaw) {
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          popText = fitPDF(popRaw, LBL_FS2, MAX_TW);
+          wPop = pdf.getStringUnitWidth(popText) * LBL_FS2 / PT_MM;
+        }
+
+        const lw = LBL_STR + PAD_H + Math.max(wFirma, wPop, 4) + PAD_H;
+        const lh = popText
+          ? PAD_V + LINE_H1 + GAP_LN + LINE_H2 + PAD_V
+          : PAD_V + LINE_H1 + PAD_V;
+
+        const [px, py] = placeLblPos(acx, acy, aw, ah, lw, lh);
+        lPlaced.push({x:px, y:py, w:lw, h:lh});
+
+        // Leader line when label center is far from annotation center
+        const lblCx = px + lw/2, lblCy = py + lh/2;
+        if (Math.hypot(lblCx - acx, lblCy - acy) > Math.max(aw, lw) * 0.5 + 2) {
           pdf.setDrawColor(r, g, b);
           pdf.setLineWidth(0.12);
           pdf.setLineDashPattern([0.4, 0.5], 0);
-          // Line from annotation center to nearest edge of label
-          const ex = Math.max(pos.x, Math.min(pos.x+lw, acx));
-          const ey = Math.max(pos.y, Math.min(pos.y+LBL_H, acy));
+          const ex = Math.max(px, Math.min(px+lw, acx));
+          const ey = Math.max(py, Math.min(py+lh, acy));
           pdf.line(acx, acy, ex, ey);
           pdf.setLineDashPattern([], 0);
         }
 
-        // Dark background
+        // Dark rounded background
         pdf.setFillColor(18, 18, 18);
-        pdf.roundedRect(pos.x, pos.y, lw, LBL_H, 0.25, 0.25, 'F');
-        // Colored left stripe
+        pdf.roundedRect(px, py, lw, lh, 0.45, 0.45, 'F');
+        // Colored left stripe (rect on top — sharp right edge blends into dark bg)
         pdf.setFillColor(r, g, b);
-        pdf.rect(pos.x, pos.y, LBL_STR, LBL_H, 'F');
+        pdf.rect(px, py, LBL_STR, lh, 'F');
 
-        const tx = pos.x + LBL_STR + LBL_XP;
-        const ty = pos.y + LBL_H * 0.72;
-        // annotId — bold, colored
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(LBL_FS);
+        const tx = px + LBL_STR + PAD_H;
+        // Line 1: firma — bold, profese color
+        const ty1 = py + PAD_V + LINE_H1 * 0.82;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
         pdf.setTextColor(r, g, b);
-        pdf.text(idText, tx, ty);
-        // firma — normal, white
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(LBL_FS * 0.86);
-        pdf.setTextColor(210, 210, 210);
-        pdf.text(' ' + firmaText, tx + wId, ty);
+        pdf.text(firmaText, tx, ty1);
+        // Line 2: popisek — normal, light grey
+        if (popText) {
+          const ty2 = ty1 + GAP_LN + LINE_H2;
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          pdf.setTextColor(175, 175, 175);
+          pdf.text(popText, tx, ty2);
+        }
       });
 
       resolve();
@@ -10473,7 +10547,7 @@ function drawKDNavPage(pdf, profList, kdRecords, pdfLogo, PW, PH, overviewPage, 
 }
 
 // ── KD in-PDF filter: single-subcontractor page(s) ────────────────────────────
-function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, navPageNum) {
+function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH, inclDone, navPageNum) {
   const csT = s => csText(String(s || ''));
   const PT_MM = 72/25.4;
   const tw = (t,fs) => pdf.getStringUnitWidth(csT(t))*fs/PT_MM;
@@ -10488,9 +10562,20 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   [...kdRecords].sort((a,z)=>(z.date||'')>(a.date||'')?-1:(z.date||'')<(a.date||'')?1:0).forEach(rec=>{
     (rec.chapters||[]).forEach(ch=>(ch.cards||[]).forEach(card=>{
       (card.tasks||[]).filter(t=>(inclDone||!t.done)&&t.sub===prof.name).forEach(task=>{
-        entries.push({recDate:rec.date||'',chapterTitle:ch.title||'',sectionTitle:card.title||'',task});
+        entries.push({recDate:rec.date||'',chapterTitle:ch.title||'',sectionTitle:card.title||'',task,isAnnot:false});
       });
     }));
+  });
+  // Append canvas annotations as rows
+  (annotEntries||[]).forEach(a => {
+    const dateFmt = ts => { if(!ts)return ''; const d=new Date(ts); return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; };
+    entries.push({
+      recDate: dateFmt(a.updatedAt||a.createdAt),
+      chapterTitle: a.levelName||'',
+      sectionTitle: csT('Výkres'),
+      task: { text: a.popisek||'', urgent: a.status==='Urgence', done: a.status==='Hotovo', writtenAt: a.updatedAt||a.createdAt },
+      isAnnot: true, annotId: a.annotId
+    });
   });
   if (!entries.length) return;
 
@@ -10571,26 +10656,36 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, pdfLogo, PW, PH, inclDone, nav
   drawPageHeader(); drawFrame(true);
   let curY=ROWS_START, isFirst=true;
 
-  for (const {recDate,chapterTitle,sectionTitle,task} of entries) {
+  for (const {recDate,chapterTitle,sectionTitle,task,isAnnot,annotId} of entries) {
     const lines=getLines(task.text);
     const rowH=Math.max(LH+LH*.4,LH*lines.length+LH*.4);
     if (curY+rowH>pageBottom) {
       pdf.addPage(); drawPageHeader(); drawFrame(false); curY=ROWS_START; isFirst=false;
     }
     const tY=curY+LH*.8;
-    if (task.urgent){pdf.setFillColor(255,246,246);pdf.rect(lx,curY,lw,rowH,'F');}
+    if (isAnnot) {
+      pdf.setFillColor(245,247,252); pdf.rect(lx,curY,lw,rowH,'F');
+    } else if (task.urgent) {
+      pdf.setFillColor(255,246,246); pdf.rect(lx,curY,lw,rowH,'F');
+    }
     pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS);
     pdf.setTextColor(80,90,70); pdf.text(fitT(writtenFmt(task.writtenAt,recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
     pdf.setTextColor(55,65,45); pdf.text(fitT(csT(chapterTitle),ROW_FS,C_SEC-C_CHAP-0.5),C_CHAP,tY);
-    pdf.setTextColor(80,90,70); pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
-    const taskFg=task.urgent?[160,40,40]:[40,50,35];
+    if(isAnnot){pdf.setTextColor(90,110,150);}else{pdf.setTextColor(80,90,70);}
+    pdf.text(fitT(csT(sectionTitle),ROW_FS,C_TASK-C_SEC-0.5),C_SEC,tY);
+    const taskFg=task.urgent&&!isAnnot?[160,40,40]:[40,50,35];
     pdf.setTextColor(...taskFg);
     lines.forEach((line,li)=>{const ty=curY+LH*li+LH*.8;if(ty>curY+rowH-.1)return;pdfTextWithLinks(pdf,line,C_TASK,ty,ROW_FS,taskFg);});
-    const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
-    const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
     const sFS=Math.max(3,ROW_FS-1);
-    pdf.setFontSize(sFS); pdf.setTextColor(90,105,75); pdf.text(fitT(ts,sFS,C_LOC-C_TERM-0.5),C_TERM,tY);
-    pdf.setTextColor(100,115,120); pdf.text(fitT((task.locations||[]).join(', '),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    if (isAnnot) {
+      pdf.setFontSize(sFS); pdf.setTextColor(130,140,160);
+      pdf.text(fitT(csT(annotId||''),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    } else {
+      const df=kdFmt(task.dateFrom),dt=kdFmt(task.dateTo);
+      const ts=df&&dt?df+'-'+dt:dt?'do '+dt:df?'od '+df:'';
+      pdf.setFontSize(sFS); pdf.setTextColor(90,105,75); pdf.text(fitT(ts,sFS,C_LOC-C_TERM-0.5),C_TERM,tY);
+      pdf.setTextColor(100,115,120); pdf.text(fitT((task.locations||[]).join(', '),sFS,lx+lw-C_LOC-0.5),C_LOC,tY);
+    }
     pdf.setDrawColor(210,215,205); pdf.setLineWidth(0.1); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
     curY+=rowH;
   }
@@ -10657,6 +10752,46 @@ async function doExportPDF() {
       drawDochazkaPDF(pdf, recForDoc, _pdfLogo, PW, PH);
     }
 
+    // ── KD pages (after attendance, before drawings) ─────────────────────────
+    if (includeKD && kdRecords.length > 0) {
+      const sortedKdRecs = [...kdRecords]
+        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
+      const profList = appState.profese || [];
+      const allAnnots = getAllAnnotations();
+
+      // Reserve blank nav/filter page (filled in after we know all page numbers)
+      if (!first) pdf.addPage();
+      first = false;
+      const navPageNum = pdf.getNumberOfPages();
+
+      // Full overview — all subcontractors
+      let overviewStart = null;
+      for (const rec of sortedKdRecs) {
+        const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
+        if (!hasVis) continue;
+        pdf.addPage();
+        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
+        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
+      }
+
+      // Per-subcontractor filtered pages (KD tasks + canvas annotations)
+      const subPageNums = {};
+      for (const prof of profList) {
+        const profAnnots = allAnnots.filter(a => a.profese === prof.name && (inclHotovo || a.status !== 'Hotovo'));
+        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
+        if (!hasTasks && !profAnnots.length) continue;
+        pdf.addPage();
+        subPageNums[prof.name] = pdf.getNumberOfPages();
+        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, profAnnots, _pdfLogo, PW, PH, inclHotovo, navPageNum);
+      }
+
+      // Now go back and draw the nav/filter page
+      pdf.setPage(navPageNum);
+      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
+      pdf.setPage(pdf.getNumberOfPages());
+    }
+
+    // ── Level drawing pages ───────────────────────────────────────────────────
     for (const idx of levelIdxs) {
       const level = appState.levels[idx];
       if (!level) continue;
@@ -10733,43 +10868,6 @@ async function doExportPDF() {
       } else if (includeList) {
         drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
       }
-    }
-
-    // ── KD pages ─────────────────────────────────────────────────────────────
-    if (includeKD && kdRecords.length > 0) {
-      const sortedKdRecs = [...kdRecords]
-        .sort((a,b) => (b.date||'') < (a.date||'') ? -1 : (b.date||'') > (a.date||'') ? 1 : 0);
-      const profList = appState.profese || [];
-
-      // Reserve blank nav/filter page (filled in after we know all page numbers)
-      if (!first) pdf.addPage();
-      first = false;
-      const navPageNum = pdf.getNumberOfPages();
-
-      // Full overview — all subcontractors
-      let overviewStart = null;
-      for (const rec of sortedKdRecs) {
-        const hasVis = (rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>inclHotovo||!t.done)));
-        if (!hasVis) continue;
-        pdf.addPage();
-        if (!overviewStart) overviewStart = pdf.getNumberOfPages();
-        drawKDRecordToPDF(pdf, rec, _pdfLogo, PW, PH, inclHotovo);
-      }
-
-      // Per-subcontractor filtered pages
-      const subPageNums = {};
-      for (const prof of profList) {
-        const hasTasks = sortedKdRecs.some(rec=>(rec.chapters||[]).some(ch=>(ch.cards||[]).some(c=>(c.tasks||[]).some(t=>(inclHotovo||!t.done)&&t.sub===prof.name))));
-        if (!hasTasks) continue;
-        pdf.addPage();
-        subPageNums[prof.name] = pdf.getNumberOfPages();
-        drawKDSubPageToPDF(pdf, prof, sortedKdRecs, _pdfLogo, PW, PH, inclHotovo, navPageNum);
-      }
-
-      // Now go back and draw the nav/filter page
-      pdf.setPage(navPageNum);
-      drawKDNavPage(pdf, profList, sortedKdRecs, _pdfLogo, PW, PH, overviewStart, subPageNums, inclHotovo);
-      pdf.setPage(pdf.getNumberOfPages());
     }
 
     const name = (currentProject?.name || 'export').replace(/[^\w]/g, '_');
@@ -12963,7 +13061,8 @@ function toggleUsersPage(forceState) {
 
 function updateMobileNavBar() {
   const overlayIds = ['kd-page','users-page','anotace-page','home-page'];
-  const anyOpen = overlayIds.some(id => document.getElementById(id)?.classList.contains('visible'));
+  const pdfOpen = document.getElementById('pdf-export-overlay')?.classList.contains('visible');
+  const anyOpen = pdfOpen || overlayIds.some(id => document.getElementById(id)?.classList.contains('visible'));
   const dd  = document.getElementById('level-dropdown');
   const bk  = document.getElementById('mob-back-bar');
   const mbb = document.getElementById('mobile-bottom-bar');
@@ -12972,6 +13071,8 @@ function updateMobileNavBar() {
   if (bk)  bk.style.display  = anyOpen ? 'flex' : 'none';
   if (mbb) mbb.style.display = anyOpen ? 'none' : '';
   if (fb)  fb.style.display  = anyOpen ? 'none' : '';
+  const vb = document.getElementById('vykres-btn');
+  if (vb) vb.classList.toggle('active', !anyOpen);
 }
 
 function closeMobileOverlay() {
