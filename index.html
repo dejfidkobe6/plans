@@ -11425,13 +11425,14 @@ async function _saveProfese(deletedNames = []) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formBody,
     });
-    // Merge back: server may have added entries from concurrent users
+    // Merge back server additions and persist confirmed state to localStorage
     if (ok && Array.isArray(data.profese)) {
       const localNames = new Set(appState.profese.map(p => p.name));
       let added = false;
       data.profese.forEach(sp => {
         if (!localNames.has(sp.name)) { appState.profese.push(sp); added = true; }
       });
+      try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(appState.profese)); } catch(e) {}
       if (added) { rebuildProfeseSelects(); renderProfeseList(); }
     }
   } catch(e) { console.error('[profese] save error:', e); }
@@ -13581,10 +13582,15 @@ async function openProject(proj) {
         try { localStorage.setItem(LS_KD_LOCATIONS_KEY(_pid), JSON.stringify(kdLocations)); } catch(e) {}
       }
       annotIdCounter = Math.max(annotIdCounter, serverData.counter || 1);
-      if (profServerData && profServerData.length > 0) {
-        appState.profese = profServerData;
-      } else if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0) {
-        appState.profese = serverData.profese; // backward compat fallback
+      // Dirty path: local wins (preserves unsaved edits). Add server-only entries.
+      {
+        const _base = profServerData && profServerData.length > 0
+          ? profServerData
+          : (serverData.profese && Array.isArray(serverData.profese) ? serverData.profese : []);
+        if (_base.length > 0) {
+          const localNames = new Set((appState.profese || []).map(p => p.name));
+          _base.forEach(sp => { if (!localNames.has(sp.name)) appState.profese.push(sp); });
+        }
       }
 
       // Re-add annotations created locally but absent from server.
