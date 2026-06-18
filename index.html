@@ -13091,6 +13091,15 @@ function toggleHomePage(forceState) {
     } else {
       closeAnotacePage(); toggleUsersPage(false); closeKDPage();
       hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
+      // Refresh profese from server when opening so edits from other devices are visible
+      if (currentProject) _profServerLoad(currentProject.id).then(profs => {
+        if (!Array.isArray(profs) || !profs.length) return;
+        if (JSON.stringify(profs) === JSON.stringify(appState.profese)) return;
+        appState.profese = profs;
+        _lastProfTs = null; // reset so next poll cycle records fresh timestamp
+        try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(profs)); } catch(e) {}
+        rebuildProfeseSelects(); renderHomePage();
+      }).catch(() => {});
     }
   }
   updateMobileNavBar();
@@ -14150,9 +14159,9 @@ async function _pollLiveSync() {
 let _lastProfTs = null;
 let _profPollCounter = 0;
 async function _pollProfeseSync() {
-  if (!currentProject || _hasPendingSave) return;
+  if (!currentProject) return;
   _profPollCounter++;
-  if (_profPollCounter % 12 !== 0) return; // run every ~60 s (12 × 5 s poll interval)
+  if (_profPollCounter % 5 !== 0) return; // run every ~10 s (5 × 2 s poll interval)
   try {
     const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}&ts_only=1`);
     if (!ok || !data.updated_at) return;
