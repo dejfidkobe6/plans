@@ -9399,6 +9399,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
     const htmlImg = new Image();
     htmlImg.onerror = () => resolve();
     htmlImg.onload = () => {
+      try {
       const imgW = htmlImg.naturalWidth || htmlImg.width;
       const imgH = htmlImg.naturalHeight || htmlImg.height;
       if (!imgW || !imgH) { resolve(); return; }
@@ -9663,26 +9664,16 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setLineDashPattern([], 0);
         }
 
-        // Clip drawing to rounded rect shape, then fill stripe + white as plain rects
-        pdf.saveGraphicsState();
-        const _rc = 0.9, _kc = _rc * 0.5523;
-        pdf.moveTo(px + _rc, py);
-        pdf.lineTo(px + lw - _rc, py);
-        pdf.curveTo(px + lw - _rc + _kc, py,  px + lw, py + _rc - _kc,  px + lw, py + _rc);
-        pdf.lineTo(px + lw, py + lh - _rc);
-        pdf.curveTo(px + lw, py + lh - _rc + _kc,  px + lw - _rc + _kc, py + lh,  px + lw - _rc, py + lh);
-        pdf.lineTo(px + _rc, py + lh);
-        pdf.curveTo(px + _rc - _kc, py + lh,  px, py + lh - _rc + _kc,  px, py + lh - _rc);
-        pdf.lineTo(px, py + _rc);
-        pdf.curveTo(px, py + _rc - _kc,  px + _rc - _kc, py,  px + _rc, py);
-        pdf.closePath();
-        pdf.clip();
-        pdf.setFillColor(r, g, b);
-        pdf.rect(px, py, LBL_STR, lh, 'F');
+        // White rounded background
         pdf.setFillColor(255, 255, 255);
-        pdf.rect(px + LBL_STR, py, lw - LBL_STR, lh, 'F');
-        pdf.restoreGraphicsState();
-        // Rounded border drawn outside clip scope
+        pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'F');
+        // Colored stripe: extend 0.9 mm right so its own right-side rounding
+        // lands inside the label, then overdraw that extension with white
+        pdf.setFillColor(r, g, b);
+        pdf.roundedRect(px, py, LBL_STR + 0.9, lh, 0.9, 0.9, 'F');
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(px + LBL_STR, py, 0.9, lh, 'F');
+        // Rounded border
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.18);
         pdf.roundedRect(px, py, lw, lh, 0.9, 0.9, 'S');
 
@@ -9703,6 +9694,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
       if (_gsReset) pdf.setGState(_gsReset);
 
       resolve();
+      } catch(e) { console.error('drawLevelToPDF:', e); resolve(); }
     };
     htmlImg.src = level.backgroundImage;
   });
