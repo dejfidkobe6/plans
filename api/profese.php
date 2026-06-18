@@ -131,23 +131,50 @@ if ($method === 'POST') {
         foreach ($toUpsert as $i => $p) {
             $name = $p['name'] ?? null;
             if (!$name) continue;
+
+            // Current server row for this profese (used for merge logic below)
+            $sv = $existingByName[$name] ?? null;
+
             if (isset($p['_emails_json'])) {
+                // Server-only entry re-inserted unchanged
                 $emailsJson = $p['_emails_json'];
-            } elseif (isset($p['emails']) && is_array($p['emails'])) {
-                $emailsJson = json_encode(array_values(array_filter($p['emails'])));
-            } elseif (isset($p['email'])) {
-                $emailsJson = is_array($p['email'])
-                    ? json_encode(array_values(array_filter($p['email'])))
-                    : json_encode(array_filter([$p['email']]));
+                $firma   = $p['firma']   ?? null;
+                $kontakt = $p['kontakt'] ?? null;
+                $telefon = $p['telefon'] ?? null;
             } else {
-                $emailsJson = null;
+                // Client-submitted entry: resolve emails and text fields
+                if (isset($p['emails']) && is_array($p['emails'])) {
+                    $clientEmails = array_values(array_filter($p['emails']));
+                } elseif (isset($p['email'])) {
+                    $clientEmails = is_array($p['email'])
+                        ? array_values(array_filter($p['email']))
+                        : array_values(array_filter([$p['email']]));
+                } else {
+                    $clientEmails = [];
+                }
+
+                // Emails: always union — never discard addresses the server already has
+                if ($sv && $sv['emails_json']) {
+                    $serverEmails = json_decode($sv['emails_json'], true) ?: [];
+                    $merged = array_values(array_unique(array_merge($serverEmails, $clientEmails)));
+                } else {
+                    $merged = $clientEmails;
+                }
+                $emailsJson = !empty($merged) ? json_encode($merged) : null;
+
+                // Text fields: prefer client value when non-empty, fall back to server
+                // so a stale device never blanks out data a richer device already saved
+                $firma   = ($p['firma']   ?? '') !== '' ? $p['firma']   : ($sv['firma']   ?? null);
+                $kontakt = ($p['kontakt'] ?? '') !== '' ? $p['kontakt'] : ($sv['kontakt'] ?? null);
+                $telefon = ($p['telefon'] ?? '') !== '' ? $p['telefon'] : ($sv['telefon'] ?? null);
             }
+
             $ins->execute([
                 $projectId, $name,
-                $p['firma']   ?? null,
+                $firma,
                 $emailsJson,
-                $p['kontakt'] ?? null,
-                $p['telefon'] ?? null,
+                $kontakt,
+                $telefon,
                 $p['color']   ?? null,
                 !empty($p['exportPinned']) ? 1 : 0,
                 $i,
