@@ -11241,6 +11241,7 @@ function _flushSave() {
     localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
     localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
     localStorage.setItem(LS_PROJECT_DIRTY(pid), '1'); // cleared only after confirmed server save
+    localStorage.setItem(LS_PROJECT_PROFESE_DIRTY(pid), '1'); // cleared only after _saveProfese() confirms
   } catch(e) { /* localStorage plný */ }
 }
 
@@ -11414,6 +11415,7 @@ async function _profServerLoad(projectId) {
 
 let _hasPendingProfSave = false; // true while a _saveProfese POST is in-flight
 let _profSaveSeq = 0;           // incremented per save; response ignored if outdated
+let _profSaveDoneSeq = 0;       // incremented when a save COMPLETES successfully
 
 // Save profese to dedicated table. Pass deletedNames for explicit removals.
 async function _saveProfese(deletedNames = []) {
@@ -11434,8 +11436,13 @@ async function _saveProfese(deletedNames = []) {
     if (ok && Array.isArray(data.profese) && seq === _profSaveSeq) {
       // Replace full state with server's authoritative response (includes union-merged emails etc.)
       appState.profese = data.profese;
+      _profSaveDoneSeq++;   // signal: GET responses older than this carry stale data
       _lastProfTs = null; // reset so next poll cycle just records new ts, no redundant load
-      try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(appState.profese)); } catch(e) {}
+      const _pid = String(currentProject.id);
+      try {
+        localStorage.setItem(LS_PROJECT_PROFESE(_pid), JSON.stringify(appState.profese));
+        localStorage.removeItem(LS_PROJECT_PROFESE_DIRTY(_pid)); // confirmed by server
+      } catch(e) {}
       rebuildProfeseSelects();
       renderProfeseList();
     }
@@ -13097,16 +13104,22 @@ function toggleHomePage(forceState) {
     } else {
       closeAnotacePage(); toggleUsersPage(false); closeKDPage();
       hp.classList.add('visible'); btn.classList.add('active'); renderHomePage();
-      // Refresh profese from server when opening so edits from other devices are visible
-      if (currentProject) _profServerLoad(currentProject.id).then(profs => {
-        if (!Array.isArray(profs) || !profs.length) return;
-        if (_hasPendingProfSave) return; // our own save in-flight — local is authoritative
-        if (JSON.stringify(profs) === JSON.stringify(appState.profese)) return;
-        appState.profese = profs;
-        _lastProfTs = null; // reset so next poll cycle records fresh timestamp
-        try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(profs)); } catch(e) {}
-        rebuildProfeseSelects(); renderHomePage();
-      }).catch(() => {});
+      // Refresh profese from server when opening so edits from other devices are visible.
+      // Capture _profSaveDoneSeq BEFORE sending GET — if a save completes while the GET
+      // is in-flight, the GET may carry data from before the commit; skip it in that case.
+      if (currentProject) {
+        const _doneSeqAtFetch = _profSaveDoneSeq;
+        _profServerLoad(currentProject.id).then(profs => {
+          if (!Array.isArray(profs) || !profs.length) return;
+          if (_hasPendingProfSave) return; // POST still in-flight — local is authoritative
+          if (_profSaveDoneSeq !== _doneSeqAtFetch) return; // save completed after GET was sent — GET may be stale
+          if (JSON.stringify(profs) === JSON.stringify(appState.profese)) return;
+          appState.profese = profs;
+          _lastProfTs = null; // reset so next poll cycle records fresh timestamp
+          try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(profs)); } catch(e) {}
+          rebuildProfeseSelects(); renderHomePage();
+        }).catch(() => {});
+      }
     }
   }
   updateMobileNavBar();
@@ -13294,6 +13307,7 @@ const LS_PROJECT_STATE        = (pid) => `besix_plans_state_${pid}`;
 const LS_PROJECT_COUNTER      = (pid) => `besix_plans_counter_${pid}`;
 const LS_PROJECT_PROFESE      = (pid) => `besix_plans_profese_${pid}`;
 const LS_PROJECT_DIRTY        = (pid) => `besix_plans_dirty_${pid}`;
+const LS_PROJECT_PROFESE_DIRTY = (pid) => `besix_plans_profese_dirty_${pid}`; // cleared only after _saveProfese() confirms
 const LS_MEMBER_PROFESE       = (pid) => `besix_plans_member_profese_${pid}`;
 
 let currentUser    = null;  // {id, name, email, avatar_color}
@@ -13652,6 +13666,34 @@ async function openProject(proj) {
         appState.profese = serverData.profese; // backward compat fallback
       }
     }
+
+    // Profese-specific dirty flag: set by _flushSave(), cleared only after _saveProfese()
+    // confirms success. Survives the canvas-save clearing LS_PROJECT_DIRTY, so profese
+    // edits are never lost when the user reloads during the canvas→profese save race window.
+    {
+      const _lsProfDirty = localStorage.getItem(LS_PROJECT_PROFESE_DIRTY(_pid)) === '1';
+      if (_lsProfDirty) {
+        const _localProfStr = localStorage.getItem(LS_PROJECT_PROFESE(_pid));
+        if (_localProfStr) {
+          try {
+            const _localProf = JSON.parse(_localProfStr);
+            if (Array.isArray(_localProf) && _localProf.length > 0) {
+              // Local wins — it has edits not yet confirmed by server
+              const _localNames = new Set(_localProf.map(p => p.name));
+              appState.profese = _localProf.slice();
+              // Append server-only entries (e.g. added by another device) not in local dirty state
+              const _srvBase = (profServerData && profServerData.length > 0)
+                ? profServerData
+                : (serverData.profese && Array.isArray(serverData.profese) ? serverData.profese : []);
+              _srvBase.forEach(sp => { if (!_localNames.has(sp.name)) appState.profese.push(sp); });
+            }
+          } catch(e) {}
+        }
+        // Retry the profese save now that we're back online (was interrupted by page reload)
+        setTimeout(() => { if (currentProject && !_isProjectLoading) _saveProfese(); }, 1500);
+      }
+    }
+
     rebuildProfeseSelects();
     if (appState.showGrid) { document.getElementById('grid-btn').classList.add('active'); drawGrid(); }
     setTool(window.innerWidth <= 768 ? 'pan' : appState.tool);
@@ -13724,6 +13766,7 @@ async function deleteProject(e, projId) {
   localStorage.removeItem(LS_PROJECT_STATE(projId));
   localStorage.removeItem(LS_PROJECT_COUNTER(projId));
   localStorage.removeItem(LS_PROJECT_PROFESE(projId));
+  localStorage.removeItem(LS_PROJECT_PROFESE_DIRTY(projId));
   renderProjectGrid();
 }
 
