@@ -80,7 +80,7 @@ if ($method === 'POST') {
     try {
         $stmt = $db->prepare(
             'SELECT name, firma, emails_json, kontakt, telefon, color, export_pinned, sort_order
-               FROM plan_profese WHERE project_id = ? FOR UPDATE ORDER BY sort_order, name'
+               FROM plan_profese WHERE project_id = ? ORDER BY sort_order, name FOR UPDATE'
         );
         $stmt->execute([$projectId]);
         $existing = $stmt->fetchAll();
