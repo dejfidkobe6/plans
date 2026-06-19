@@ -4632,6 +4632,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   <div class="status-sep">|</div>
   <div class="status-item" id="status-save-info" style="color:var(--text-dim)">💾 –</div>
   <div class="status-sep">|</div>
+  <div class="status-item" id="status-prof-info" style="color:var(--text-dim)">👤 –</div>
+  <div class="status-sep">|</div>
   <div class="status-item" id="status-sync-info" style="display:none;color:var(--olive-light);cursor:pointer;" title="Jiný uživatel upravil projekt – klikni pro načtení">🔄 Nová data</div>
   <button id="backup-btn" title="Zálohy projektu" style="margin-left:8px;background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0 4px;" onclick="openBackupModal()">🗂 Zálohy</button>
 </div>
@@ -11459,11 +11461,13 @@ async function _saveProfese(deletedNames = []) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formBody,
     });
-    // Save confirmed by server — mark as clean and add any server-only entries
-    if (ok && Array.isArray(data.profese) && seq === _profSaveSeq) {
+    if (!ok) {
+      console.error('[profese] save failed:', data?.error);
+      showToast('Chyba uložení dodavatele: ' + (data?.error || 'síťová chyba'), 'error');
+    } else if (Array.isArray(data.profese) && seq === _profSaveSeq) {
+      // Save confirmed by server — mark as clean and add any server-only entries
       _profSaveDoneSeq++;
       _lastProfTs = null;
-      // Add entries that exist only on server (e.g. added by another device)
       const localNames = new Set(appState.profese.map(p => p.name));
       data.profese.forEach(sp => {
         if (!localNames.has(sp.name)) appState.profese.push(sp);
@@ -11474,8 +11478,16 @@ async function _saveProfese(deletedNames = []) {
         localStorage.removeItem(LS_PROJECT_PROFESE_DIRTY(_pid));
         localStorage.removeItem(LS_PROJECT_PROFESE_DELETED(_pid));
       } catch(e) {}
+      const _saveEl = document.getElementById('status-prof-info');
+      if (_saveEl) {
+        const _t = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        _saveEl.textContent = '👤 ' + _t; _saveEl.style.color = 'var(--text-dim)';
+      }
     }
-  } catch(e) { console.error('[profese] save error:', e); }
+  } catch(e) {
+    console.error('[profese] save error:', e);
+    showToast('Chyba uložení dodavatele: ' + (e.message || 'neznámá chyba'), 'error');
+  }
   finally { if (seq === _profSaveSeq) _hasPendingProfSave = false; }
 }
 
@@ -11786,7 +11798,8 @@ function renderProfeseList() {
       _flushSave();
       clearTimeout(_srvTimer);
       _serverSaveNow();
-      _saveProfese(); // dedicated profese table — faster, independent of canvas save
+      // When name changed, delete the old DB row so it doesn't re-appear as a ghost entry.
+      _saveProfese(oldName !== name ? [oldName] : []);
       rebuildProfeseSelects();
       renderProfeseList();
       renderHomePage();
@@ -14233,15 +14246,13 @@ let _profPollCounter = 0;
 async function _pollProfeseSync() {
   if (!currentProject) return;
   _profPollCounter++;
-  if (_profPollCounter % 5 !== 0) return; // run every ~10 s (5 × 2 s poll interval)
+  if (_profPollCounter % 2 !== 0) return; // run every ~4 s (2 × 2 s poll interval)
   if (_hasPendingProfSave) return; // don't overwrite while our own save is in-flight
   try {
     const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}&ts_only=1`);
     if (!ok || !data.updated_at) return;
-    if (_lastProfTs !== null && data.updated_at === _lastProfTs) return;
-    const prevTs = _lastProfTs;
+    if (data.updated_at === _lastProfTs) return; // nothing changed
     _lastProfTs = data.updated_at;
-    if (prevTs === null) return; // first call — just record timestamp, don't sync
 
     if (_hasPendingProfSave) return; // re-check after await
     const { ok: ok2, data: data2 } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
