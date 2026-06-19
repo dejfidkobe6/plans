@@ -11241,8 +11241,14 @@ function _flushSave() {
     localStorage.setItem(LS_PROJECT_COUNTER(pid), String(annotIdCounter));
     localStorage.setItem(LS_PROJECT_PROFESE(pid), JSON.stringify(appState.profese));
     localStorage.setItem(LS_PROJECT_DIRTY(pid), '1'); // cleared only after confirmed server save
-    localStorage.setItem(LS_PROJECT_PROFESE_DIRTY(pid), '1'); // cleared only after _saveProfese() confirms
   } catch(e) { /* localStorage plný */ }
+}
+
+// Mark profese as locally dirty (call before any user-initiated profese mutation).
+// Separate from _flushSave() so that plain canvas saves don't set this flag.
+function _markProfeseLocalDirty() {
+  if (!currentProject) return;
+  try { localStorage.setItem(LS_PROJECT_PROFESE_DIRTY(String(currentProject.id)), '1'); } catch(e) {}
 }
 
 // ---- Server save (debounce 2 s) ----
@@ -11445,6 +11451,7 @@ async function _saveProfese(deletedNames = []) {
       try {
         localStorage.setItem(LS_PROJECT_PROFESE(_pid), JSON.stringify(appState.profese));
         localStorage.removeItem(LS_PROJECT_PROFESE_DIRTY(_pid));
+        localStorage.removeItem(LS_PROJECT_PROFESE_DELETED(_pid));
       } catch(e) {}
     }
   } catch(e) { console.error('[profese] save error:', e); }
@@ -11716,6 +11723,7 @@ function renderProfeseList() {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
       appState.profese[idx].exportPinned = !appState.profese[idx].exportPinned;
+      _markProfeseLocalDirty();
       saveState();
       _saveProfese(); // dedicated profese table
       renderProfeseList();
@@ -11753,6 +11761,7 @@ function renderProfeseList() {
         }))));
         kdSave();
       }
+      _markProfeseLocalDirty();
       _flushSave();
       clearTimeout(_srvTimer);
       _serverSaveNow();
@@ -11778,6 +11787,13 @@ function renderProfeseList() {
       if (!confirmed) return;
       const deletedName = prof.name;
       appState.profese.splice(idx, 1);
+      _markProfeseLocalDirty();
+      // Remember deleted name so reload doesn't re-add it from server
+      try {
+        const _pid = String(currentProject.id);
+        const _del = JSON.parse(localStorage.getItem(LS_PROJECT_PROFESE_DELETED(_pid)) || '[]');
+        if (!_del.includes(deletedName)) { _del.push(deletedName); localStorage.setItem(LS_PROJECT_PROFESE_DELETED(_pid), JSON.stringify(_del)); }
+      } catch(e) {}
       _flushSave();
       clearTimeout(_srvTimer);
       _serverSaveNow();
@@ -11802,6 +11818,7 @@ function closeManageProfese() {
 function addNewProfese() {
   const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', emails: [] };
   appState.profese.push(newProf);
+  _markProfeseLocalDirty();
   _flushSave();
   clearTimeout(_srvTimer);
   _serverSaveNow();
@@ -13292,7 +13309,8 @@ const LS_PROJECT_STATE        = (pid) => `besix_plans_state_${pid}`;
 const LS_PROJECT_COUNTER      = (pid) => `besix_plans_counter_${pid}`;
 const LS_PROJECT_PROFESE      = (pid) => `besix_plans_profese_${pid}`;
 const LS_PROJECT_DIRTY        = (pid) => `besix_plans_dirty_${pid}`;
-const LS_PROJECT_PROFESE_DIRTY = (pid) => `besix_plans_profese_dirty_${pid}`; // cleared only after _saveProfese() confirms
+const LS_PROJECT_PROFESE_DIRTY   = (pid) => `besix_plans_profese_dirty_${pid}`;   // cleared only after _saveProfese() confirms
+const LS_PROJECT_PROFESE_DELETED = (pid) => `besix_plans_profese_deleted_${pid}`; // names deleted locally, not yet confirmed
 const LS_MEMBER_PROFESE       = (pid) => `besix_plans_member_profese_${pid}`;
 
 let currentUser    = null;  // {id, name, email, avatar_color}
@@ -13652,9 +13670,9 @@ async function openProject(proj) {
       }
     }
 
-    // Profese-specific dirty flag: set by _flushSave(), cleared only after _saveProfese()
-    // confirms success. Survives the canvas-save clearing LS_PROJECT_DIRTY, so profese
-    // edits are never lost when the user reloads during the canvas→profese save race window.
+    // Profese-specific dirty flag: set only by explicit profese mutations (not canvas saves).
+    // Cleared only after _saveProfese() confirms success. Protects unsaved profese edits
+    // from being overwritten by server data during the canvas→profese save race window.
     {
       const _lsProfDirty = localStorage.getItem(LS_PROJECT_PROFESE_DIRTY(_pid)) === '1';
       if (_lsProfDirty) {
@@ -13665,12 +13683,16 @@ async function openProject(proj) {
             if (Array.isArray(_localProf) && _localProf.length > 0) {
               // Local wins — it has edits not yet confirmed by server
               const _localNames = new Set(_localProf.map(p => p.name));
+              // Names explicitly deleted locally — don't re-add from server
+              const _deletedLocally = new Set(JSON.parse(localStorage.getItem(LS_PROJECT_PROFESE_DELETED(_pid)) || '[]'));
               appState.profese = _localProf.slice();
-              // Append server-only entries (e.g. added by another device) not in local dirty state
+              // Append server-only entries (added by another device), excluding locally-deleted ones
               const _srvBase = (profServerData && profServerData.length > 0)
                 ? profServerData
                 : (serverData.profese && Array.isArray(serverData.profese) ? serverData.profese : []);
-              _srvBase.forEach(sp => { if (!_localNames.has(sp.name)) appState.profese.push(sp); });
+              _srvBase.forEach(sp => {
+                if (!_localNames.has(sp.name) && !_deletedLocally.has(sp.name)) appState.profese.push(sp);
+              });
             }
           } catch(e) {}
         }
@@ -13752,6 +13774,7 @@ async function deleteProject(e, projId) {
   localStorage.removeItem(LS_PROJECT_COUNTER(projId));
   localStorage.removeItem(LS_PROJECT_PROFESE(projId));
   localStorage.removeItem(LS_PROJECT_PROFESE_DIRTY(projId));
+  localStorage.removeItem(LS_PROJECT_PROFESE_DELETED(projId));
   renderProjectGrid();
 }
 
