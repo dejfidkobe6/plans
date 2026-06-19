@@ -11412,9 +11412,14 @@ async function _profServerLoad(projectId) {
   return null;
 }
 
+let _hasPendingProfSave = false; // true while a _saveProfese POST is in-flight
+let _profSaveSeq = 0;           // incremented per save; response ignored if outdated
+
 // Save profese to dedicated table. Pass deletedNames for explicit removals.
 async function _saveProfese(deletedNames = []) {
   if (!currentProject || !canEdit()) return;
+  _hasPendingProfSave = true;
+  const seq = ++_profSaveSeq;
   try {
     const formBody = 'data=' + encodeURIComponent(JSON.stringify({
       profese: appState.profese,
@@ -11425,17 +11430,17 @@ async function _saveProfese(deletedNames = []) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formBody,
     });
-    // Merge back server additions and persist confirmed state to localStorage
-    if (ok && Array.isArray(data.profese)) {
-      const localNames = new Set(appState.profese.map(p => p.name));
-      let added = false;
-      data.profese.forEach(sp => {
-        if (!localNames.has(sp.name)) { appState.profese.push(sp); added = true; }
-      });
+    // Apply server-confirmed state only if no newer save has fired since this one
+    if (ok && Array.isArray(data.profese) && seq === _profSaveSeq) {
+      // Replace full state with server's authoritative response (includes union-merged emails etc.)
+      appState.profese = data.profese;
+      _lastProfTs = null; // reset so next poll cycle just records new ts, no redundant load
       try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(appState.profese)); } catch(e) {}
-      if (added) { rebuildProfeseSelects(); renderProfeseList(); }
+      rebuildProfeseSelects();
+      renderProfeseList();
     }
   } catch(e) { console.error('[profese] save error:', e); }
+  finally { if (seq === _profSaveSeq) _hasPendingProfSave = false; }
 }
 
 function loadState() {
@@ -13095,6 +13100,7 @@ function toggleHomePage(forceState) {
       // Refresh profese from server when opening so edits from other devices are visible
       if (currentProject) _profServerLoad(currentProject.id).then(profs => {
         if (!Array.isArray(profs) || !profs.length) return;
+        if (_hasPendingProfSave) return; // our own save in-flight — local is authoritative
         if (JSON.stringify(profs) === JSON.stringify(appState.profese)) return;
         appState.profese = profs;
         _lastProfTs = null; // reset so next poll cycle records fresh timestamp
@@ -14141,21 +14147,9 @@ async function _pollLiveSync() {
 
     if (changed) updateAnnotList();
 
-    // Sync profese from canvas backup (catches changes saved together with canvas)
-    if (serverData.profese && Array.isArray(serverData.profese) && serverData.profese.length > 0
-        && !_hasPendingSave) {
-      const remStr = JSON.stringify(serverData.profese);
-      const locStr = JSON.stringify(appState.profese);
-      if (remStr !== locStr) {
-        appState.profese = serverData.profese;
-        try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), remStr); } catch(e) {}
-        rebuildProfeseSelects();
-        if (fabricCanvas) {
-          fabricCanvas.getObjects().filter(o => o.annotId).forEach(o => applyAnnotColorToCanvas(o));
-          fabricCanvas.renderAll();
-        }
-      }
-    }
+    // NOTE: profese is no longer synced from canvas backup here.
+    // plan_canvas_data.profese_json can be stale relative to plan_profese.
+    // _pollProfeseSync() (runs every 10 s) is the authoritative profese sync path.
 
   } catch(e) { /* network error – skip silently */ }
 }
@@ -14168,6 +14162,7 @@ async function _pollProfeseSync() {
   if (!currentProject) return;
   _profPollCounter++;
   if (_profPollCounter % 5 !== 0) return; // run every ~10 s (5 × 2 s poll interval)
+  if (_hasPendingProfSave) return; // don't overwrite while our own save is in-flight
   try {
     const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}&ts_only=1`);
     if (!ok || !data.updated_at) return;
@@ -14176,8 +14171,10 @@ async function _pollProfeseSync() {
     _lastProfTs = data.updated_at;
     if (prevTs === null) return; // first call — just record timestamp, don't sync
 
+    if (_hasPendingProfSave) return; // re-check after await
     const { ok: ok2, data: data2 } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
     if (!ok2 || !Array.isArray(data2.profese) || !data2.profese.length) return;
+    if (_hasPendingProfSave) return; // re-check after second await
     if (JSON.stringify(data2.profese) === JSON.stringify(appState.profese)) return;
     appState.profese = data2.profese;
     try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(data2.profese)); } catch(e) {}
