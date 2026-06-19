@@ -10007,7 +10007,8 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   const COL_ROLE  = { x: lx + 77,  w: 38  };
   const COL_KONT  = { x: lx + 115, w: 48  };
   const COL_TEL   = { x: lx + 163, w: 40  };
-  const COL_EMAIL = { x: lx + 203, w: 62  };
+  const COL_EMAIL = { x: lx + 203, w: 50  };
+  const COL_VCF   = { x: lx + 253, w: 12  };
   const COL_CHECK = { x: lx + 265, w: lw - 265 - 1 };
 
   // ── Column header row ───────────────────────────────────────
@@ -10022,11 +10023,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   pdf.text('Kontaktni osoba',     COL_KONT.x,  colHdrY);
   pdf.text('Telefon',             COL_TEL.x,   colHdrY);
   pdf.text('E-mail',              COL_EMAIL.x, colHdrY);
+  pdf.text('Kontakt',             COL_VCF.x + 0.5, colHdrY);
   pdf.text('Pritomen',            COL_CHECK.x, colHdrY);
 
   // Vertical header separators
   pdf.setDrawColor(200, 205, 190); pdf.setLineWidth(0.12);
-  [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+  [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_VCF, COL_CHECK].forEach(c => {
     pdf.line(c.x - 1, COLH_Y, c.x - 1, COLH_Y + COLH_H);
   });
 
@@ -10112,6 +10114,25 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
     pdf.setTextColor(40, 45, 35);
 
+    // vCard contact button
+    const _vcfLines = ['BEGIN:VCARD', 'VERSION:3.0',
+      'FN:' + (p.kontakt || p.firma || p.name || '')];
+    if (p.firma)   _vcfLines.push('ORG:' + p.firma);
+    if (p.telefon) _vcfLines.push('TEL;TYPE=CELL:' + p.telefon.replace(/\s/g, ''));
+    pEmails.forEach(e => _vcfLines.push('EMAIL;TYPE=INTERNET:' + e));
+    if (p.name)    _vcfLines.push('TITLE:' + p.name);
+    _vcfLines.push('END:VCARD');
+    const _vcfUrl = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(_vcfLines.join('\r\n'));
+    const _vBtnH = Math.min(5, ROW_H * 0.68);
+    const _vBtnW = COL_VCF.w - 2;
+    const _vBtnX = COL_VCF.x + 1;
+    const _vBtnY = rowY + (ROW_H - _vBtnH) / 2;
+    pdf.setFillColor(Math.round(r * 0.65 + 255 * 0.35), Math.round(g * 0.65 + 255 * 0.35), Math.round(b * 0.65 + 255 * 0.35));
+    pdf.roundedRect(_vBtnX, _vBtnY, _vBtnW, _vBtnH, 0.6, 0.6, 'F');
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
+    pdf.text('VCF', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
+    pdf.link(_vBtnX, _vBtnY, _vBtnW, _vBtnH, { url: _vcfUrl });
+
     // Interactive checkbox – Yes appearance is patched to solid black by post-processing
     const cbSize = Math.min(5, BASE_ROW_H * 0.65);
     const cbX = COL_CHECK.x + (COL_CHECK.w - cbSize) / 2;
@@ -10129,7 +10150,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     // Row + column separators
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + ROW_H, lx + lw, rowY + ROW_H);
-    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_VCF, COL_CHECK].forEach(c => {
       pdf.line(c.x - 1, rowY, c.x - 1, rowY + ROW_H);
     });
 
@@ -10159,7 +10180,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
 
     pdf.setDrawColor(218, 222, 212); pdf.setLineWidth(0.1);
     pdf.line(lx, rowY + BASE_ROW_H, lx + lw, rowY + BASE_ROW_H);
-    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_CHECK].forEach(c => {
+    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_VCF, COL_CHECK].forEach(c => {
       pdf.line(c.x - 1, rowY, c.x - 1, rowY + BASE_ROW_H);
     });
     curY += BASE_ROW_H;
