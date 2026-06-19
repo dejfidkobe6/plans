@@ -12576,7 +12576,7 @@ function kdRenderContent() {
       el.style.overflow = 'visible';
     });
   }
-  scroll.scrollTop = savedScrollTop;
+  requestAnimationFrame(() => { scroll.scrollTop = savedScrollTop; });
 }
 
 function kdAllTasks(rec) {
@@ -14258,6 +14258,28 @@ async function _pollProfeseSync() {
   } catch(e) { /* ignore */ }
 }
 
+// Immediate profese fetch (bypasses the 10 s poll throttle).
+// Called when a KD task or canvas annotation references a profese name
+// that isn't in appState.profese yet — happens when device 1 creates a
+// new supplier and the KD sync (every 2 s) races ahead of profese sync (every 10 s).
+async function _refreshProfeseNow() {
+  if (!currentProject || _hasPendingProfSave) return;
+  try {
+    const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
+    if (!ok || !Array.isArray(data.profese) || !data.profese.length) return;
+    if (_hasPendingProfSave) return;
+    if (JSON.stringify(data.profese) === JSON.stringify(appState.profese)) return;
+    _lastProfTs = null; // force next poll to re-record fresh timestamp
+    appState.profese = data.profese;
+    try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(data.profese)); } catch(e) {}
+    rebuildProfeseSelects();
+    if (fabricCanvas) {
+      fabricCanvas.getObjects().filter(o => o.annotId).forEach(o => applyAnnotColorToCanvas(o));
+      fabricCanvas.renderAll();
+    }
+  } catch(e) { /* ignore */ }
+}
+
 async function _pollKDSync() {
   if (!currentProject) return;
   try {
@@ -14283,6 +14305,16 @@ async function _pollKDSync() {
         const userTyping = _ae && (_ae.tagName === 'INPUT' || _ae.tagName === 'TEXTAREA') && _ae.type !== 'checkbox' && _ae.type !== 'radio';
         if (userTyping) { _kdPendingRender = true; } else { kdRenderPage(); }
       }
+    }
+
+    // If any task references a profese that isn't locally known yet, fetch profese now
+    // (KD sync is faster than profese poll, so this avoids the ~20s lag).
+    if (mergeChanged && !_hasPendingProfSave) {
+      const _profNames = new Set((appState.profese || []).map(p => p.name));
+      const _hasMissing = kdRecords.some(r => (r.chapters || []).some(ch =>
+        (ch.cards || []).some(card => (card.tasks || []).some(t => t.sub && !_profNames.has(t.sub)))
+      ));
+      if (_hasMissing) _refreshProfeseNow();
     }
   } catch(e) { /* network error – skip */ }
 }
