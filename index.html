@@ -6416,6 +6416,7 @@ function _enableVertexControls(poly) {
 }
 
 function _enterMoveMode(obj) {
+  if (!canEdit()) return;
   if (_moveAnnot && _moveAnnot !== obj) _exitMoveMode();
   _moveAnnot = obj;
   obj.set({ lockMovementX: false, lockMovementY: false });
@@ -7209,11 +7210,12 @@ function setupEventListeners() {
     if (f) loadFile(f);
   });
 
-  // Properties panel
-  document.getElementById('prop-profese').addEventListener('change', () => updateActiveAnnotProp('profese', document.getElementById('prop-profese').value));
-  document.getElementById('prop-popisek').addEventListener('input', () => updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value));
-  document.getElementById('prop-prirazeno').addEventListener('input', () => updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value));
+  // Properties panel — all handlers guard against viewer role
+  document.getElementById('prop-profese').addEventListener('change', () => { if (!canEdit()) return; updateActiveAnnotProp('profese', document.getElementById('prop-profese').value); });
+  document.getElementById('prop-popisek').addEventListener('input', () => { if (!canEdit()) return; updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value); });
+  document.getElementById('prop-prirazeno').addEventListener('input', () => { if (!canEdit()) return; updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value); });
   document.getElementById('prop-date-from').addEventListener('change', () => {
+    if (!canEdit()) return;
     const from = document.getElementById('prop-date-from').value;
     const to   = document.getElementById('prop-deadline').value;
     if (from && to && from > to) {
@@ -7223,6 +7225,7 @@ function setupEventListeners() {
     updateActiveAnnotProp('dateFrom', from);
   });
   document.getElementById('prop-deadline').addEventListener('change', () => {
+    if (!canEdit()) return;
     const to   = document.getElementById('prop-deadline').value;
     const from = document.getElementById('prop-date-from').value;
     if (to && from && to < from) {
@@ -7233,13 +7236,14 @@ function setupEventListeners() {
   });
 
   document.querySelectorAll('.prio-btn').forEach(btn => {
-    btn.addEventListener('click', () => updateActiveAnnotProp('priorita', btn.dataset.prio));
+    btn.addEventListener('click', () => { if (!canEdit()) return; updateActiveAnnotProp('priorita', btn.dataset.prio); });
   });
   document.querySelectorAll('.status-btn').forEach(btn => {
-    btn.addEventListener('click', () => updateActiveAnnotProp('status', btn.dataset.status));
+    btn.addEventListener('click', () => { if (!canEdit()) return; updateActiveAnnotProp('status', btn.dataset.status); });
   });
 
   document.getElementById('mark-done-annot-btn').addEventListener('click', () => {
+    if (!canEdit()) return;
     const obj = fabricCanvas.getActiveObject();
     if (obj && !obj.isBackground && obj.annotId) _markAnnotAsDone(obj);
   });
@@ -7254,9 +7258,9 @@ function setupEventListeners() {
   });
 
   // Context menu
-  document.getElementById('ctx-mark-done').addEventListener('click', () => { hideContextMenu(); if (contextMenuTarget && !contextMenuTarget.isBackground && contextMenuTarget.annotId) _markAnnotAsDone(contextMenuTarget); });
-  document.getElementById('ctx-copy').addEventListener('click', () => { hideContextMenu(); copySelected(); });
-  document.getElementById('ctx-paste').addEventListener('click', () => { hideContextMenu(); pasteSelected(); });
+  document.getElementById('ctx-mark-done').addEventListener('click', () => { hideContextMenu(); if (!canEdit()) return; if (contextMenuTarget && !contextMenuTarget.isBackground && contextMenuTarget.annotId) _markAnnotAsDone(contextMenuTarget); });
+  document.getElementById('ctx-copy').addEventListener('click', () => { hideContextMenu(); if (!canEdit()) return; copySelected(); });
+  document.getElementById('ctx-paste').addEventListener('click', () => { hideContextMenu(); if (!canEdit()) return; pasteSelected(); });
   document.getElementById('ctx-select').addEventListener('click', () => { hideContextMenu(); if (contextMenuTarget) { fabricCanvas.setActiveObject(contextMenuTarget); fabricCanvas.renderAll(); } });
   document.addEventListener('click', () => hideContextMenu());
 
@@ -7851,6 +7855,15 @@ function pasteSelected() {
 // ============================================================
 function showContextMenu(x, y) {
   const menu = document.getElementById('context-menu');
+  const viewer = !canEdit();
+  ['ctx-copy','ctx-paste','ctx-mark-done'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = viewer ? 'none' : '';
+  });
+  // Hide separators if all edit items hidden
+  menu.querySelectorAll('.ctx-sep').forEach((sep, i) => {
+    sep.style.display = viewer ? 'none' : '';
+  });
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
   menu.classList.add('visible');
@@ -11661,7 +11674,7 @@ function renderProfeseList() {
         <div class="profese-row-dot" style="background:${escHtml(prof.color)}"></div>
         <div class="profese-row-name">${escHtml(prof.firma || prof.name)}</div>
         <div class="profese-row-firma">${escHtml(prof.name)}</div>
-        <div class="profese-row-actions">
+        <div class="profese-row-actions" ${!canEdit() ? 'style="display:none"' : ''}>
           <button class="profese-action-btn${prof.exportPinned ? ' pinned' : ''} prof-pin-btn" data-idx="${idx}" title="Vždy zahrnout do KD exportu">${prof.exportPinned ? '📌 Vždy' : '📌'}</button>
           <button class="profese-action-btn prof-edit-btn" data-idx="${idx}">Upravit</button>
           <button class="profese-action-btn danger prof-delete-btn" data-idx="${idx}">Smazat</button>
@@ -11842,6 +11855,9 @@ function renderProfeseList() {
 
 function openManageProfese() {
   renderProfeseList();
+  // Hide add-profese button for viewers
+  const footer = document.getElementById('manage-profese-footer');
+  if (footer) footer.style.display = canEdit() ? '' : 'none';
   document.getElementById('manage-profese-overlay').classList.add('visible');
 }
 
@@ -12568,7 +12584,7 @@ function kdRenderContent() {
     if (fDone) fDone.checked = _kdFilter.showDone;
   }
 
-  const isLive = !_kdViewingBackup;
+  const isLive = !_kdViewingBackup && canEdit();
   const savedScrollTop = scroll.scrollTop;
   scroll.innerHTML = '';
   const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
@@ -13362,16 +13378,38 @@ function applyViewerMode() {
   // Drawing editor, move-drawing, upload buttons
   ['drawing-edit-btn','move-overlay','drawing-upload-btn','add-level-btn']
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = viewer ? 'none' : ''; });
-  // Right panel (properties) – hide in viewer mode
+  // Right panel — always visible; disable interactive controls for viewers
   const rp = document.getElementById('right-panel');
-  if (rp) rp.style.display = viewer ? 'none' : '';
+  if (rp) {
+    rp.style.display = '';
+    rp.querySelectorAll('#prop-form input, #prop-form select, #prop-form textarea').forEach(el => { el.disabled = viewer; });
+    rp.querySelectorAll('#prop-form button').forEach(el => { el.disabled = viewer; });
+    // No-selection hint: viewers see "click to view params", editors see drawing hint
+    const ns = document.getElementById('no-sel-state');
+    if (ns) ns.querySelector('p').textContent = viewer
+      ? 'Klikněte na anotaci pro zobrazení jejích vlastností.'
+      : 'Vyberte anotaci pro zobrazení vlastností nebo použijte nástroj pro kreslení nové.';
+  }
   // Status bar save indicator
   const si = document.getElementById('status-save-info');
   if (si) si.style.display = viewer ? 'none' : '';
-  // Canvas: disable object interaction for viewer
+  // Canvas: viewers can click annotations to read their params but cannot drag/modify them
   if (fabricCanvas) {
     fabricCanvas.selection = !viewer;
-    fabricCanvas.getObjects().forEach(o => { if (!o.isBackground) o.selectable = !viewer; });
+    fabricCanvas.getObjects().forEach(o => {
+      if (o.isBackground) return;
+      o.selectable      = true;   // always clickable — needed for viewer read panel
+      o.evented         = true;
+      o.lockMovementX   = viewer;
+      o.lockMovementY   = viewer;
+      o.lockRotation    = viewer;
+      o.lockScalingX    = viewer;
+      o.lockScalingY    = viewer;
+      o.hasControls     = !viewer;
+      o.hasBorders      = !viewer;
+      o.hoverCursor     = viewer ? 'pointer' : 'move';
+    });
+    fabricCanvas.defaultCursor = viewer ? 'default' : 'crosshair';
   }
   // Show viewer badge if applicable
   let badge = document.getElementById('viewer-badge');
