@@ -3675,6 +3675,44 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   cursor: pointer;
   font-weight: 500;
 }
+
+/* ── Viewer / read-only mode (body.viewer-mode) ─────────────── */
+/* Text fields look like plain closed labels, not editable inputs */
+body.viewer-mode #prop-form input:disabled,
+body.viewer-mode #prop-form select:disabled,
+body.viewer-mode #prop-form textarea:disabled {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  cursor: default;
+  -webkit-appearance: none;
+  appearance: none;
+  resize: none;
+  pointer-events: none;
+}
+/* Non-active status/priority buttons vanish; active one becomes a static badge */
+body.viewer-mode .status-btn:disabled:not([class*="active-"]),
+body.viewer-mode .prio-btn:disabled:not([class*="active-"]) {
+  display: none !important;
+}
+body.viewer-mode .status-btn:disabled,
+body.viewer-mode .prio-btn:disabled {
+  pointer-events: none;
+  cursor: default;
+  flex: 0 0 auto;
+}
+/* Section headers still collapsible (read-only but navigable) */
+body.viewer-mode .prop-section summary { cursor: pointer; }
+/* Hide all write-action elements for viewers */
+body.viewer-mode #mark-done-annot-btn,
+body.viewer-mode #kd-new-record-btn,
+body.viewer-mode #kd-add-chapter-btn,
+body.viewer-mode #kd-delete-record-btn,
+body.viewer-mode .prof-card-edit-btn { display: none !important; }
+/* Hide backup schedule config for viewers (keep backup list for history view) */
+body.viewer-mode #kd-backup-day,
+body.viewer-mode #kd-backup-time,
+body.viewer-mode #kd-backup-next { display: none !important; }
 </style>
 </head>
 <body>
@@ -10179,7 +10217,9 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
     pdf.text('Vizitka', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
     if (_profeseVcfToken && currentProject) {
-      const _vcfUrl = window.location.origin + '/api/vcard.php?project_id=' + currentProject.id + '&name=' + encodeURIComponent(p.name) + '&token=' + _profeseVcfToken;
+      // Encode all params as single base64 blob — avoids & in URL which breaks mobile PDF viewers
+      const _vcfD   = encodeURIComponent(btoa(JSON.stringify({ p: currentProject.id, n: p.name, t: _profeseVcfToken })));
+      const _vcfUrl = window.location.origin + '/api/vcard.php?d=' + _vcfD;
       pdf.link(_vBtnX, _vBtnY, _vBtnW, _vBtnH, { url: _vcfUrl });
     }
 
@@ -13453,23 +13493,29 @@ function canEdit() {
 
 function applyViewerMode() {
   const viewer = !canEdit();
+  // Body class drives all viewer-mode CSS rules
+  document.body.classList.toggle('viewer-mode', viewer);
   // Toolbar drawing tools
   document.querySelectorAll('.tool-btn:not([data-tool="select"]):not([data-tool="pan"])')
     .forEach(el => { el.style.display = viewer ? 'none' : ''; });
   // Drawing editor, move-drawing, upload buttons
   ['drawing-edit-btn','move-overlay','drawing-upload-btn','add-level-btn']
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = viewer ? 'none' : ''; });
-  // Right panel — always visible; disable interactive controls for viewers
+  // Right panel — always visible; mark controls disabled (CSS styles them as read-only labels)
   const rp = document.getElementById('right-panel');
   if (rp) {
     rp.style.display = '';
     rp.querySelectorAll('#prop-form input, #prop-form select, #prop-form textarea').forEach(el => { el.disabled = viewer; });
     rp.querySelectorAll('#prop-form button').forEach(el => { el.disabled = viewer; });
-    // No-selection hint: viewers see "click to view params", editors see drawing hint
+    // No-selection state: change icon and hint text for viewers
     const ns = document.getElementById('no-sel-state');
-    if (ns) ns.querySelector('p').textContent = viewer
-      ? 'Klikněte na anotaci pro zobrazení jejích vlastností.'
-      : 'Vyberte anotaci pro zobrazení vlastností nebo použijte nástroj pro kreslení nové.';
+    if (ns) {
+      const icon = ns.querySelector('.ns-icon');
+      if (icon) icon.textContent = viewer ? '👁' : '✏️';
+      ns.querySelector('p').textContent = viewer
+        ? 'Klikněte na anotaci pro zobrazení jejích vlastností.'
+        : 'Vyberte anotaci pro zobrazení vlastností nebo použijte nástroj pro kreslení nové.';
+    }
   }
   // Status bar save indicator
   const si = document.getElementById('status-save-info');
