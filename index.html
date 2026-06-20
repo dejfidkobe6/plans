@@ -2431,6 +2431,24 @@ option { background: var(--card); color: var(--text); }
   gap: 6px;
   justify-content: flex-end;
 }
+/* Multiple contacts */
+.pf-contacts-container { display: flex; flex-direction: column; gap: 4px; }
+.pf-contact-row { display: flex; gap: 4px; align-items: center; }
+.pf-contact-row .pf-contact-name  { flex: 2; }
+.pf-contact-row .pf-contact-tel   { flex: 2; }
+.pf-contact-row .pf-contact-email { flex: 3; }
+.pf-contact-remove {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-dim); font-size: 14px; line-height: 1; padding: 3px 7px;
+  cursor: pointer; flex-shrink: 0;
+}
+.pf-contact-remove:hover { background: rgba(239,68,68,0.1); color: #EF4444; border-color: #EF4444; }
+.pf-contact-add {
+  align-self: flex-start; margin-top: 2px;
+  background: none; border: 1px dashed var(--border); border-radius: 4px;
+  color: var(--text-dim); font-size: 11px; padding: 3px 8px; cursor: pointer;
+}
+.pf-contact-add:hover { border-color: var(--olive); color: var(--olive); }
 /* Multiple emails */
 .pf-emails-container { display: flex; flex-direction: column; gap: 4px; }
 .pf-email-row { display: flex; gap: 4px; align-items: center; }
@@ -4807,8 +4825,17 @@ const DEFAULT_PROFESE = [
 // Helper: get emails array from profese (supports old single-email format)
 function getProfEmails(prof) {
   if (!prof) return [];
-  if (Array.isArray(prof.emails)) return prof.emails.filter(Boolean);
-  if (prof.email) return [prof.email];
+  const set = new Set();
+  (prof.emails || []).forEach(e => e && set.add(e));
+  if (prof.email) set.add(prof.email);
+  (prof.contacts || []).forEach(c => c.email && set.add(c.email));
+  return [...set];
+}
+
+function getAllContacts(prof) {
+  if (!prof) return [];
+  if (prof.contacts && prof.contacts.length) return prof.contacts;
+  if (prof.kontakt || prof.telefon) return [{ name: prof.kontakt || '', telefon: prof.telefon || '' }];
   return [];
 }
 
@@ -10038,7 +10065,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   pdf.text('Kontaktni osoba',     COL_KONT.x,  colHdrY);
   pdf.text('Telefon',             COL_TEL.x,   colHdrY);
   pdf.text('E-mail',              COL_EMAIL.x, colHdrY);
-  pdf.text('Kontakt',             COL_VCF.x + 0.5, colHdrY);
+  pdf.text('Vizitka',             COL_VCF.x + 0.5, colHdrY);
   pdf.text('Pritomen',            COL_CHECK.x, colHdrY);
 
   // Vertical header separators
@@ -10080,8 +10107,11 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
       if (curLine.length) emailWrapped.push(curLine);
     }
 
-    const numELines = Math.max(1, emailWrapped.length);
-    const ROW_H = numELines > 1 ? Math.max(BASE_ROW_H, LINE_H * numELines + 2) : BASE_ROW_H;
+    const numELines   = Math.max(1, emailWrapped.length);
+    const _ctacts     = getAllContacts(p);
+    const numCLines   = Math.max(1, _ctacts.length);
+    const numRowLines = Math.max(numELines, numCLines);
+    const ROW_H = numRowLines > 1 ? Math.max(BASE_ROW_H, LINE_H * numRowLines + 2) : BASE_ROW_H;
     const rowY = curY;
     if (rowY + ROW_H > ly + lh) return; // overflow guard
 
@@ -10107,12 +10137,22 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     // Firma (no dot)
     pdf.text(fitT(p.firma || p.name, ROW_FS, COL_FIRMA.w - 2), COL_FIRMA.x + 1, midY);
 
-    // Role / Kontakt / Telefon
+    // Role
     pdf.setTextColor(100, 105, 90);
     pdf.text(fitT(p.name, ROW_FS, COL_ROLE.w - 2), COL_ROLE.x, midY);
     pdf.setTextColor(40, 45, 35);
-    pdf.text(fitT(p.kontakt || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, midY);
-    pdf.text(fitT(p.telefon || '', ROW_FS, COL_TEL.w - 2),  COL_TEL.x,  midY);
+    // Kontaktní osoby — stacked per contact
+    if (_ctacts.length <= 1) {
+      const _c = _ctacts[0] || {};
+      pdf.text(fitT(_c.name    || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, midY);
+      pdf.text(fitT(_c.telefon || '', ROW_FS, COL_TEL.w - 2),  COL_TEL.x,  midY);
+    } else {
+      _ctacts.forEach((_c, _ci) => {
+        const _cY = rowY + LINE_H * (_ci + 0.85);
+        pdf.text(fitT(_c.name    || '', ROW_FS, COL_KONT.w - 2), COL_KONT.x, _cY);
+        pdf.text(fitT(_c.telefon || '', ROW_FS, COL_TEL.w - 2),  COL_TEL.x,  _cY);
+      });
+    }
 
     // Emails — side by side, wrap to next line when column full
     emailWrapped.forEach((line, li) => {
@@ -10129,15 +10169,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
     pdf.setTextColor(40, 45, 35);
 
-    // vCard contact button
-    const _vcfLines = ['BEGIN:VCARD', 'VERSION:3.0',
-      'FN:' + (p.kontakt || p.firma || p.name || '')];
-    if (p.firma)   _vcfLines.push('ORG:' + p.firma);
-    if (p.telefon) _vcfLines.push('TEL;TYPE=CELL:' + p.telefon.replace(/\s/g, ''));
-    pEmails.forEach(e => _vcfLines.push('EMAIL;TYPE=INTERNET:' + e));
-    if (p.name)    _vcfLines.push('TITLE:' + p.name);
-    _vcfLines.push('END:VCARD');
-    const _vcfUrl = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(_vcfLines.join('\r\n'));
+    // Vizitka contact button — links to server vCard endpoint (works on mobile)
     const _vBtnH = Math.min(5, ROW_H * 0.68);
     const _vBtnW = COL_VCF.w - 2;
     const _vBtnX = COL_VCF.x + 1;
@@ -10145,8 +10177,11 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFillColor(Math.round(r * 0.65 + 255 * 0.35), Math.round(g * 0.65 + 255 * 0.35), Math.round(b * 0.65 + 255 * 0.35));
     pdf.roundedRect(_vBtnX, _vBtnY, _vBtnW, _vBtnH, 0.6, 0.6, 'F');
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
-    pdf.text('VCF', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
-    pdf.link(_vBtnX, _vBtnY, _vBtnW, _vBtnH, { url: _vcfUrl });
+    pdf.text('Vizitka', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
+    if (_profeseVcfToken && currentProject) {
+      const _vcfUrl = window.location.origin + '/api/vcard.php?project_id=' + currentProject.id + '&name=' + encodeURIComponent(p.name) + '&token=' + _profeseVcfToken;
+      pdf.link(_vBtnX, _vBtnY, _vBtnW, _vBtnH, { url: _vcfUrl });
+    }
 
     // Interactive checkbox – Yes appearance is patched to solid black by post-processing
     const cbSize = Math.min(5, BASE_ROW_H * 0.65);
@@ -10491,8 +10526,9 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
     pdf.setTextColor(100,105,90);
     pdf.text(fitT(p.name,ROW_FS,COL_PROF.w-2),COL_PROF.x,tY);
     pdf.setTextColor(40,45,35);
-    pdf.text(fitT(p.kontakt||'',ROW_FS,COL_KONT.w-2),COL_KONT.x,tY);
-    pdf.text(fitT(p.telefon||'',ROW_FS,COL_TEL.w-2),COL_TEL.x,tY);
+    { const _c = getAllContacts(p)[0] || {};
+      pdf.text(fitT(_c.name    ||'',ROW_FS,COL_KONT.w-2),COL_KONT.x,tY);
+      pdf.text(fitT(_c.telefon ||'',ROW_FS,COL_TEL.w-2), COL_TEL.x, tY); }
     { const pEmails = getProfEmails(p);
       const emailStr = pEmails.length > 1 ? pEmails[0] + ' +' + (pEmails.length-1) : (pEmails[0] || '');
       pdf.setTextColor(30,90,200);
@@ -11450,7 +11486,10 @@ async function _serverLoad(projectId) {
 async function _profServerLoad(projectId) {
   try {
     const { ok, data } = await apiFetch(`api/profese.php?project_id=${projectId}`);
-    if (ok && Array.isArray(data.profese)) return data.profese;
+    if (ok && Array.isArray(data.profese)) {
+      if (data.vcf_token) _profeseVcfToken = data.vcf_token;
+      return data.profese;
+    }
   } catch(e) {}
   return null;
 }
@@ -11478,6 +11517,7 @@ async function _saveProfese(deletedNames = []) {
       console.error('[profese] save failed:', data?.error);
       showToast('Chyba uložení dodavatele: ' + (data?.error || 'síťová chyba'), 'error');
     } else if (Array.isArray(data.profese) && seq === _profSaveSeq) {
+      if (data.vcf_token) _profeseVcfToken = data.vcf_token;
       // Save confirmed by server — mark as clean and add any server-only entries
       _profSaveDoneSeq++;
       _lastProfTs = null;
@@ -11697,19 +11737,27 @@ function renderProfeseList() {
             <label>Firma</label>
             <input type="text" class="pf-firma" value="${escHtml(prof.firma)}" placeholder="Název firmy">
           </div>
-          <div class="profese-form-field">
-            <label>Kontakt</label>
-            <input type="text" class="pf-kontakt" value="${escHtml(prof.kontakt)}" placeholder="Jméno kontaktní osoby">
-          </div>
-          <div class="profese-form-field">
-            <label>Telefon</label>
-            <input type="tel" class="pf-telefon" value="${escHtml(prof.telefon)}" placeholder="+420 ...">
+          <div class="profese-form-field" style="grid-column:1/-1">
+            <label>Kontaktní osoby</label>
+            <div class="pf-contacts-container">
+              ${(() => {
+                const _ctacts = getAllContacts(prof);
+                const _rows = _ctacts.length ? _ctacts : [{}];
+                return _rows.map(c => `<div class="pf-contact-row">
+                  <input type="text"  class="pf-contact-name"  value="${escHtml(c.name||'')}"    placeholder="Jméno">
+                  <input type="tel"   class="pf-contact-tel"   value="${escHtml(c.telefon||'')}" placeholder="Telefon">
+                  <input type="email" class="pf-contact-email" value="${escHtml(c.email||'')}"   placeholder="Email kontaktu">
+                  <button type="button" class="pf-contact-remove" title="Odebrat">×</button>
+                </div>`).join('');
+              })()}
+            </div>
+            <button type="button" class="pf-contact-add">+ Přidat kontaktní osobu</button>
           </div>
           <div class="profese-form-field" style="grid-column:1/-1">
-            <label>Emaily</label>
+            <label>Emaily bez osoby</label>
             <div class="pf-emails-container">
-              ${getProfEmails(prof).length
-                ? getProfEmails(prof).map(e => `<div class="pf-email-row"><input type="email" class="pf-email" value="${escHtml(e)}" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button></div>`).join('')
+              ${(prof.emails||[]).filter(Boolean).length
+                ? (prof.emails||[]).filter(Boolean).map(e => `<div class="pf-email-row"><input type="email" class="pf-email" value="${escHtml(e)}" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button></div>`).join('')
                 : `<div class="pf-email-row"><input type="email" class="pf-email" value="" placeholder="email@firma.cz"><button type="button" class="pf-email-remove">×</button></div>`
               }
             </div>
@@ -11723,6 +11771,28 @@ function renderProfeseList() {
       </div>
     `;
     container.appendChild(row);
+  });
+
+  // Bind add/remove contact buttons
+  function _bindContactRemove(btn, cont) {
+    btn.addEventListener('click', () => {
+      const r = btn.closest('.pf-contact-row');
+      if (cont.querySelectorAll('.pf-contact-row').length > 1) r.remove();
+      else { r.querySelectorAll('input').forEach(i => i.value = ''); }
+    });
+  }
+  container.querySelectorAll('.pf-contacts-container').forEach(cont => {
+    cont.querySelectorAll('.pf-contact-remove').forEach(btn => _bindContactRemove(btn, cont));
+  });
+  container.querySelectorAll('.pf-contact-add').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cont = btn.previousElementSibling;
+      const r = document.createElement('div'); r.className = 'pf-contact-row';
+      r.innerHTML = `<input type="text" class="pf-contact-name" placeholder="Jméno"><input type="tel" class="pf-contact-tel" placeholder="Telefon"><input type="email" class="pf-contact-email" placeholder="Email kontaktu"><button type="button" class="pf-contact-remove" title="Odebrat">×</button>`;
+      _bindContactRemove(r.querySelector('.pf-contact-remove'), cont);
+      cont.appendChild(r);
+      r.querySelector('.pf-contact-name').focus();
+    });
   });
 
   // Bind add/remove email buttons
@@ -11791,12 +11861,21 @@ function renderProfeseList() {
       if (!name) { showToast('Název profese nesmí být prázdný', 'warn'); return; }
       const color = form.querySelector('.pf-color').value;
       const firma = form.querySelector('.pf-firma').value.trim();
-      const kontakt = form.querySelector('.pf-kontakt').value.trim();
-      const telefon = form.querySelector('.pf-telefon').value.trim();
+      const contacts = [...form.querySelectorAll('.pf-contact-row')].map(r => {
+        const n = r.querySelector('.pf-contact-name').value.trim();
+        const t = r.querySelector('.pf-contact-tel').value.trim();
+        const e = r.querySelector('.pf-contact-email').value.trim();
+        const obj = {};
+        if (n) obj.name = n; if (t) obj.telefon = t; if (e) obj.email = e;
+        return obj;
+      }).filter(c => c.name || c.telefon || c.email);
       const emails = [...form.querySelectorAll('.pf-email')].map(i => i.value.trim()).filter(Boolean);
       const oldName = appState.profese[idx].name; // capture before update
       const exportPinned = appState.profese[idx].exportPinned || false;
-      appState.profese[idx] = { name, color, firma, kontakt, telefon, emails, exportPinned };
+      // Derive legacy fields from first contact for backward compat
+      const _fc = contacts[0] || {};
+      appState.profese[idx] = { name, color, firma, contacts, emails, exportPinned,
+        kontakt: _fc.name || '', telefon: _fc.telefon || '' };
       // Cascade rename: update all annotations and KD tasks that reference oldName
       if (oldName !== name) {
         appState.levels.forEach(level => {
@@ -11866,7 +11945,7 @@ function closeManageProfese() {
 }
 
 function addNewProfese() {
-  const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', kontakt: '', telefon: '', emails: [] };
+  const newProf = { name: 'Nová profese', color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), firma: '', contacts: [], emails: [] };
   appState.profese.push(newProf);
   _markProfeseLocalDirty();
   _flushSave();
@@ -11903,7 +11982,7 @@ function renderHomePage() {
     !searchVal ||
     p.name.toLowerCase().includes(searchVal) ||
     (p.firma || '').toLowerCase().includes(searchVal) ||
-    (p.kontakt || '').toLowerCase().includes(searchVal)
+    getAllContacts(p).some(c => (c.name || '').toLowerCase().includes(searchVal))
   );
 
   // Pre-compute annotation counts for all profese in one pass
@@ -11922,12 +12001,15 @@ function renderHomePage() {
     const firmaHtml = prof.firma
       ? `<div class="prof-card-firma">${escHtml(prof.firma)}</div>`
       : `<div class="prof-card-firma"><span class="placeholder">— nevyplněno —</span></div>`;
-    const kontaktHtml = prof.kontakt
-      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${escHtml(prof.kontakt)}</div>`
-      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
-    const telefonHtml = prof.telefon
-      ? `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><a href="tel:${escHtml(prof.telefon)}">${escHtml(prof.telefon)}</a></div>`
-      : `<div class="prof-card-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg><span class="placeholder">— nevyplněno —</span></div>`;
+    const personSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+    const telSvg    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 18a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.93-9.41A2 2 0 0 1 3.44 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6 6l.72-.78a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.28 15.26"/></svg>`;
+    const _allCtacts = getAllContacts(prof);
+    const contactsHtml = _allCtacts.length
+      ? _allCtacts.map((c, ci) => [
+          c.name    ? `<div class="prof-card-row">${ci===0?personSvg:'<span style="width:16px;flex-shrink:0"></span>'} ${escHtml(c.name)}</div>` : '',
+          c.telefon ? `<div class="prof-card-row">${ci===0&&!c.name?telSvg:'<span style="width:16px;flex-shrink:0"></span>'} <a href="tel:${escHtml(c.telefon)}">${escHtml(c.telefon)}</a></div>` : '',
+        ].filter(Boolean).join('')).join('')
+      : `<div class="prof-card-row">${personSvg}<span class="placeholder">— nevyplněno —</span></div>`;
     const profEmails = getProfEmails(prof);
     const emailSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
     const emailHtml = profEmails.length
@@ -11940,8 +12022,7 @@ function renderHomePage() {
         <div class="prof-card-name">${escHtml(prof.name)}</div>
         ${firmaHtml}
         <div class="prof-card-info">
-          ${kontaktHtml}
-          ${telefonHtml}
+          ${contactsHtml}
           ${emailHtml}
         </div>
         <div class="prof-card-footer">
@@ -12413,7 +12494,7 @@ function kdTaskVisible(task) {
       task.text || '',
       task.sub || '',
       profObj?.firma || '',
-      profObj?.kontakt || '',
+      ...getAllContacts(profObj).map(c => c.name || ''),
       ...getProfEmails(profObj),
       ...(task.locations || []),
     ].map(_normStr).join(' ');
@@ -14281,6 +14362,7 @@ async function _pollLiveSync() {
 // accompany a canvas save – e.g. another user edits profese while you have no canvas changes).
 let _lastProfTs = null;
 let _profPollCounter = 0;
+let _profeseVcfToken = null;
 async function _pollProfeseSync() {
   if (!currentProject) return;
   _profPollCounter++;
@@ -14296,6 +14378,7 @@ async function _pollProfeseSync() {
     const { ok: ok2, data: data2 } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
     if (!ok2 || !Array.isArray(data2.profese) || !data2.profese.length) return;
     if (_hasPendingProfSave) return; // re-check after second await
+    if (data2.vcf_token) _profeseVcfToken = data2.vcf_token;
     if (JSON.stringify(data2.profese) === JSON.stringify(appState.profese)) return;
     appState.profese = data2.profese;
     try { localStorage.setItem(LS_PROJECT_PROFESE(String(currentProject.id)), JSON.stringify(data2.profese)); } catch(e) {}
@@ -14317,6 +14400,7 @@ async function _refreshProfeseNow() {
     const { ok, data } = await apiFetch(`api/profese.php?project_id=${currentProject.id}`);
     if (!ok || !Array.isArray(data.profese) || !data.profese.length) return;
     if (_hasPendingProfSave) return;
+    if (data.vcf_token) _profeseVcfToken = data.vcf_token;
     if (JSON.stringify(data.profese) === JSON.stringify(appState.profese)) return;
     _lastProfTs = null; // force next poll to re-record fresh timestamp
     appState.profese = data.profese;

@@ -38,6 +38,7 @@ getDB()->exec('CREATE TABLE IF NOT EXISTS plan_profese (
     emails_json   TEXT         DEFAULT NULL,
     kontakt       VARCHAR(255) DEFAULT NULL,
     telefon       VARCHAR(100) DEFAULT NULL,
+    contacts_json TEXT         DEFAULT NULL,
     color         VARCHAR(32)  DEFAULT NULL,
     export_pinned TINYINT(1)   NOT NULL DEFAULT 0,
     sort_order    INT          NOT NULL DEFAULT 0,
@@ -45,6 +46,7 @@ getDB()->exec('CREATE TABLE IF NOT EXISTS plan_profese (
     UNIQUE KEY uq_proj_name (project_id, name),
     INDEX idx_project (project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+getDB()->exec('ALTER TABLE plan_profese ADD COLUMN IF NOT EXISTS contacts_json TEXT DEFAULT NULL');
 
 // ── GET ────────────────────────────────────────────────────────
 if ($method === 'GET') {
@@ -55,7 +57,8 @@ if ($method === 'GET') {
         jsonOk(['updated_at' => $row['updated_at'] ?? null]);
     }
     $rows = _profLoad($projectId);
-    jsonOk(['profese' => _rowsToProfese($rows)]);
+    $vcfToken = substr(hash_hmac('sha256', strval($projectId), DB_PASS), 0, 24);
+    jsonOk(['profese' => _rowsToProfese($rows), 'vcf_token' => $vcfToken]);
 }
 
 // ── POST ───────────────────────────────────────────────────────
@@ -79,7 +82,7 @@ if ($method === 'POST') {
     $db->beginTransaction();
     try {
         $stmt = $db->prepare(
-            'SELECT name, firma, emails_json, kontakt, telefon, color, export_pinned, sort_order
+            'SELECT name, firma, emails_json, kontakt, telefon, contacts_json, color, export_pinned, sort_order
                FROM plan_profese WHERE project_id = ? ORDER BY sort_order, name FOR UPDATE'
         );
         $stmt->execute([$projectId]);
@@ -107,25 +110,26 @@ if ($method === 'POST') {
         foreach ($existingByName as $name => $e) {
             if (!isset($incomingByName[$name])) {
                 $toUpsert[] = [
-                    'name'         => $e['name'],
-                    'firma'        => $e['firma'],
-                    '_emails_json' => $e['emails_json'], // already encoded
-                    'kontakt'      => $e['kontakt'],
-                    'telefon'      => $e['telefon'],
-                    'color'        => $e['color'],
-                    'exportPinned' => (bool)$e['export_pinned'],
+                    'name'             => $e['name'],
+                    'firma'            => $e['firma'],
+                    '_emails_json'     => $e['emails_json'],    // already encoded
+                    '_contacts_json'   => $e['contacts_json'],  // already encoded
+                    'kontakt'          => $e['kontakt'],
+                    'telefon'          => $e['telefon'],
+                    'color'            => $e['color'],
+                    'exportPinned'     => (bool)$e['export_pinned'],
                 ];
             }
         }
 
         $ins = $db->prepare(
             'INSERT INTO plan_profese
-                 (project_id, name, firma, emails_json, kontakt, telefon, color, export_pinned, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 (project_id, name, firma, emails_json, kontakt, telefon, contacts_json, color, export_pinned, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                firma=VALUES(firma), emails_json=VALUES(emails_json), kontakt=VALUES(kontakt),
-               telefon=VALUES(telefon), color=VALUES(color), export_pinned=VALUES(export_pinned),
-               sort_order=VALUES(sort_order), updated_at=NOW()'
+               telefon=VALUES(telefon), contacts_json=VALUES(contacts_json), color=VALUES(color),
+               export_pinned=VALUES(export_pinned), sort_order=VALUES(sort_order), updated_at=NOW()'
         );
 
         foreach ($toUpsert as $i => $p) {
@@ -137,7 +141,8 @@ if ($method === 'POST') {
 
             if (isset($p['_emails_json'])) {
                 // Server-only entry re-inserted unchanged
-                $emailsJson = $p['_emails_json'];
+                $emailsJson    = $p['_emails_json'];
+                $contactsJson  = $p['_contacts_json'] ?? null;
                 $firma   = $p['firma']   ?? null;
                 $kontakt = $p['kontakt'] ?? null;
                 $telefon = $p['telefon'] ?? null;
@@ -153,7 +158,7 @@ if ($method === 'POST') {
                     $clientEmails = [];
                 }
 
-                // Emails: always union — never discard addresses the server already has
+                // Standalone emails: always union — never discard addresses the server already has
                 if ($sv && $sv['emails_json']) {
                     $serverEmails = json_decode($sv['emails_json'], true) ?: [];
                     $merged = array_values(array_unique(array_merge($serverEmails, $clientEmails)));
@@ -162,11 +167,22 @@ if ($method === 'POST') {
                 }
                 $emailsJson = !empty($merged) ? json_encode($merged) : null;
 
-                // Text fields: prefer client value when non-empty, fall back to server
-                // so a stale device never blanks out data a richer device already saved
-                $firma   = ($p['firma']   ?? '') !== '' ? $p['firma']   : ($sv['firma']   ?? null);
-                $kontakt = ($p['kontakt'] ?? '') !== '' ? $p['kontakt'] : ($sv['kontakt'] ?? null);
-                $telefon = ($p['telefon'] ?? '') !== '' ? $p['telefon'] : ($sv['telefon'] ?? null);
+                // Contacts array (new multi-contact support)
+                if (isset($p['contacts']) && is_array($p['contacts'])) {
+                    $contacts = array_values(array_filter($p['contacts'], fn($c) => !empty($c['name']) || !empty($c['telefon']) || !empty($c['email'])));
+                    $contactsJson = !empty($contacts) ? json_encode($contacts) : null;
+                    // Derive legacy kontakt/telefon from first contact for backward compat
+                    $kontakt = !empty($contacts[0]['name'])    ? $contacts[0]['name']    : null;
+                    $telefon = !empty($contacts[0]['telefon']) ? $contacts[0]['telefon'] : null;
+                } else {
+                    // Legacy single contact fields
+                    $contactsJson = null;
+                    $kontakt = ($p['kontakt'] ?? '') !== '' ? $p['kontakt'] : ($sv['kontakt'] ?? null);
+                    $telefon = ($p['telefon'] ?? '') !== '' ? $p['telefon'] : ($sv['telefon'] ?? null);
+                }
+
+                // Firm: prefer client when non-empty
+                $firma = ($p['firma'] ?? '') !== '' ? $p['firma'] : ($sv['firma'] ?? null);
             }
 
             $ins->execute([
@@ -175,6 +191,7 @@ if ($method === 'POST') {
                 $emailsJson,
                 $kontakt,
                 $telefon,
+                $contactsJson,
                 $p['color']   ?? null,
                 !empty($p['exportPinned']) ? 1 : 0,
                 $i,
@@ -183,7 +200,8 @@ if ($method === 'POST') {
 
         $db->commit();
         $rows = _profLoad($projectId);
-        jsonOk(['profese' => _rowsToProfese($rows)]);
+        $vcfToken = substr(hash_hmac('sha256', strval($projectId), DB_PASS), 0, 24);
+        jsonOk(['profese' => _rowsToProfese($rows), 'vcf_token' => $vcfToken]);
     } catch (Exception $e) {
         $db->rollBack();
         jsonError('Chyba při ukládání profesí: ' . $e->getMessage(), 500);
@@ -197,7 +215,7 @@ jsonError('Metoda není povolena', 405);
 function _profLoad(int $projectId): array {
     $db   = getDB();
     $stmt = $db->prepare(
-        'SELECT name, firma, emails_json, kontakt, telefon, color, export_pinned, sort_order
+        'SELECT name, firma, emails_json, kontakt, telefon, contacts_json, color, export_pinned, sort_order
            FROM plan_profese WHERE project_id = ? ORDER BY sort_order, name'
     );
     $stmt->execute([$projectId]);
@@ -210,10 +228,22 @@ function _rowsToProfese(array $rows): array {
     return array_values(array_map(function($r) {
         $p = ['name' => $r['name']];
         if ($r['firma'])   $p['firma']   = $r['firma'];
-        if ($r['kontakt']) $p['kontakt'] = $r['kontakt'];
-        if ($r['telefon']) $p['telefon'] = $r['telefon'];
         if ($r['color'])   $p['color']   = $r['color'];
         if ($r['export_pinned']) $p['exportPinned'] = true;
+        // Contacts: prefer contacts_json, fall back to legacy kontakt/telefon fields
+        if (!empty($r['contacts_json'])) {
+            $contacts = json_decode($r['contacts_json'], true);
+            if (is_array($contacts) && !empty($contacts)) $p['contacts'] = $contacts;
+        } elseif ($r['kontakt'] || $r['telefon']) {
+            $c = [];
+            if ($r['kontakt']) $c['name']    = $r['kontakt'];
+            if ($r['telefon']) $c['telefon'] = $r['telefon'];
+            $p['contacts'] = [$c];
+        }
+        // Always include legacy fields for backward compat with old clients/KD search
+        if ($r['kontakt']) $p['kontakt'] = $r['kontakt'];
+        if ($r['telefon']) $p['telefon'] = $r['telefon'];
+        // Standalone emails
         if ($r['emails_json']) {
             $emails = json_decode($r['emails_json'], true);
             if (is_array($emails) && !empty($emails)) $p['emails'] = $emails;
@@ -270,7 +300,7 @@ function _migrateProfeseFromCanvas(int $projectId): array {
         }
 
         $stmt2 = $db->prepare(
-            'SELECT name, firma, emails_json, kontakt, telefon, color, export_pinned, sort_order
+            'SELECT name, firma, emails_json, kontakt, telefon, contacts_json, color, export_pinned, sort_order
                FROM plan_profese WHERE project_id = ? ORDER BY sort_order, name'
         );
         $stmt2->execute([$projectId]);
