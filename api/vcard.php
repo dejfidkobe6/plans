@@ -5,9 +5,17 @@ error_reporting(0);
 
 require_once __DIR__ . '/functions.php';
 
-$projectId = (int)($_GET['project_id'] ?? 0);
-$name      = trim($_GET['name'] ?? '');
-$token     = $_GET['token'] ?? '';
+// Support single base64-encoded param ?d=... (avoids & in URL breaking mobile PDF viewers)
+if (!empty($_GET['d'])) {
+    $parsed    = json_decode(base64_decode($_GET['d']), true) ?: [];
+    $projectId = (int)($parsed['p'] ?? 0);
+    $name      = trim($parsed['n'] ?? '');
+    $token     = $parsed['t'] ?? '';
+} else {
+    $projectId = (int)($_GET['project_id'] ?? 0);
+    $name      = trim($_GET['name'] ?? '');
+    $token     = $_GET['token'] ?? '';
+}
 
 if (!$projectId || !$name) {
     http_response_code(400);

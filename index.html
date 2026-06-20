@@ -10217,7 +10217,9 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
     pdf.text('Vizitka', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
     if (_profeseVcfToken && currentProject) {
-      const _vcfUrl = window.location.origin + '/api/vcard.php?project_id=' + currentProject.id + '&name=' + encodeURIComponent(p.name) + '&token=' + _profeseVcfToken;
+      // Encode all params as single base64 blob — avoids & in URL which breaks mobile PDF viewers
+      const _vcfD   = encodeURIComponent(btoa(JSON.stringify({ p: currentProject.id, n: p.name, t: _profeseVcfToken })));
+      const _vcfUrl = window.location.origin + '/api/vcard.php?d=' + _vcfD;
       pdf.link(_vBtnX, _vBtnY, _vBtnW, _vBtnH, { url: _vcfUrl });
     }
 
