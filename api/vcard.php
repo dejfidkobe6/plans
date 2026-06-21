@@ -5,9 +5,10 @@ error_reporting(0);
 
 require_once __DIR__ . '/functions.php';
 
-// Support single base64-encoded param ?d=... (avoids & in URL breaking mobile PDF viewers)
+// Support single URL-encoded JSON param ?d=... (avoids & in URL breaking mobile PDF viewers)
+// PHP $_GET auto-decodes the URL encoding, so json_decode directly works
 if (!empty($_GET['d'])) {
-    $parsed    = json_decode(base64_decode($_GET['d']), true) ?: [];
+    $parsed    = json_decode($_GET['d'], true) ?: [];
     $projectId = (int)($parsed['p'] ?? 0);
     $name      = trim($parsed['n'] ?? '');
     $token     = $parsed['t'] ?? '';
