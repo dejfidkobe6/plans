@@ -5125,23 +5125,34 @@ function addLevel(name, type) {
 }
 
 async function removeLevel(idx) {
+  if (!currentProject || !['owner','admin'].includes(currentProject.role)) {
+    showToast('Pouze administrátor projektu může smazat podlaží', 'warn');
+    return;
+  }
   if (appState.levels.length <= 1) {
     showToast('Nelze smazat poslední podlaží', 'warn');
     return;
   }
   const levelName = appState.levels[idx]?.name || 'toto podlaží';
-  const confirmed = await showModal(
+  const confirmed1 = await showModal(
     'Smazat podlaží',
-    `Opravdu chcete smazat podlaží „${levelName}"? Tato akce je nevratná – smažou se i všechny anotace na tomto podlaží.`
+    `Chcete smazat podlaží „${levelName}"?\n\nSmažou se i všechny anotace na tomto podlaží.`
   );
-  if (!confirmed) return;
+  if (!confirmed1) return;
+  const confirmed2 = await showModal(
+    'Potvrdit smazání',
+    `Tato akce je nevratná.\n\nOpravdu chcete trvale smazat podlaží „${levelName}" i se všemi jeho anotacemi?`
+  );
+  if (!confirmed2) return;
   appState.levels.splice(idx, 1);
   if (appState.activeLevel >= appState.levels.length) {
     appState.activeLevel = appState.levels.length - 1;
   }
   renderLevelTabs();
   switchLevel(appState.activeLevel);
-  saveState();
+  _flushSave();
+  await _serverSaveNow();
+  showToast('Podlaží „' + levelName + '" bylo smazáno', 'ok');
 }
 
 function switchLevel(idx) {
@@ -5231,10 +5242,11 @@ function renderLevelTabs() {
     const tab = document.createElement('div');
     tab.className = 'level-tab ' + typeInfo.cssClass + (idx === appState.activeLevel ? ' active' : '');
     tab.dataset.idx = idx;
+    const _canDel = currentProject && ['owner','admin'].includes(currentProject.role);
     tab.innerHTML = `
       <span class="tab-icon">${typeInfo.icon}</span>
       <span class="tab-name">${escHtml(level.name)}</span>
-      <span class="tab-close" data-idx="${idx}" title="Zavřít podlaží">×</span>
+      ${_canDel ? `<span class="tab-close" data-idx="${idx}" title="Smazat podlaží">×</span>` : ''}
     `;
     tab.addEventListener('click', (e) => {
       if (e.target.classList.contains('tab-close')) {
