@@ -5144,6 +5144,8 @@ async function removeLevel(idx) {
     `Tato akce je nevratná.\n\nOpravdu chcete trvale smazat podlaží „${levelName}" i se všemi jeho anotacemi?`
   );
   if (!confirmed2) return;
+  const deletedId = appState.levels[idx]?.id;
+  if (deletedId) _deletedLevelIds.push(deletedId);
   appState.levels.splice(idx, 1);
   if (appState.activeLevel >= appState.levels.length) {
     appState.activeLevel = appState.levels.length - 1;
@@ -11353,7 +11355,8 @@ function _buildStateObj() {
     tool: appState.tool,
     showGrid: appState.showGrid,
     zones3D: appState.zones3D,
-    kdLocations: kdLocations
+    kdLocations: kdLocations,
+    deletedLevelIds: _deletedLevelIds.slice()
   };
 }
 
@@ -11386,6 +11389,7 @@ function _serverSave() {
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
 let _saving = false;
+let _deletedLevelIds = [];
 async function _serverSaveNow() {
   // Keep _hasPendingSave = true until save fully completes — prevents _pollLiveSync
   // from overwriting appState with stale server data during in-flight network call.
@@ -11447,6 +11451,7 @@ async function _serverSaveNow() {
       console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
       _lastOwnSaveTs = Date.now();
+      _deletedLevelIds = [];
       try { localStorage.removeItem(LS_PROJECT_DIRTY(String(currentProject.id))); } catch(e) {}
       // Apply any annotations added concurrently by another user
       if (data?.counter && data.counter > annotIdCounter) annotIdCounter = data.counter;
