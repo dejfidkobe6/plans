@@ -12537,6 +12537,16 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
+  const scrollLeft = scroll.scrollLeft;
+
+  // Keep chapter headers anchored at the left edge when horizontal scroll is active.
+  // position:sticky top:0 handles vertical; we compensate horizontal manually
+  // because the element's natural left is always 0 (CSS sticky:left won't trigger).
+  const isMobile = window.innerWidth <= 768;
+  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
+    el.style.transform = (!isMobile && scrollLeft > 0) ? `translateX(${scrollLeft}px)` : '';
+  });
+
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
     const bar = ch.querySelector(':scope > .kd-card-headers-bar');
@@ -12863,6 +12873,7 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
+  _kdUpdateSectionBar(); // sync horizontal offset if scroll was already non-zero
   // On mobile: force overflow:visible so CSS sticky works on .kd-card-header
   if (window.innerWidth <= 768) {
     inner.querySelectorAll('.kd-chapter-cards, .kd-card').forEach(el => {
