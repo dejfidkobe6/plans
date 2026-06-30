@@ -320,10 +320,11 @@ if ($method === 'POST') {
             $mergedLevels[] = $merged;
         }
 
-        // Preserve server-only levels (added by another user)
+        // Preserve server-only levels (added by another user), but not explicitly deleted ones
+        $deletedLevelIds = array_flip((array)($state['deletedLevelIds'] ?? []));
         foreach ($serverLevels as $sl) {
             $id = $sl['id'] ?? null;
-            if ($id && !isset($clientLevelMap[$id])) {
+            if ($id && !isset($clientLevelMap[$id]) && !isset($deletedLevelIds[$id])) {
                 $sl2 = $sl;
                 if (isset($sl2['fabricJSON'])) {
                     $sl2['fabricJSON'] = [
