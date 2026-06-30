@@ -3676,6 +3676,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   font-weight: 500;
 }
 
+/* ── Level-link tool: desktop only ──────────────────────────── */
+@media (max-width: 768px) { .desktop-only-tool { display: none !important; } }
+
 /* ── Viewer / read-only mode (body.viewer-mode) ─────────────── */
 /* Text fields look like plain closed labels, not editable inputs */
 body.viewer-mode #prop-form input:disabled,
@@ -3967,6 +3970,9 @@ body.viewer-mode #kd-backup-next { display: none !important; }
     <button class="tb-btn tool-btn" id="tool-text" data-tool="text" title="Text (T)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
     </button>
+    <button class="tb-btn tool-btn desktop-only-tool" id="tool-levellink" data-tool="levellink" title="Proklik na výkres (K)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2"><line x1="3" y1="12" x2="17" y2="12" stroke-dasharray="4 2.5"/><polyline points="13 8 17 12 13 16"/><circle cx="3" cy="12" r="1.8" fill="#06B6D4" stroke="none"/></svg>
+    </button>
     <div class="tb-separator"></div>
     <button class="tb-btn" id="zoom-in-btn" title="Přiblížit (+)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
@@ -4239,8 +4245,19 @@ body.viewer-mode #kd-backup-next { display: none !important; }
       </div>
       <div id="prop-form" style="display:none;">
 
+        <!-- Section: Proklik (levellink only) -->
+        <div id="prop-levellink-section" style="display:none;padding:12px 0 4px;">
+          <div class="field-group">
+            <label class="field-label" style="color:#06B6D4;">⤵ Proklik — cílový výkres</label>
+            <select class="field-select" id="prop-link-to-level">
+              <option value="">— Vyberte výkres —</option>
+            </select>
+            <p style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5;">Dvojklikem na čáru přejdete na vybraný výkres.</p>
+          </div>
+        </div>
+
         <!-- Section: Základní -->
-        <details class="prop-section" open>
+        <details class="prop-section prop-annot-section" open>
           <summary class="prop-section-hd">
             <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             Základní
@@ -4266,7 +4283,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
         </details>
 
         <!-- Section: Status -->
-        <details class="prop-section" open>
+        <details class="prop-section prop-annot-section" open>
           <summary class="prop-section-hd">
             <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             Status &amp; Priorita
@@ -4297,7 +4314,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
         </details>
 
         <!-- Section: Termíny -->
-        <details class="prop-section" open>
+        <details class="prop-section prop-annot-section" open>
           <summary class="prop-section-hd">
             <svg class="prop-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             Termíny
@@ -4327,7 +4344,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
           </div>
         </details>
 
-        <button id="mark-done-annot-btn" title="Označit anotaci jako hotovou (skryje ji)">✓ Označit jako hotové</button>
+        <button id="mark-done-annot-btn" class="prop-annot-section" title="Označit anotaci jako hotovou (skryje ji)">✓ Označit jako hotové</button>
       </div>
     </div>
   </div>
@@ -4896,6 +4913,7 @@ function applyStatusButtons(value) {
 }
 
 function getAnnotColor(obj) {
+  if (obj && obj.annotType === 'levellink') return '#06B6D4';
   if (obj && obj.status === 'Urgence') return '#EF4444';
   return getProfColor(obj ? (obj.profese || '') : '');
 }
@@ -6306,6 +6324,7 @@ function deconflictLabels() {
 }
 
 function createAnnotLabel(obj) {
+  if (obj.annotType === 'levellink') return createLevelLinkLabel(obj);
   const zoom    = fabricCanvas.getZoom();
   const compact = zoom < LABEL_COMPACT_ZOOM;
   const color   = getAnnotColor(obj);
@@ -6379,6 +6398,46 @@ function createAnnotLabel(obj) {
   return group;
 }
 
+function createLevelLinkLabel(obj) {
+  const zoom = fabricCanvas.getZoom();
+  const LINK_COLOR = '#06B6D4';
+  const FONT = 12, PAD_L = 8, PAD_T = 5, RX = 6;
+  const targetLvl = appState.levels.find(l => l.id === obj.linkToLevel);
+  const targetName = targetLvl ? targetLvl.name : (obj.linkToLevel ? '?' : '— nevybráno —');
+  const txt = new fabric.Text('⤵ ' + targetName, {
+    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT, fill: LINK_COLOR,
+    left: 0, top: 0
+  });
+  const W = txt.width + PAD_L * 2, H = txt.height + PAD_T * 2;
+  txt.set({ left: PAD_L, top: PAD_T });
+  const bg = new fabric.Rect({
+    left: 0, top: 0, width: W, height: H,
+    fill: 'rgba(6,182,212,0.08)', stroke: LINK_COLOR, strokeWidth: 1, strokeDashArray: [4, 3]
+  });
+  const s = 1 / zoom;
+  const group = new fabric.Group([bg, txt], {
+    selectable: false, evented: false, hasControls: false, hasBorders: false,
+    annotLabelFor: obj.annotId, scaleX: s, scaleY: s, originX: 'left', originY: 'top'
+  });
+  group.clipPath = new fabric.Rect({ width: W, height: H, rx: RX, ry: RX, originX: 'center', originY: 'center' });
+  group.shadow = new fabric.Shadow({ color: 'rgba(6,182,212,0.2)', blur: 12, offsetX: 0, offsetY: 3 });
+  fabricCanvas.add(group);
+  positionLabel(group, obj);
+  return group;
+}
+
+function createLevelLinkLine(x1, y1, x2, y2) {
+  return new fabric.Polyline([{ x: x1, y: y1 }, { x: x2, y: y2 }], {
+    stroke: '#06B6D4',
+    strokeWidth: 3,
+    strokeDashArray: [10, 5],
+    fill: 'transparent',
+    strokeLineCap: 'round',
+    strokeLineJoin: 'round',
+    selectable: true
+  });
+}
+
 function updateAllLabelScales() {
   if (!fabricCanvas) return;
   const zoom    = fabricCanvas.getZoom();
@@ -6432,6 +6491,7 @@ function addAnnotationProperties(obj, type) {
     priorita: 'Střední',
     prirazeno: '',
     status: 'Nový úkol',
+    linkToLevel: null,
     createdAt: new Date().toISOString(),
     updatedAt: Date.now(),
     lockMovementX: true, lockMovementY: true,
@@ -6753,6 +6813,15 @@ function setupEventListeners() {
         evented: false
       });
       cw.add(tempShape);
+    } else if (appState.tool === 'levellink') {
+      tempShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+        stroke: '#06B6D4',
+        strokeWidth: 2.5,
+        strokeDashArray: [8, 4],
+        selectable: false,
+        evented: false
+      });
+      cw.add(tempShape);
     }
   });
 
@@ -6810,6 +6879,8 @@ function setupEventListeners() {
     } else if (appState.tool === 'circle') {
       tempShape.set({ rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2 });
     } else if (appState.tool === 'arrow') {
+      tempShape.set({ x2: pointer.x, y2: pointer.y });
+    } else if (appState.tool === 'levellink') {
       tempShape.set({ x2: pointer.x, y2: pointer.y });
     }
     cw.renderAll();
@@ -6898,6 +6969,16 @@ function setupEventListeners() {
       updateAnnotList();
       onObjectSelected({ target: lineObj });
       setTool('select');
+    } else if (appState.tool === 'levellink') {
+      const llObj = createLevelLinkLine(drawStartX, drawStartY, pointer.x, pointer.y);
+      addAnnotationProperties(llObj, 'levellink');
+      cw.add(llObj);
+      createAnnotLabel(llObj);
+      cw.setActiveObject(llObj);
+      pushUndoState();
+      updateAnnotList();
+      onObjectSelected({ target: llObj });
+      setTool('select');
     }
 
     saveCurrentLevel();
@@ -6924,6 +7005,13 @@ function setupEventListeners() {
     }
     const obj = opt.target;
     if (!obj || !obj.annotId) return;
+    // Level-link: navigate to target level on double-click
+    if (obj.annotType === 'levellink') {
+      if (!obj.linkToLevel) { showToast('Cílový výkres nebyl nastaven', 'warn'); return; }
+      const idx = appState.levels.findIndex(l => l.id === obj.linkToLevel);
+      if (idx >= 0) { switchLevel(idx); } else { showToast('Cílový výkres nenalezen', 'warn'); }
+      return;
+    }
     const panel = document.getElementById('model-3d-panel');
     if (panel.classList.contains('open')) {
       panel.classList.remove('open');
@@ -7290,6 +7378,16 @@ function setupEventListeners() {
   });
 
   // Properties panel — all handlers guard against viewer role
+  document.getElementById('prop-link-to-level').addEventListener('change', () => {
+    if (!canEdit()) return;
+    const obj = fabricCanvas.getActiveObject();
+    if (!obj || obj.annotType !== 'levellink') return;
+    obj.set('linkToLevel', document.getElementById('prop-link-to-level').value || null);
+    obj.updatedAt = Date.now();
+    updateLabelFor(obj.annotId);
+    saveCurrentLevel();
+    clearTimeout(_srvTimer); _serverSaveNow();
+  });
   document.getElementById('prop-profese').addEventListener('change', () => { if (!canEdit()) return; updateActiveAnnotProp('profese', document.getElementById('prop-profese').value); });
   document.getElementById('prop-popisek').addEventListener('input', () => { if (!canEdit()) return; updateActiveAnnotProp('popisek', document.getElementById('prop-popisek').value); });
   document.getElementById('prop-prirazeno').addEventListener('input', () => { if (!canEdit()) return; updateActiveAnnotProp('prirazeno', document.getElementById('prop-prirazeno').value); });
@@ -7458,7 +7556,7 @@ function onKeyDown(e) {
     if (e.key === 's') { e.preventDefault(); if (currentProject) { saveCurrentLevel(); _flushSave(); clearTimeout(_srvTimer); _serverSaveNow().then(() => showToast('Projekt uložen', 'success')); } return; }
   }
 
-  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon', y: 'polyline' };
+  const toolKeys = { v: 'select', h: 'pan', f: 'freehand', r: 'rect', c: 'circle', a: 'arrow', p: 'pin', t: 'text', l: 'polygon', y: 'polyline', k: 'levellink' };
   if (toolKeys[e.key.toLowerCase()]) { setTool(toolKeys[e.key.toLowerCase()]); return; }
 
   if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -7631,6 +7729,25 @@ function onObjectSelected(opt) {
   document.getElementById('prop-form').style.display = 'block';
   if (window.innerWidth <= 768) document.dispatchEvent(new CustomEvent('annotation-selected'));
 
+  // Toggle levellink vs. standard annotation sections
+  const isLevelLink = obj.annotType === 'levellink';
+  document.getElementById('prop-levellink-section').style.display = isLevelLink ? '' : 'none';
+  document.querySelectorAll('.prop-annot-section').forEach(el => { el.style.display = isLevelLink ? 'none' : ''; });
+
+  if (isLevelLink) {
+    const sel = document.getElementById('prop-link-to-level');
+    sel.innerHTML = '<option value="">— Vyberte výkres —</option>';
+    appState.levels.forEach(lvl => {
+      const opt = document.createElement('option');
+      opt.value = lvl.id;
+      opt.textContent = lvl.name;
+      if (lvl.id === obj.linkToLevel) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    document.getElementById('prop-annot-id').textContent = obj.annotId || '-';
+    return; // skip standard fields
+  }
+
   document.getElementById('prop-profese').value = obj.profese || 'Elektro';
   document.getElementById('prop-popisek').value = obj.popisek || '';
   document.getElementById('prop-prirazeno').value = obj.prirazeno || '';
@@ -7700,7 +7817,7 @@ function updateAnnotList() {
 
   // Skip full DOM rebuild if nothing visible has changed
   const fp = (activeObj?.annotId || '') + '|' + filtered.map(o =>
-    o.annotId + o.popisek + o.profese + o.status + (o.updatedAt || '')
+    o.annotId + o.popisek + o.profese + o.status + (o.updatedAt || '') + (o.linkToLevel || '')
   ).join(',');
   if (fp === _annotListFingerprint) return;
   _annotListFingerprint = fp;
@@ -7713,12 +7830,21 @@ function updateAnnotList() {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:12px;">Žádné anotace</div>';
   } else {
     filtered.forEach(obj => {
-      const color = getProfColor(obj.profese);
+      const isLL = obj.annotType === 'levellink';
+      const color = isLL ? '#06B6D4' : getProfColor(obj.profese);
       const isSelected = activeObj && (activeObj === obj || (activeObj._objects && activeObj._objects.includes(obj)));
       const statusClass = obj.status === 'Urgence' ? 'status-urgence' : obj.status === 'Nový úkol' ? 'status-otevreno' : obj.status === 'Probíhá' ? 'status-vreseni' : 'status-hotovo';
+      const llTargetName = isLL ? (() => { const l = appState.levels.find(x => x.id === obj.linkToLevel); return l ? l.name : '—'; })() : '';
       const item = document.createElement('div');
       item.className = 'annot-item' + (isSelected ? ' selected' : '');
-      item.innerHTML = `
+      item.innerHTML = isLL ? `
+        <div class="annot-color-dot" style="background:#06B6D4"></div>
+        <div class="annot-info">
+          <div class="annot-label" style="color:#06B6D4;">⤵ Proklik</div>
+          <div class="annot-meta"><span>→ ${escHtml(llTargetName)}</span></div>
+        </div>
+        <div class="annot-id-tag">${obj.annotId || ''}</div>
+      ` : `
         <div class="annot-color-dot" style="background:${color}"></div>
         <div class="annot-info">
           <div class="annot-label">${escHtml(obj.popisek || getAnnotTypeName(obj.annotType || obj.type))}</div>
@@ -7859,7 +7985,7 @@ function drawGrid() {
 // ============================================================
 // UNDO / REDO
 // ============================================================
-const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper'];
+const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper','linkToLevel'];
 
 function _canvasJSON() {
   const json = fabricCanvas.toJSON(_JSON_FIELDS);
@@ -7912,7 +8038,7 @@ function copySelected() {
   obj.clone((cloned) => {
     appState.clipboard = cloned;
     showToast('Zkopírováno', 'info');
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','linkToLevel']);
 }
 
 function pasteSelected() {
@@ -7926,7 +8052,7 @@ function pasteSelected() {
     updateAnnotList();
     saveCurrentLevel();
     clearTimeout(_srvTimer); _serverSaveNow();
-  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom']);
+  }, ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','linkToLevel']);
 }
 
 // ============================================================
@@ -11407,7 +11533,7 @@ async function _serverSaveNow() {
   _saving = true;
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground']);
+    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel']);
     _snap.objects = (_snap.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
     appState.levels[appState.activeLevel].fabricJSON = _snap;
     // refresh annotations list for this level
