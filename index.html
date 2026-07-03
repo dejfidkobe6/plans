@@ -5197,21 +5197,21 @@ function switchLevel(idx) {
       fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
-      applyHotovoVisibility();
       if (level.backgroundImage) {
-        loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
+        loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
       } else if (level.bgServerUrl) {
         // Background cleared after remote crop — fetch fresh from server
         _fetchBgFromServer(level).then(ok => {
           if (ok && level.backgroundImage) {
-            loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); });
-          } else { _isProjectLoading = false; fitToWindow(); updateAllLabelScales(); }
+            loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
+          } else { _isProjectLoading = false; fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); }
         });
       } else {
         _isProjectLoading = false; // no background – loading done
         fitToWindow();
       }
       rebuildAllLabels();
+      applyHotovoVisibility();
       fabricCanvas.renderAll();
       updateAnnotList();
     });
@@ -6423,6 +6423,7 @@ function createLevelLinkLabel(obj) {
   group.shadow = new fabric.Shadow({ color: 'rgba(6,182,212,0.2)', blur: 12, offsetX: 0, offsetY: 3 });
   fabricCanvas.add(group);
   positionLabel(group, obj);
+  if (!showHotovo && obj.status === 'Hotovo') group.visible = false;
   return group;
 }
 
@@ -9106,6 +9107,7 @@ function getAllAnnotations() {
   const rows = [];
   appState.levels.forEach((level, levelIdx) => {
     (level.annotations || []).forEach(a => {
+      if (a.annotType === 'levellink') return;
       rows.push({ ...a, levelName: level.name, levelIdx, firma: profeseMap.get(a.profese) || '' });
     });
   });
@@ -9676,6 +9678,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
 
       const annotObjs = srcJSON.objects.filter(
         o => o.annotId && !o.annotLabelFor && !o.isBackground &&
+             o.annotType !== 'levellink' &&
              (includeHotovo || o.status !== 'Hotovo')
       );
       const FILL_A  = 0.28; // blend profese color with white — light tint on blueprint
@@ -11328,10 +11331,11 @@ function saveCurrentLevel() {
   // Extract annotations for sidebar
   const annotObjects = getAnnotObjects();
   appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
-    annotId: o.annotId, profese: o.profese, popisek: o.popisek,
+    annotId: o.annotId, annotType: o.annotType || null, profese: o.profese, popisek: o.popisek,
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
     createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
-    deadline: o.deadline || null, dateFrom: o.dateFrom || null
+    deadline: o.deadline || null, dateFrom: o.dateFrom || null,
+    linkToLevel: o.linkToLevel || null
   }));
 
   saveState();
