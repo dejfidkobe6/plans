@@ -10735,7 +10735,7 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
 }
 
 // ── KD in-PDF filter: navigation page ─────────────────────────────────────────
-function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, overviewPage, subPageNums, inclDone) {
+function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, overviewPage, subPageNums, inclDone, subsOverride) {
   const csT = s => csText(String(s || ''));
   const PT_MM = 72 / 25.4;
   const tw = (t, fs) => pdf.getStringUnitWidth(csT(t)) * fs / PT_MM;
@@ -10802,7 +10802,7 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
   }
 
   // Per-subcontractor rows (three columns)
-  const subsWithPages = profList.filter(p=>subPageNums[p.name]);
+  const subsWithPages = subsOverride != null ? subsOverride : profList.filter(p=>subPageNums[p.name]);
   const NCOLS=3, COL_GAP=3;
   const colW=(rowW-(NCOLS-1)*COL_GAP)/NCOLS;
   let col=0;
@@ -11067,11 +11067,23 @@ async function doExportPDF() {
       _kdAllAnnots = getAllAnnotations();
     }
 
-    // ── KD filter: reserve nav page (filled in after per-sub pages) ───────────
+    // ── KD filter: reserve nav page(s) (filled in after per-sub pages) ─────────
+    // ROW_H=8, NCOLS=3, gap=2 → first page holds 45 subs (overview takes space),
+    // subsequent pages hold 51 subs each.
+    const _KD_NAV_FIRST_CAP = 45;
+    const _KD_NAV_NEXT_CAP  = 51;
+    let _kdNavPageNums = [];
     if (includeKDFilter && _kdProfList) {
-      if (!first) pdf.addPage();
-      first = false;
-      _kdNavPageNum = pdf.getNumberOfPages();
+      const maxSubs = _kdProfList.length;
+      const navPagesNeeded = maxSubs <= _KD_NAV_FIRST_CAP
+        ? 1
+        : 1 + Math.ceil((maxSubs - _KD_NAV_FIRST_CAP) / _KD_NAV_NEXT_CAP);
+      for (let _ni = 0; _ni < navPagesNeeded; _ni++) {
+        if (!first || _ni > 0) pdf.addPage();
+        first = false;
+        _kdNavPageNums.push(pdf.getNumberOfPages());
+      }
+      _kdNavPageNum = _kdNavPageNums[0];
     }
 
     // ── KD records: all tasks by chapter/section ──────────────────────────────
@@ -11176,10 +11188,20 @@ async function doExportPDF() {
         drawKDSubPageToPDF(pdf, prof, _kdSorted||[], profAnnots, _pdfLogo, PW, PH, inclHotovo, _kdNavPageNum);
       }
 
-      // Fill in the reserved nav page (all page numbers now known)
-      if (_kdNavPageNum) {
-        pdf.setPage(_kdNavPageNum);
-        drawKDNavPage(pdf, _kdProfList, _kdSorted||[], _kdAllAnnots||[], _pdfLogo, PW, PH, _kdOverviewStart, _kdSubPageNums, inclHotovo);
+      // Fill in reserved nav page(s) (all page numbers now known)
+      if (_kdNavPageNums.length > 0) {
+        const _allNavSubs = (_kdProfList||[]).filter(p => _kdSubPageNums[p.name]);
+        let _subOffset = 0;
+        _kdNavPageNums.forEach((_navPgNum, _pgIdx) => {
+          const _cap = _pgIdx === 0 ? _KD_NAV_FIRST_CAP : _KD_NAV_NEXT_CAP;
+          const _chunk = _allNavSubs.slice(_subOffset, _subOffset + _cap);
+          _subOffset += _cap;
+          pdf.setPage(_navPgNum);
+          // Overview row only on first nav page; subsequent pages pass null to skip it
+          drawKDNavPage(pdf, _kdProfList, _kdSorted||[], _kdAllAnnots||[], _pdfLogo, PW, PH,
+            _pgIdx === 0 ? _kdOverviewStart : null,
+            _kdSubPageNums, inclHotovo, _chunk);
+        });
         pdf.setPage(pdf.getNumberOfPages());
       }
     }
