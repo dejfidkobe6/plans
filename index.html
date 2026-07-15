@@ -2987,6 +2987,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   padding: 0 12px; border-left: 1px solid var(--border);
   font-family: var(--font-mono); font-size: 11px;
   margin-left: auto;
+  flex-shrink: 0;
 }
 #topbar-user-name { color: var(--text-dim); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 #topbar-project-name { color: var(--olive-light); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
@@ -2998,6 +2999,42 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 #topbar-switch-project-btn:hover { border-color: var(--olive); color: var(--olive-light); }
 #topbar-logout-btn:hover { border-color: #EF4444; color: #EF4444; }
+
+/* ============================================================
+   RESPONSIVE – narrow desktop (769px – 1450px)
+   #topbar-user-info is always visible; other parts shrink.
+   ============================================================ */
+
+/* ≤1450px: nav buttons icon-only (hide text labels) */
+@media (max-width: 1450px) and (min-width: 769px) {
+  #topbar-actions button span { display: none; }
+  #topbar-actions button {
+    padding: 0 10px;
+    gap: 0;
+  }
+}
+
+/* ≤1100px: hide project name + separator dot; tighten user-info */
+@media (max-width: 1100px) and (min-width: 769px) {
+  #topbar-project-name, .topbar-sep-dot { display: none; }
+  #topbar-user-name { max-width: 90px; }
+  #topbar-user-info { gap: 5px; padding: 0 8px; }
+}
+
+/* ≤920px: hide user name; shrink tool buttons */
+@media (max-width: 920px) and (min-width: 769px) {
+  #topbar-user-name { display: none; }
+  #topbar-user-info { gap: 4px; padding: 0 6px; }
+  .tb-btn { width: 28px; height: 28px; }
+  #toolbar-right { gap: 1px; padding: 0 4px; }
+}
+
+/* ≤840px: even smaller tool buttons */
+@media (max-width: 840px) and (min-width: 769px) {
+  .tb-btn { width: 24px; height: 24px; }
+  .tb-btn svg { width: 13px; height: 13px; }
+  .tb-separator { margin: 0 1px; }
+}
 
 /* ============================================================
    RESPONSIVE – mobile (≤ 768px)
