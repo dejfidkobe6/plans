@@ -142,6 +142,7 @@ body {
   height: 48px;
   flex-shrink: 0;
   z-index: 100;
+  overflow: hidden; /* prevent any child from pushing off-screen */
 }
 #logo {
   display: flex;
@@ -342,6 +343,11 @@ body {
   gap: 2px;
   padding: 0 8px;
   border-left: 1px solid var(--border);
+  /* Grow to fill space between nav and user-info; shrink + clip when
+     the window is narrow so #topbar-user-info always stays visible. */
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .tb-btn {
   display: flex; align-items: center; justify-content: center;
