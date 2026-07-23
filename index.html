@@ -6181,10 +6181,18 @@ function labelLineDates(obj) {
   return null;
 }
 
+// O(1) label lookup cache — stale entries auto-expire when canvas removes the object
+const _labelCache = new Map();
 function findLabel(annotId) {
   if (!annotId) return null;
-  return fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
+  const cached = _labelCache.get(annotId);
+  if (cached && cached.canvas) return cached; // canvas ref is null when object was removed
+  _labelCache.delete(annotId);
+  const found = fabricCanvas.getObjects().find(o => o.annotLabelFor === annotId);
+  if (found) _labelCache.set(annotId, found);
+  return found || null;
 }
+function _invalidateLabelCache() { _labelCache.clear(); }
 
 const LABEL_COMPACT_ZOOM = 2.0; // below this threshold show only contractor name
 let _labelsCompact = null;       // tracks current label mode to detect threshold crossing
@@ -6359,11 +6367,13 @@ function deconflictLabels() {
             lbl.top  = ac.y + (lc.y - ac.y) * scale - lblH / 2;
           }
         }
-        lbl.setCoords(); rects[mi] = getR(lbl);
+        rects[mi] = getR(lbl); // defer setCoords() until after all iterations
       }
     }
     if (!moved) break;
   }
+  // Batch setCoords after all push-apart iterations (was called inside the O(n²) inner loop)
+  labels.forEach(lbl => lbl.setCoords());
 }
 
 function createAnnotLabel(obj) {
@@ -6438,6 +6448,7 @@ function createAnnotLabel(obj) {
   fabricCanvas.add(group);
   positionLabel(group, obj);
   if (!showHotovo && obj.status === 'Hotovo') group.visible = false;
+  _labelCache.set(obj.annotId, group);
   return group;
 }
 
@@ -6467,6 +6478,7 @@ function createLevelLinkLabel(obj) {
   fabricCanvas.add(group);
   positionLabel(group, obj);
   if (!showHotovo && obj.status === 'Hotovo') group.visible = false;
+  _labelCache.set(obj.annotId, group);
   return group;
 }
 
@@ -6519,6 +6531,7 @@ function updateLabelFor(annotId) {
 }
 
 function rebuildAllLabels() {
+  _labelCache.clear();
   const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
   existing.forEach(l => fabricCanvas.remove(l));
   getAnnotObjects().forEach(obj => createAnnotLabel(obj));
@@ -6642,13 +6655,16 @@ function applyHotovoVisibility() {
     btn.style.opacity = showHotovo ? '1' : '0.5';
     btn.title = showHotovo ? 'Skrýt dokončené úkoly' : 'Zobrazit dokončené úkoly';
   }
-  fabricCanvas.getObjects().forEach(o => {
+  const _objs = fabricCanvas.getObjects();
+  // Build label map once (O(n)) instead of calling findLabel() per annotation (was O(n²))
+  const _lblMap = new Map(_objs.filter(o => o.annotLabelFor).map(o => [o.annotLabelFor, o]));
+  _objs.forEach(o => {
     if (!o.annotId || o.isBackground || o.annotLabelFor) return;
     const shouldBeVisible = o.status !== 'Hotovo' || showHotovo;
     o.visible    = shouldBeVisible;
     o.selectable = shouldBeVisible;
     o.evented    = shouldBeVisible;
-    const lbl = findLabel(o.annotId);
+    const lbl = _lblMap.get(o.annotId);
     if (lbl) lbl.visible = shouldBeVisible;
   });
   fabricCanvas.renderAll();
@@ -6883,13 +6899,13 @@ function setupEventListeners() {
       vpt[4] = lastViewportX + dx;
       vpt[5] = lastViewportY + dy;
       cw.setViewportTransform(vpt);
-      cw.renderAll();
+      cw.requestRenderAll();
       return;
     }
 
     if ((appState.tool === 'polygon' || appState.tool === 'polyline') && polyPreviewLine) {
       polyPreviewLine.set({ x2: pointer.x, y2: pointer.y });
-      fabricCanvas.renderAll();
+      fabricCanvas.requestRenderAll();
       return;
     }
 
@@ -6907,7 +6923,7 @@ function setupEventListeners() {
       } else if (tempShape) {
         tempShape.set({ x2: pointer.x, y2: pointer.y });
       }
-      fabricCanvas.renderAll();
+      fabricCanvas.requestRenderAll();
       return;
     }
 
@@ -6927,7 +6943,7 @@ function setupEventListeners() {
     } else if (appState.tool === 'levellink') {
       tempShape.set({ x2: pointer.x, y2: pointer.y });
     }
-    cw.renderAll();
+    cw.requestRenderAll();
   });
 
   // Mouse up
@@ -7116,7 +7132,7 @@ function setupEventListeners() {
     vpt[4] = _midVptX + (e.clientX - _midStartX);
     vpt[5] = _midVptY + (e.clientY - _midStartY);
     cw.setViewportTransform(vpt);
-    cw.renderAll();
+    cw.requestRenderAll();
   });
   window.addEventListener('mouseup', (e) => {
     if (e.button !== 1 || !_midPanning) return;
