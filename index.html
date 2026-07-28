@@ -7730,6 +7730,9 @@ function updateActiveAnnotProp(prop, value) {
 
   obj.set(prop, value);
   obj.updatedAt = Date.now();
+  if (prop === 'status') {
+    obj.completedAt = (value === 'Hotovo') ? new Date().toISOString().slice(0, 10) : null;
+  }
 
   // Update annotation label
   if (prop === 'profese' || prop === 'popisek' || prop === 'deadline' || prop === 'dateFrom') {
@@ -7847,6 +7850,7 @@ function deselectAnnot() {
 function _markAnnotAsDone(obj) {
   if (!obj || obj.isBackground || !obj.annotId) return;
   obj.set('status', 'Hotovo');
+  obj.completedAt = new Date().toISOString().slice(0, 10);
   applyAnnotColorToCanvas(obj);
   updateLabelFor(obj.annotId);
   applyStatusButtons('Hotovo');
@@ -9237,8 +9241,8 @@ function goToAnnotation(levelIdx, annotId) {
 let anotaceSort = { col: 'createdAt', dir: 'desc' };
 
 // Annotation table column definitions + order
-const ATBL_MOVABLE = ['annotId','firma','profese','popisek','levelName','priorita','status','prirazeno','deadline','createdAt'];
-const ATBL_LABELS  = { annotId:'ID', firma:'Firma', profese:'Profese', popisek:'Popis', levelName:'Podlaží', priorita:'Priorita', status:'Status', prirazeno:'Přiřazeno', deadline:'Termín', createdAt:'Vytvořeno' };
+const ATBL_MOVABLE = ['annotId','firma','profese','popisek','levelName','priorita','status','prirazeno','deadline','createdAt','completedAt'];
+const ATBL_LABELS  = { annotId:'ID', firma:'Firma', profese:'Profese', popisek:'Popis', levelName:'Podlaží', priorita:'Priorita', status:'Status', prirazeno:'Přiřazeno', deadline:'Termín', createdAt:'Vytvořeno', completedAt:'Dokončeno' };
 const ATBL_STATUS_COLORS = {
   'Nový úkol': { bg: 'rgba(245,158,11,0.13)', border: '#F59E0B', color: '#7c5800' },
   'Probíhá':   { bg: 'rgba(59,130,246,0.13)',  border: '#3B82F6', color: '#1e3a6e' },
@@ -9271,8 +9275,9 @@ function atblCellHTML(key, r) {
       return `<td class="tcell-status"><select style="background:${sc.bg};border-color:${sc.border};color:${sc.color}" onchange="updateAnnotStatusFromAnotacePage('${escHtml(r.annotId)}',${r.levelIdx},this.value)">${opts}</select></td>`;
     }
     case 'prirazeno': return `<td class="tcell-prirazeno">${escHtml(r.prirazeno||'—')}</td>`;
-    case 'deadline':  return `<td class="tcell-date">${escHtml(r.deadline||'—')}</td>`;
-    case 'createdAt': return `<td class="tcell-date">${escHtml(r.createdAt ? r.createdAt.slice(0,10) : '—')}</td>`;
+    case 'deadline':     return `<td class="tcell-date">${escHtml(r.deadline||'—')}</td>`;
+    case 'createdAt':   return `<td class="tcell-date">${escHtml(r.createdAt ? r.createdAt.slice(0,10) : '—')}</td>`;
+    case 'completedAt': return `<td class="tcell-date">${escHtml(r.completedAt||'—')}</td>`;
     default: return '';
   }
 }
@@ -11418,6 +11423,7 @@ function saveCurrentLevel() {
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
     createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
     deadline: o.deadline || null, dateFrom: o.dateFrom || null,
+    completedAt: o.completedAt || null,
     linkToLevel: o.linkToLevel || null
   }));
 
