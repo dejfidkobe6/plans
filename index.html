@@ -55,6 +55,8 @@
   --vlastni: #6B7280;
   --font-mono: 'IBM Plex Mono', monospace;
   --font-main: 'Barlow Condensed', sans-serif;
+  /* KD board: fixed chrome above cards (topbar 48 + bottom-pad 26 + meta-bar ~40 + filter-bar ~42 + inner-pad 28 + buffer 11) */
+  --kd-cards-chrome: 195px;
 }
 #annot-tooltip {
   display: none;
@@ -1588,9 +1590,7 @@ option { background: var(--card); color: var(--text); }
   width: 420px; min-width: 240px; background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
-  /* 100vh minus: topbar(48) + kd-page bottom(26) + meta-bar(~40)
-     + filter-bar(~42) + inner-padding(28) = ~184px; use 195 for safety */
-  max-height: calc(100vh - 195px);
+  max-height: calc(100vh - var(--kd-cards-chrome));
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow: hidden;
 }
