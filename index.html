@@ -1724,8 +1724,11 @@ option { background: var(--card); color: var(--text); }
   padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
   flex-shrink: 0;
   background: var(--bg);
-  /* Sticky works because zoom is applied to .kd-chapter-cards, not here */
-  position: sticky; top: 0; z-index: 10;
+  /* Dual-axis sticky: top:0 locks on vertical scroll, left:0 locks on horizontal scroll.
+     width:max-content makes the element narrower than the scroll container so left sticky
+     actually triggers; ::after extends the visual bg/border-bottom across the full row. */
+  position: sticky; top: 0; left: 0; z-index: 10;
+  width: max-content;
   overflow: visible;
 }
 .kd-chapter-header::after {
@@ -1769,7 +1772,7 @@ option { background: var(--card); color: var(--text); }
   box-sizing: border-box; text-align: center; overflow: hidden; text-overflow: ellipsis;
 }
 .kd-chapter-title-input {
-  flex: 1; background: transparent; border: none; outline: none;
+  flex: 1; min-width: 180px; background: transparent; border: none; outline: none;
   font-family: var(--font-mono); font-size: 24px; font-weight: 700;
   color: var(--olive-light); text-transform: uppercase; letter-spacing: 0.06em;
   cursor: pointer; padding: 1px 3px;
@@ -12633,15 +12636,8 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
-  const scrollLeft = scroll.scrollLeft;
 
-  // Keep chapter headers anchored at the left edge when horizontal scroll is active.
-  // position:sticky top:0 handles vertical; we compensate horizontal manually
-  // because the element's natural left is always 0 (CSS sticky:left won't trigger).
-  const isMobile = window.innerWidth <= 768;
-  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
-    el.style.transform = (!isMobile && scrollLeft > 0) ? `translateX(${scrollLeft}px)` : '';
-  });
+  // Chapter headers use CSS position:sticky top:0 left:0 — no JS needed.
 
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
