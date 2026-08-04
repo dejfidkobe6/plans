@@ -1720,24 +1720,18 @@ option { background: var(--card); color: var(--text); }
   display: flex; flex-direction: column; gap: 8px;
 }
 .kd-chapter-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
+  /* Full-width outer shell: vertical sticky + background + olive border line */
+  position: sticky; top: 0; z-index: 10;
   flex-shrink: 0;
   background: var(--bg);
-  /* Dual-axis sticky: top:0 locks on vertical scroll, left:0 locks on horizontal scroll.
-     width:max-content makes the element narrower than the scroll container so left sticky
-     actually triggers; ::after extends the visual bg/border-bottom across the full row. */
-  position: sticky; top: 0; left: 0; z-index: 10;
-  width: max-content;
+  border-bottom: 2px solid var(--olive);
   overflow: visible;
 }
-.kd-chapter-header::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: -2px; left: 100%;
-  width: 9999px;
-  background: var(--bg);
-  border-bottom: 2px solid var(--olive);
+/* Inner wrapper sticks horizontally so the title always shows at the left edge */
+.kd-chapter-header-inner {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 0 5px;
+  position: sticky; left: 0;
 }
 /* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
 .kd-card-headers-bar {
@@ -1772,7 +1766,7 @@ option { background: var(--card); color: var(--text); }
   box-sizing: border-box; text-align: center; overflow: hidden; text-overflow: ellipsis;
 }
 .kd-chapter-title-input {
-  flex: 1; min-width: 180px; background: transparent; border: none; outline: none;
+  flex: 1; background: transparent; border: none; outline: none;
   font-family: var(--font-mono); font-size: 24px; font-weight: 700;
   color: var(--olive-light); text-transform: uppercase; letter-spacing: 0.06em;
   cursor: pointer; padding: 1px 3px;
@@ -12987,6 +12981,7 @@ function kdBuildChapter(rec, ch, isLive) {
   const el = document.createElement('div'); el.className = 'kd-chapter'; el.dataset.chapterId = ch.id;
 
   const hdr = document.createElement('div'); hdr.className = 'kd-chapter-header';
+  const hdrInner = document.createElement('div'); hdrInner.className = 'kd-chapter-header-inner';
   const titleInp = document.createElement('input');
   titleInp.className = 'kd-chapter-title-input'; titleInp.value = ch.title || '';
   titleInp.placeholder = 'Název kapitoly...'; titleInp.readOnly = !isLive;
@@ -12998,9 +12993,10 @@ function kdBuildChapter(rec, ch, isLive) {
       rec.chapters = rec.chapters.filter(c => c.id !== ch.id);
       kdSave(); kdRenderPage();
     };
-    hdr.appendChild(delBtn);
+    hdrInner.appendChild(delBtn);
   }
-  hdr.appendChild(titleInp);
+  hdrInner.appendChild(titleInp);
+  hdr.appendChild(hdrInner);
   el.appendChild(hdr);
 
   // Sticky section-names bar (outside zoom — CSS sticky works here)
