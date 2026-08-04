@@ -1588,7 +1588,10 @@ option { background: var(--card); color: var(--text); }
   width: 420px; min-width: 240px; background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
-  max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  /* 100vh minus: topbar(48) + kd-page bottom(26) + meta-bar(~40)
+     + filter-bar(~42) + inner-padding(28) = ~184px; use 195 for safety */
+  max-height: calc(100vh - 195px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow: hidden;
 }
 .kd-card-header {
