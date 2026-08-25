@@ -171,7 +171,18 @@ function mergeKDRecords(array $server, array $client): array {
 }
 
 function mergeKDRecord(array $server, array $client): array {
-    $merged             = $client; // date, note: klient vyhrává
+    $merged = $client; // date: klient vyhrává (mění se zřídka, nekoliduje)
+
+    // note: merge podle timestampu (stejný princip jako u úkolů níže) — jinak
+    // starší lokální kopie od jiného uživatele/tabu při dalším uložení potichu
+    // přepíše čerstvě napsanou poznámku.
+    $serverNoteTs = (int)($server['noteWrittenAt'] ?? 0);
+    $clientNoteTs = (int)($client['noteWrittenAt'] ?? 0);
+    if ($serverNoteTs > $clientNoteTs) {
+        $merged['note']          = $server['note'] ?? null;
+        $merged['noteWrittenAt'] = $serverNoteTs;
+    }
+
     $merged['chapters'] = mergeKDById(
         $server['chapters'] ?? [],
         $client['chapters'] ?? [],
@@ -195,7 +206,19 @@ function mergeKDCard(array $server, array $client): array {
     $merged['tasks'] = mergeKDById(
         $server['tasks'] ?? [],
         $client['tasks'] ?? [],
-        null // úkoly: last-write-wins per task ID (žádný sub-merge)
+        'mergeKDTask' // timestamp-based: vyhrává novější writtenAt, ne kdo uložil poslední
     );
     return $merged;
+}
+
+// Úkol: zachovej stranu (server/klient), která byla naposledy skutečně
+// upravena (task.writtenAt), místo bezpodmínečného "klient vždy vyhrává".
+// Bez toho starší lokální snapshot (např. z jiné otevřené záložky, kde
+// uživatel jen odškrtl jiný úkol) při uložení tiše přepíše čerstvě napsaný
+// víceřádkový text úkolu. Chybí-li writtenAt na obou stranách (staré
+// záznamy), spadne to zpět na původní chování — klient vyhrává.
+function mergeKDTask(array $server, array $client): array {
+    $serverTs = (int)($server['writtenAt'] ?? 0);
+    $clientTs = (int)($client['writtenAt'] ?? 0);
+    return $clientTs >= $serverTs ? $client : $server;
 }

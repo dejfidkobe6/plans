@@ -13187,12 +13187,14 @@ function kdBuildTask(rec, card, task, isLive) {
   const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => {
     task.dateFrom = v;
     if (v && task.dateTo && v > task.dateTo) { task.dateTo = v; inpDo._setValue(v); }
+    task.writtenAt = Date.now();
     kdSave();
   }) : () => {});
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
   const inpDo = mkDateWidget(task.dateTo, isLive ? (v => {
     task.dateTo = v;
     if (v && task.dateFrom && v < task.dateFrom) { task.dateFrom = v; inpOd._setValue(v); }
+    task.writtenAt = Date.now();
     kdSave();
   }) : () => {});
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
@@ -13205,7 +13207,7 @@ function kdBuildTask(rec, card, task, isLive) {
     const txt = document.createElement('span'); txt.textContent = loc;
     if (isLive) {
       const del = document.createElement('button'); del.className = 'kd-task-loc-del'; del.textContent = '×';
-      del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); kdSave(); kdRenderContent(); };
+      del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
       chip.appendChild(del);
     }
     chip.insertBefore(txt, chip.firstChild); locsEl.appendChild(chip);
@@ -13223,7 +13225,7 @@ function kdBuildTask(rec, card, task, isLive) {
   urgBtn.className = 'kd-task-urgent-btn' + (task.urgent ? ' on' : '');
   urgBtn.title = task.urgent ? 'Urgentní – kliknutím zrušit' : 'Označit jako urgentní';
   urgBtn.textContent = '!';
-  if (isLive) urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
+  if (isLive) urgBtn.onclick = () => { task.urgent = !task.urgent; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
   else urgBtn.disabled = true;
   ctrl.appendChild(urgBtn);
 
@@ -13232,7 +13234,7 @@ function kdBuildTask(rec, card, task, isLive) {
   doneBtn.className = 'kd-task-done-btn' + (task.done ? ' on' : '');
   doneBtn.title = task.done ? 'Splněno – kliknutím zrušit' : 'Označit jako splněno';
   doneBtn.textContent = '✓';
-  if (isLive) doneBtn.onclick = () => { task.done = !task.done; kdSave(); kdRenderContent(); };
+  if (isLive) doneBtn.onclick = () => { task.done = !task.done; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
   else doneBtn.disabled = true;
   ctrl.appendChild(doneBtn);
 
@@ -13385,7 +13387,7 @@ function kdOpenSubPop(e, rec, task) {
   const items = [{ value: null, label: 'Žádný', dot: '#ccc', em: true }];
   [...(appState.profese || [])].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'))
     .forEach(p => items.push({ value: p.name, label: p.firma||p.name, dot: p.color||'#888' }));
-  openSearchPop(e.target, items, val => { task.sub = val; kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
+  openSearchPop(e.target, items, val => { task.sub = val; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
 }
 
 // ── Location popover (only unselected locations shown) ──────────
@@ -13408,6 +13410,7 @@ function kdOpenLocPop(e, task) {
     d.onclick = e2 => {
       e2.stopPropagation();
       if (!task.locations.includes(loc)) task.locations.push(loc);
+      task.writtenAt = Date.now();
       kdCloseAllPops();
       kdSave(); kdRenderContent();
     };
@@ -13449,7 +13452,7 @@ function kdSetupPage() {
   document.getElementById('kd-note-input').addEventListener('input', e => {
     if (_kdViewingBackup) return;
     const rec = kdRecords.find(r => r.id === kdActiveId);
-    if (rec) { rec.note = e.target.value; kdSave(); }
+    if (rec) { rec.note = e.target.value; rec.noteWrittenAt = Date.now(); kdSave(); }
   });
   document.getElementById('kd-add-chapter-btn').addEventListener('click', () => {
     if (_kdViewingBackup) return;
