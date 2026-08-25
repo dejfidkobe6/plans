@@ -184,10 +184,113 @@ function logoutSession(): void {
 function getPlansAppId(): int {
     static $id = null;
     if ($id) return $id;
-    $row = getDB()->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
-    if (!$row) jsonError('Plans app není registrována v DB. Spusť setup.sql.', 500);
-    $id = (int)$row['id'];
-    return $id;
+    $db = getDB();
+
+    // 1) Try to recreate apps table if dropped/renamed externally
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS apps (
+            id      INT AUTO_INCREMENT PRIMARY KEY,
+            app_key VARCHAR(64) NOT NULL UNIQUE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (\Exception $e) { /* no CREATE privilege – continue to fallbacks */ }
+
+    // 2) Query apps table for the plans row
+    try {
+        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+        if ($row) { $id = (int)$row['id']; return $id; }
+    } catch (\Exception $e) { /* apps table still unavailable */ }
+
+    // 3) Find app_id by joining projects with a plans-specific table (avoids
+    //    confusing board.besix.cz projects which share the same projects table)
+    $plansAppId = null;
+    $plansTables = ['plan_canvas_data', 'plan_backgrounds'];
+    foreach ($plansTables as $tbl) {
+        try {
+            $r = $db->query("SELECT DISTINCT p.app_id FROM plan_projects p
+                             INNER JOIN `$tbl` t ON t.project_id = p.id
+                             WHERE p.app_id IS NOT NULL LIMIT 1")->fetch();
+            if ($r && $r['app_id']) { $plansAppId = (int)$r['app_id']; break; }
+        } catch (\Exception $e2) {}
+    }
+
+    // 4) Fall back to any app_id in projects if no plans-specific data exists yet
+    if (!$plansAppId) {
+        try {
+            $r = $db->query("SELECT DISTINCT app_id FROM plan_projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
+            if ($r && $r['app_id']) $plansAppId = (int)$r['app_id'];
+        } catch (\Exception $e) {}
+    }
+
+    // 5) Re-register in apps table with the found ID so future requests are fast
+    if ($plansAppId) {
+        try {
+            $db->exec("INSERT IGNORE INTO apps (id, app_key) VALUES ($plansAppId, '" . PLANS_APP_KEY . "')");
+        } catch (\Exception $e) {}
+        $id = $plansAppId;
+        return $id;
+    }
+
+    // 6) Fresh install: insert a new row with auto-increment
+    try {
+        $db->exec("INSERT IGNORE INTO apps (app_key) VALUES ('" . PLANS_APP_KEY . "')");
+        $row = $db->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+        if ($row) { $id = (int)$row['id']; return $id; }
+    } catch (\Exception $e) {}
+
+    jsonError('Nelze zjistit plans app_id z DB.', 500);
+}
+
+// ============================================================
+// Ensure plan project tables exist (creates + migrates from board_projects)
+// ============================================================
+function _ensureProjectTables(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $db = getDB();
+
+    $db->exec("CREATE TABLE IF NOT EXISTS plan_projects (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        app_id      INT          NOT NULL,
+        name        VARCHAR(255) NOT NULL,
+        created_by  INT          NOT NULL,
+        invite_code VARCHAR(64)  DEFAULT NULL,
+        is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_app (app_id),
+        INDEX idx_creator (created_by)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS plan_project_members (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        project_id  INT         NOT NULL,
+        user_id     INT         NOT NULL,
+        role        VARCHAR(32) NOT NULL DEFAULT 'viewer',
+        invited_by  INT         DEFAULT NULL,
+        joined_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_pm (project_id, user_id),
+        INDEX      idx_uid (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // One-time migration from board_projects → projects (runs only when projects is empty)
+    $empty = ((int)$db->query("SELECT COUNT(*) FROM plan_projects")->fetchColumn()) === 0;
+    if ($empty) {
+        try {
+            $appRow = $db->query("SELECT id FROM apps WHERE app_key = 'plans' LIMIT 1")->fetch();
+            $appId  = $appRow ? (int)$appRow['id'] : 1;
+            $db->exec("INSERT IGNORE INTO plan_projects
+                           (id, app_id, name, created_by, invite_code, is_active, created_at)
+                       SELECT id, app_id, name, created_by, invite_code, is_active, created_at
+                       FROM board_projects
+                       WHERE app_id = $appId");
+            $db->exec("INSERT IGNORE INTO plan_project_members
+                           (id, project_id, user_id, role, invited_by, joined_at)
+                       SELECT bpm.id, bpm.project_id, bpm.user_id, bpm.role,
+                              bpm.invited_by, bpm.joined_at
+                       FROM board_project_members bpm
+                       INNER JOIN plan_projects p ON p.id = bpm.project_id");
+        } catch (\Exception $e) { /* board_projects unavailable – skip */ }
+    }
 }
 
 // ============================================================
@@ -195,16 +298,16 @@ function getPlansAppId(): int {
 // ============================================================
 function getProjectMembership(int $projectId, int $userId): array|false {
     $db   = getDB();
-    $stmt = $db->prepare('SELECT id, role FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
+    $stmt = $db->prepare('SELECT id, role FROM plan_project_members WHERE project_id = ? AND user_id = ? LIMIT 1');
     $stmt->execute([$projectId, $userId]);
     $row = $stmt->fetch();
     if ($row) return $row;
 
-    // Fallback: pokud je user creator projektu, auto-migruj ho do project_members
-    $check = $db->prepare('SELECT id FROM projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
+    // Fallback: pokud je user creator projektu, auto-migruj ho do plan_project_members
+    $check = $db->prepare('SELECT id FROM plan_projects WHERE id = ? AND created_by = ? AND is_active = 1 LIMIT 1');
     $check->execute([$projectId, $userId]);
     if ($check->fetch()) {
-        $db->prepare('INSERT IGNORE INTO project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
+        $db->prepare('INSERT IGNORE INTO plan_project_members (project_id, user_id, role, invited_by) VALUES (?,?,"owner",?)')
            ->execute([$projectId, $userId, $userId]);
         return ['id' => 0, 'role' => 'owner'];
     }
@@ -247,3 +350,6 @@ function sendMail(string $to, string $subject, string $htmlBody): bool {
     $headers .= "Content-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
     return (bool)@mail($to, $subject, $htmlBody, $headers);
 }
+
+// Auto-create / migrate project tables on first request
+_ensureProjectTables();

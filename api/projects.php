@@ -27,14 +27,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $stmt = getDB()->prepare('
         SELECT p.id, p.name, p.created_at, pm.role
-        FROM projects p
-        JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+        FROM plan_projects p
+        JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
         WHERE p.app_id = ? AND p.is_active = 1
         ORDER BY p.created_at DESC
     ');
     $stmt->execute([$userId, $appId]);
     $projects = $stmt->fetchAll();
-    jsonOk(['projects' => $projects]);
+    jsonOk(['plan_projects' => $projects]);
 }
 
 // ============================================================
@@ -50,15 +50,15 @@ if ($method === 'POST') {
     $invite_code = substr(bin2hex(random_bytes(16)), 0, 32);
 
     $db->prepare('
-        INSERT INTO projects (app_id, name, created_by, invite_code, is_active)
+        INSERT INTO plan_projects (app_id, name, created_by, invite_code, is_active)
         VALUES (?, ?, ?, ?, 1)
     ')->execute([$appId, $name, $userId, $invite_code]);
 
     $projectId = (int)$db->lastInsertId();
 
-    // Přidej tvůrce jako owner do project_members
+    // Přidej tvůrce jako owner do plan_project_members
     $db->prepare('
-        INSERT INTO project_members (project_id, user_id, role, invited_by)
+        INSERT INTO plan_project_members (project_id, user_id, role, invited_by)
         VALUES (?, ?, "owner", ?)
     ')->execute([$projectId, $userId, $userId]);
 
@@ -78,12 +78,12 @@ if ($method === 'DELETE') {
     if (!$projectId) jsonError('Chybí ID projektu');
 
     $db   = getDB();
-    $stmt = $db->prepare('SELECT id FROM projects WHERE id = ? AND app_id = ? AND created_by = ? LIMIT 1');
+    $stmt = $db->prepare('SELECT id FROM plan_projects WHERE id = ? AND app_id = ? AND created_by = ? LIMIT 1');
     $stmt->execute([$projectId, $appId, $userId]);
     if (!$stmt->fetch()) jsonError('Projekt nenalezen nebo nemáš oprávnění', 403);
 
     // Soft delete
-    $db->prepare('UPDATE projects SET is_active = 0 WHERE id = ?')->execute([$projectId]);
+    $db->prepare('UPDATE plan_projects SET is_active = 0 WHERE id = ?')->execute([$projectId]);
 
     jsonOk();
 }
