@@ -12617,14 +12617,11 @@ function kdApplyZoom() {
   document.querySelectorAll('#kd-cards-inner .kd-chapter-cards').forEach(el => {
     el.style.zoom = String(_kdZoom);
   });
-  // Sync sticky chip widths/gap to match zoomed card columns
-  const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
-  const chipGap = Math.round(12 * _kdZoom) + 'px';
+  // Sticky chip bar keeps its unzoomed px width/gap (set in kdBuildChapter)
+  // and gets the same `zoom` applied here — identical browser scaling as
+  // the real row, so columns stay aligned instead of drifting per-chip.
   document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar-inner').forEach(inner => {
-    inner.style.gap = chipGap;
-    inner.querySelectorAll('.kd-card-hdr-chip').forEach(chip => {
-      chip.style.width = chipW; chip.style.minWidth = chipW;
-    });
+    inner.style.zoom = String(_kdZoom);
   });
   _kdUpdateSectionBar();
 }
@@ -13008,15 +13005,18 @@ function kdBuildChapter(rec, ch, isLive) {
   hdr.appendChild(titleInp);
   el.appendChild(hdr);
 
-  // Sticky section-names bar (outside zoom — CSS sticky works here)
+  // Sticky section-names bar. Mirrors the real card row using the same
+  // unzoomed px width/gap as .kd-chapter-cards/.kd-card — kdApplyZoom()
+  // then applies the identical `zoom` factor to both, so they scale
+  // through the same browser math and stay pixel-aligned at any zoom
+  // level (manually rounding px per chip drifted more with each column).
   const hdrsBar = document.createElement('div'); hdrsBar.className = 'kd-card-headers-bar';
   const hdrsBarInner = document.createElement('div'); hdrsBarInner.className = 'kd-card-headers-bar-inner';
-  hdrsBarInner.style.gap = Math.round(12 * _kdZoom) + 'px';
+  hdrsBarInner.style.gap = '12px';
   (ch.cards || []).forEach(card => {
     const chip = document.createElement('div'); chip.className = 'kd-card-hdr-chip';
     chip.dataset.cardId = card.id; chip.textContent = card.title || 'Úsek';
-    const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
-    chip.style.width = chipW; chip.style.minWidth = chipW;
+    chip.style.width = _kdCardWidth + 'px'; chip.style.minWidth = '240px';
     hdrsBarInner.appendChild(chip);
   });
   hdrsBar.appendChild(hdrsBarInner);
