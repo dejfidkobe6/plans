@@ -166,6 +166,15 @@ function mergeKDById(array $server, array $client, ?string $mergeFn): array {
     return $result;
 }
 
+// Klientský Date.now() může být kvůli špatně nastaveným hodinám v budoucnosti
+// oproti serveru — bez ořezání by takový klient vyhrával merge natrvalo bez
+// ohledu na to, kdy k úpravě reálně došlo. Ořízni na aktuální serverový čas
+// (+ tolerance na latenci požadavku).
+function kdClampTs(int $ts): int {
+    $maxAllowed = (int) round(microtime(true) * 1000) + 5000;
+    return min($ts, $maxAllowed);
+}
+
 function mergeKDRecords(array $server, array $client): array {
     return mergeKDById($server, $client, 'mergeKDRecord');
 }
@@ -176,11 +185,13 @@ function mergeKDRecord(array $server, array $client): array {
     // note: merge podle timestampu (stejný princip jako u úkolů níže) — jinak
     // starší lokální kopie od jiného uživatele/tabu při dalším uložení potichu
     // přepíše čerstvě napsanou poznámku.
-    $serverNoteTs = (int)($server['noteWrittenAt'] ?? 0);
-    $clientNoteTs = (int)($client['noteWrittenAt'] ?? 0);
+    $serverNoteTs = kdClampTs((int)($server['noteWrittenAt'] ?? 0));
+    $clientNoteTs = kdClampTs((int)($client['noteWrittenAt'] ?? 0));
     if ($serverNoteTs > $clientNoteTs) {
         $merged['note']          = $server['note'] ?? null;
         $merged['noteWrittenAt'] = $serverNoteTs;
+    } else {
+        $merged['noteWrittenAt'] = $clientNoteTs;
     }
 
     $merged['chapters'] = mergeKDById(
@@ -218,7 +229,12 @@ function mergeKDCard(array $server, array $client): array {
 // víceřádkový text úkolu. Chybí-li writtenAt na obou stranách (staré
 // záznamy), spadne to zpět na původní chování — klient vyhrává.
 function mergeKDTask(array $server, array $client): array {
-    $serverTs = (int)($server['writtenAt'] ?? 0);
-    $clientTs = (int)($client['writtenAt'] ?? 0);
-    return $clientTs >= $serverTs ? $client : $server;
+    $serverTs = kdClampTs((int)($server['writtenAt'] ?? 0));
+    $clientTs = kdClampTs((int)($client['writtenAt'] ?? 0));
+    if ($clientTs >= $serverTs) {
+        $client['writtenAt'] = $clientTs;
+        return $client;
+    }
+    $server['writtenAt'] = $serverTs;
+    return $server;
 }
