@@ -1720,18 +1720,21 @@ option { background: var(--card); color: var(--text); }
   display: flex; flex-direction: column; gap: 8px;
 }
 .kd-chapter-header {
-  /* Full-width outer shell: vertical sticky + background + olive border line */
-  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0 5px; border-bottom: 2px solid var(--olive);
   flex-shrink: 0;
   background: var(--bg);
-  border-bottom: 2px solid var(--olive);
+  /* Sticky works because zoom is applied to .kd-chapter-cards, not here */
+  position: sticky; top: 0; z-index: 10;
   overflow: visible;
 }
-/* Inner wrapper sticks horizontally so the title always shows at the left edge */
-.kd-chapter-header-inner {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 4px 0 5px;
-  position: sticky; left: 0;
+.kd-chapter-header::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: -2px; left: 100%;
+  width: 9999px;
+  background: var(--bg);
+  border-bottom: 2px solid var(--olive);
 }
 /* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
 .kd-card-headers-bar {
@@ -12630,17 +12633,25 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
+  const scrollLeft = scroll.scrollLeft;
 
-  // Chapter headers use CSS position:sticky top:0 left:0 — no JS needed.
+  // Keep chapter headers anchored at the left edge when horizontal scroll is active.
+  // position:sticky top:0 handles vertical; we compensate horizontal manually
+  // because the element's natural left is always 0 (CSS sticky:left won't trigger).
+  const isMobile = window.innerWidth <= 768;
+  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
+    el.style.transform = (!isMobile && scrollLeft > 0) ? `translateX(${scrollLeft}px)` : '';
+  });
 
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
     const bar = ch.querySelector(':scope > .kd-card-headers-bar');
     const cardsRow = ch.querySelector(':scope > .kd-chapter-cards');
     if (!bar || !cardsRow) return;
-    // Show bar when the top of the zoomed cards row is behind the sticky chapter header
+    // Show bar when cards have scrolled past the chapter header vertically,
+    // OR when horizontal scroll is active (so the leftmost visible card's name stays readable).
     const rowTop = cardsRow.getBoundingClientRect().top;
-    if (rowTop < scrollTop + CHAPTER_HDR_H) {
+    if (rowTop < scrollTop + CHAPTER_HDR_H || (!isMobile && scrollLeft > 0)) {
       bar.classList.add('active');
     } else {
       bar.classList.remove('active');
@@ -12959,7 +12970,7 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
-  _kdUpdateSectionBar(); // sync horizontal offset if scroll was already non-zero
+  _kdUpdateSectionBar(); // show section-header chips if board is already scrolled
   // On mobile: force overflow:visible so CSS sticky works on .kd-card-header
   if (window.innerWidth <= 768) {
     inner.querySelectorAll('.kd-chapter-cards, .kd-card').forEach(el => {
@@ -12981,7 +12992,6 @@ function kdBuildChapter(rec, ch, isLive) {
   const el = document.createElement('div'); el.className = 'kd-chapter'; el.dataset.chapterId = ch.id;
 
   const hdr = document.createElement('div'); hdr.className = 'kd-chapter-header';
-  const hdrInner = document.createElement('div'); hdrInner.className = 'kd-chapter-header-inner';
   const titleInp = document.createElement('input');
   titleInp.className = 'kd-chapter-title-input'; titleInp.value = ch.title || '';
   titleInp.placeholder = 'Název kapitoly...'; titleInp.readOnly = !isLive;
@@ -12993,10 +13003,9 @@ function kdBuildChapter(rec, ch, isLive) {
       rec.chapters = rec.chapters.filter(c => c.id !== ch.id);
       kdSave(); kdRenderPage();
     };
-    hdrInner.appendChild(delBtn);
+    hdr.appendChild(delBtn);
   }
-  hdrInner.appendChild(titleInp);
-  hdr.appendChild(hdrInner);
+  hdr.appendChild(titleInp);
   el.appendChild(hdr);
 
   // Sticky section-names bar (outside zoom — CSS sticky works here)
