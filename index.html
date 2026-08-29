@@ -1736,8 +1736,11 @@ option { background: var(--card); color: var(--text); }
   background: var(--bg);
   border-bottom: 2px solid var(--olive);
 }
-/* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
+/* Section-headers chip bar: built for the old single-row horizontal-scroll layout,
+   where each chip's x-position matched a card column. Cards now wrap onto multiple
+   rows, so the chips no longer track which row a card actually ended up on — disabled. */
 .kd-card-headers-bar {
+  display: none;
   position: sticky; top: 40px; z-index: 10;
   height: 0; overflow: visible;
   margin-bottom: -8px; /* cancel flex gap so layout is unaffected */
@@ -3154,11 +3157,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     margin: 0 !important;
     overflow: visible !important;
   }
-  /* Section header sticks below chapter header while scrolling through section tasks */
+  /* Not sticky: pinning detached the header from the card's border while scrolling
+     (the card box scrolls away above the viewport, leaving the header floating with
+     no visible frame around it) — keep it in normal flow so the card always looks the same. */
   .kd-card-header {
-    position: sticky !important;
-    top: 40px !important;
-    z-index: 5;
     background: var(--panel) !important;
     border-radius: 8px 8px 0 0 !important;
   }
@@ -12630,31 +12632,16 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
-  const scrollLeft = scroll.scrollLeft;
 
-  // Keep chapter headers AND section-name chips bars anchored at the left viewport
-  // edge when the board scrolls horizontally. position:sticky handles vertical;
-  // we compensate horizontal manually (CSS sticky:left won't trigger here).
-  // Always apply the translateX (even at 0) to avoid a visual jump at scrollLeft=0.
-  const isMobile = window.innerWidth <= 768;
-  // Always apply translateX (even 0px) so the chapter title stays anchored
-  // at the left viewport edge without a visual jump at scrollLeft=0.
-  // The chips bar (.kd-card-headers-bar) must NOT get this offset —
-  // it needs to scroll with the columns so chip positions match column positions.
-  const tx = !isMobile ? `translateX(${scrollLeft}px)` : '';
-  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
-    el.style.transform = tx;
-  });
-
+  // .kd-card-headers-bar is permanently display:none (see its CSS rule) — the board
+  // no longer scrolls horizontally, so this only tracks vertical scroll past the header.
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
     const bar = ch.querySelector(':scope > .kd-card-headers-bar');
     const cardsRow = ch.querySelector(':scope > .kd-chapter-cards');
     if (!bar || !cardsRow) return;
-    // Show bar when cards have scrolled past the chapter header vertically,
-    // OR when horizontal scroll is active (so the leftmost visible card's name stays readable).
     const rowTop = cardsRow.getBoundingClientRect().top;
-    if (rowTop < scrollTop + CHAPTER_HDR_H || (!isMobile && scrollLeft > 0)) {
+    if (rowTop < scrollTop + CHAPTER_HDR_H) {
       bar.classList.add('active');
     } else {
       bar.classList.remove('active');
@@ -12973,7 +12960,7 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
-  _kdUpdateSectionBar(); // show section-header chips if board is already scrolled
+  _kdUpdateSectionBar(); // sync section-headers-bar .active state to current vertical scroll
   // On mobile: force overflow:visible so CSS sticky works on .kd-card-header
   if (window.innerWidth <= 768) {
     inner.querySelectorAll('.kd-chapter-cards, .kd-card').forEach(el => {
