@@ -1571,7 +1571,7 @@ option { background: var(--card); color: var(--text); }
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
 }
 #kd-cards-scroll {
-  flex: 1; overflow-x: auto; overflow-y: auto;
+  flex: 1; overflow-x: hidden; overflow-y: auto;
 }
 #kd-cards-inner {
   display: flex; flex-direction: column; gap: 18px;
@@ -1779,7 +1779,7 @@ option { background: var(--card); color: var(--text); }
 }
 .kd-chapter-del-btn:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
 .kd-chapter-cards {
-  display: flex; flex-direction: row; align-items: flex-start; gap: 12px;
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 12px;
   padding-bottom: 6px; overflow: visible;
 }
 .kd-add-chapter-btn-main {
@@ -12630,20 +12630,6 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
-  const scrollLeft = scroll.scrollLeft;
-
-  // Keep chapter headers AND section-name chips bars anchored at the left viewport
-  // edge when the board scrolls horizontally. position:sticky handles vertical;
-  // we compensate horizontal manually (CSS sticky:left won't trigger here).
-  // Always apply the translateX (even at 0) to avoid a visual jump at scrollLeft=0.
-  const isMobile = window.innerWidth <= 768;
-  const tx = !isMobile ? `translateX(${scrollLeft}px)` : '';
-  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
-    el.style.transform = tx;
-  });
-  document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar').forEach(el => {
-    el.style.transform = tx;
-  });
 
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
