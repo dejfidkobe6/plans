@@ -55,6 +55,8 @@
   --vlastni: #6B7280;
   --font-mono: 'IBM Plex Mono', monospace;
   --font-main: 'Barlow Condensed', sans-serif;
+  /* KD board: fixed chrome above cards (topbar 48 + bottom-pad 26 + meta-bar ~40 + filter-bar ~42 + inner-pad 28 + buffer 11) */
+  --kd-cards-chrome: 195px;
 }
 #annot-tooltip {
   display: none;
@@ -1588,7 +1590,8 @@ option { background: var(--card); color: var(--text); }
   width: 420px; min-width: 240px; background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; flex-shrink: 0;
-  max-height: calc(100vh - 160px); box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  max-height: calc(100vh - var(--kd-cards-chrome));
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow: hidden;
 }
 .kd-card-header {
@@ -12616,14 +12619,11 @@ function kdApplyZoom() {
   document.querySelectorAll('#kd-cards-inner .kd-chapter-cards').forEach(el => {
     el.style.zoom = String(_kdZoom);
   });
-  // Sync sticky chip widths/gap to match zoomed card columns
-  const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
-  const chipGap = Math.round(12 * _kdZoom) + 'px';
+  // Sticky chip bar keeps its unzoomed px width/gap (set in kdBuildChapter)
+  // and gets the same `zoom` applied here — identical browser scaling as
+  // the real row, so columns stay aligned instead of drifting per-chip.
   document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar-inner').forEach(inner => {
-    inner.style.gap = chipGap;
-    inner.querySelectorAll('.kd-card-hdr-chip').forEach(chip => {
-      chip.style.width = chipW; chip.style.minWidth = chipW;
-    });
+    inner.style.zoom = String(_kdZoom);
   });
   _kdUpdateSectionBar();
 }
@@ -12632,15 +12632,31 @@ function _kdUpdateSectionBar() {
   const scroll = document.getElementById('kd-cards-scroll');
   if (!scroll) return;
   const scrollTop = scroll.getBoundingClientRect().top;
+  const scrollLeft = scroll.scrollLeft;
+
+  // Keep chapter headers AND section-name chips bars anchored at the left viewport
+  // edge when the board scrolls horizontally. position:sticky handles vertical;
+  // we compensate horizontal manually (CSS sticky:left won't trigger here).
+  // Always apply the translateX (even at 0) to avoid a visual jump at scrollLeft=0.
+  const isMobile = window.innerWidth <= 768;
+  // Always apply translateX (even 0px) so the chapter title stays anchored
+  // at the left viewport edge without a visual jump at scrollLeft=0.
+  // The chips bar (.kd-card-headers-bar) must NOT get this offset —
+  // it needs to scroll with the columns so chip positions match column positions.
+  const tx = !isMobile ? `translateX(${scrollLeft}px)` : '';
+  document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
+    el.style.transform = tx;
+  });
 
   const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
     const bar = ch.querySelector(':scope > .kd-card-headers-bar');
     const cardsRow = ch.querySelector(':scope > .kd-chapter-cards');
     if (!bar || !cardsRow) return;
-    // Show bar when the top of the zoomed cards row is behind the sticky chapter header
+    // Show bar when cards have scrolled past the chapter header vertically,
+    // OR when horizontal scroll is active (so the leftmost visible card's name stays readable).
     const rowTop = cardsRow.getBoundingClientRect().top;
-    if (rowTop < scrollTop + CHAPTER_HDR_H) {
+    if (rowTop < scrollTop + CHAPTER_HDR_H || (!isMobile && scrollLeft > 0)) {
       bar.classList.add('active');
     } else {
       bar.classList.remove('active');
@@ -12959,7 +12975,7 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
-  _kdUpdateSectionBar(); // sync horizontal offset if scroll was already non-zero
+  _kdUpdateSectionBar(); // show section-header chips if board is already scrolled
   // On mobile: force overflow:visible so CSS sticky works on .kd-card-header
   if (window.innerWidth <= 768) {
     inner.querySelectorAll('.kd-chapter-cards, .kd-card').forEach(el => {
@@ -12997,15 +13013,18 @@ function kdBuildChapter(rec, ch, isLive) {
   hdr.appendChild(titleInp);
   el.appendChild(hdr);
 
-  // Sticky section-names bar (outside zoom — CSS sticky works here)
+  // Sticky section-names bar. Mirrors the real card row using the same
+  // unzoomed px width/gap as .kd-chapter-cards/.kd-card — kdApplyZoom()
+  // then applies the identical `zoom` factor to both, so they scale
+  // through the same browser math and stay pixel-aligned at any zoom
+  // level (manually rounding px per chip drifted more with each column).
   const hdrsBar = document.createElement('div'); hdrsBar.className = 'kd-card-headers-bar';
   const hdrsBarInner = document.createElement('div'); hdrsBarInner.className = 'kd-card-headers-bar-inner';
-  hdrsBarInner.style.gap = Math.round(12 * _kdZoom) + 'px';
+  hdrsBarInner.style.gap = '12px';
   (ch.cards || []).forEach(card => {
     const chip = document.createElement('div'); chip.className = 'kd-card-hdr-chip';
     chip.dataset.cardId = card.id; chip.textContent = card.title || 'Úsek';
-    const chipW = Math.round(_kdCardWidth * _kdZoom) + 'px';
-    chip.style.width = chipW; chip.style.minWidth = chipW;
+    chip.style.width = _kdCardWidth + 'px'; chip.style.minWidth = '240px';
     hdrsBarInner.appendChild(chip);
   });
   hdrsBar.appendChild(hdrsBarInner);
@@ -13185,12 +13204,14 @@ function kdBuildTask(rec, card, task, isLive) {
   const inpOd = mkDateWidget(task.dateFrom, isLive ? (v => {
     task.dateFrom = v;
     if (v && task.dateTo && v > task.dateTo) { task.dateTo = v; inpDo._setValue(v); }
+    task.writtenAt = Date.now();
     kdSave();
   }) : () => {});
   const sepEl = document.createElement('span'); sepEl.className = 'kd-task-date-sep'; sepEl.textContent = '–';
   const inpDo = mkDateWidget(task.dateTo, isLive ? (v => {
     task.dateTo = v;
     if (v && task.dateFrom && v < task.dateFrom) { task.dateFrom = v; inpOd._setValue(v); }
+    task.writtenAt = Date.now();
     kdSave();
   }) : () => {});
   dp.appendChild(inpOd); dp.appendChild(sepEl); dp.appendChild(inpDo);
@@ -13203,7 +13224,7 @@ function kdBuildTask(rec, card, task, isLive) {
     const txt = document.createElement('span'); txt.textContent = loc;
     if (isLive) {
       const del = document.createElement('button'); del.className = 'kd-task-loc-del'; del.textContent = '×';
-      del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); kdSave(); kdRenderContent(); };
+      del.onclick = e => { e.stopPropagation(); task.locations = task.locations.filter(l => l !== loc); task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
       chip.appendChild(del);
     }
     chip.insertBefore(txt, chip.firstChild); locsEl.appendChild(chip);
@@ -13221,7 +13242,7 @@ function kdBuildTask(rec, card, task, isLive) {
   urgBtn.className = 'kd-task-urgent-btn' + (task.urgent ? ' on' : '');
   urgBtn.title = task.urgent ? 'Urgentní – kliknutím zrušit' : 'Označit jako urgentní';
   urgBtn.textContent = '!';
-  if (isLive) urgBtn.onclick = () => { task.urgent = !task.urgent; kdSave(); kdRenderContent(); };
+  if (isLive) urgBtn.onclick = () => { task.urgent = !task.urgent; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
   else urgBtn.disabled = true;
   ctrl.appendChild(urgBtn);
 
@@ -13230,7 +13251,7 @@ function kdBuildTask(rec, card, task, isLive) {
   doneBtn.className = 'kd-task-done-btn' + (task.done ? ' on' : '');
   doneBtn.title = task.done ? 'Splněno – kliknutím zrušit' : 'Označit jako splněno';
   doneBtn.textContent = '✓';
-  if (isLive) doneBtn.onclick = () => { task.done = !task.done; kdSave(); kdRenderContent(); };
+  if (isLive) doneBtn.onclick = () => { task.done = !task.done; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); };
   else doneBtn.disabled = true;
   ctrl.appendChild(doneBtn);
 
@@ -13383,7 +13404,7 @@ function kdOpenSubPop(e, rec, task) {
   const items = [{ value: null, label: 'Žádný', dot: '#ccc', em: true }];
   [...(appState.profese || [])].sort((a,b) => (a.firma||a.name).localeCompare(b.firma||b.name,'cs'))
     .forEach(p => items.push({ value: p.name, label: p.firma||p.name, dot: p.color||'#888' }));
-  openSearchPop(e.target, items, val => { task.sub = val; kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
+  openSearchPop(e.target, items, val => { task.sub = val; task.writtenAt = Date.now(); kdSave(); kdRenderContent(); }, 'Hledat dodavatele...');
 }
 
 // ── Location popover (only unselected locations shown) ──────────
@@ -13406,6 +13427,7 @@ function kdOpenLocPop(e, task) {
     d.onclick = e2 => {
       e2.stopPropagation();
       if (!task.locations.includes(loc)) task.locations.push(loc);
+      task.writtenAt = Date.now();
       kdCloseAllPops();
       kdSave(); kdRenderContent();
     };
@@ -13447,7 +13469,7 @@ function kdSetupPage() {
   document.getElementById('kd-note-input').addEventListener('input', e => {
     if (_kdViewingBackup) return;
     const rec = kdRecords.find(r => r.id === kdActiveId);
-    if (rec) { rec.note = e.target.value; kdSave(); }
+    if (rec) { rec.note = e.target.value; rec.noteWrittenAt = Date.now(); kdSave(); }
   });
   document.getElementById('kd-add-chapter-btn').addEventListener('click', () => {
     if (_kdViewingBackup) return;

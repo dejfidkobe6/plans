@@ -122,16 +122,17 @@ if ($method === 'GET') {
         $lvl['fabricJSON']['objects'] = $objs;
 
         $lvl['annotations'] = array_values(array_map(fn($o) => array_filter([
-            'annotId'   => $o['annotId']   ?? null,
-            'profese'   => $o['profese']   ?? null,
-            'popisek'   => $o['popisek']   ?? null,
-            'priorita'  => $o['priorita']  ?? null,
-            'prirazeno' => $o['prirazeno'] ?? null,
-            'status'    => $o['status']    ?? null,
-            'createdAt' => $o['createdAt'] ?? null,
-            'updatedAt' => $o['updatedAt'] ?? null,
-            'deadline'  => $o['deadline']  ?? null,
-            'dateFrom'  => $o['dateFrom']  ?? null,
+            'annotId'     => $o['annotId']     ?? null,
+            'profese'     => $o['profese']     ?? null,
+            'popisek'     => $o['popisek']     ?? null,
+            'priorita'    => $o['priorita']    ?? null,
+            'prirazeno'   => $o['prirazeno']   ?? null,
+            'status'      => $o['status']      ?? null,
+            'createdAt'   => $o['createdAt']   ?? null,
+            'updatedAt'   => $o['updatedAt']   ?? null,
+            'completedAt' => $o['completedAt'] ?? null,
+            'deadline'    => $o['deadline']    ?? null,
+            'dateFrom'    => $o['dateFrom']    ?? null,
         ], fn($v) => $v !== null), $objs));
     }
     unset($lvl);
