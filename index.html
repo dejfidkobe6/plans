@@ -12637,11 +12637,12 @@ function _kdUpdateSectionBar() {
   // we compensate horizontal manually (CSS sticky:left won't trigger here).
   // Always apply the translateX (even at 0) to avoid a visual jump at scrollLeft=0.
   const isMobile = window.innerWidth <= 768;
+  // Always apply translateX (even 0px) so the chapter title stays anchored
+  // at the left viewport edge without a visual jump at scrollLeft=0.
+  // The chips bar (.kd-card-headers-bar) must NOT get this offset —
+  // it needs to scroll with the columns so chip positions match column positions.
   const tx = !isMobile ? `translateX(${scrollLeft}px)` : '';
   document.querySelectorAll('#kd-cards-inner .kd-chapter-header').forEach(el => {
-    el.style.transform = tx;
-  });
-  document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar').forEach(el => {
     el.style.transform = tx;
   });
 
