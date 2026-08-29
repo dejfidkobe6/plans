@@ -1733,8 +1733,11 @@ option { background: var(--card); color: var(--text); }
   background: var(--bg);
   border-bottom: 2px solid var(--olive);
 }
-/* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
+/* Section-headers chip bar: built for the old single-row horizontal-scroll layout,
+   where each chip's x-position matched a card column. Cards now wrap onto multiple
+   rows, so the chips no longer track which row a card actually ended up on — disabled. */
 .kd-card-headers-bar {
+  display: none;
   position: sticky; top: 40px; z-index: 10;
   height: 0; overflow: visible;
   margin-bottom: -8px; /* cancel flex gap so layout is unaffected */
@@ -3151,11 +3154,10 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     margin: 0 !important;
     overflow: visible !important;
   }
-  /* Section header sticks below chapter header while scrolling through section tasks */
+  /* Not sticky: pinning detached the header from the card's border while scrolling
+     (the card box scrolls away above the viewport, leaving the header floating with
+     no visible frame around it) — keep it in normal flow so the card always looks the same. */
   .kd-card-header {
-    position: sticky !important;
-    top: 40px !important;
-    z-index: 5;
     background: var(--panel) !important;
     border-radius: 8px 8px 0 0 !important;
   }
