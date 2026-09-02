@@ -10244,63 +10244,11 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     .slice()
     .sort((a, b) => (a.firma || a.name).localeCompare(b.firma || b.name, 'cs'));
 
-  // ── Page header (shared with KD pages) ─────────────────────
-  pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, PW, 11, 'F');
-  pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
-  const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
-  if (pdfLogo) pdf.addImage(pdfLogo, 'PNG', _lX, _lY, _lW, _lH);
-  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
-  pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
-  pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
-  pdf.text(cs(currentProject?.name || ''), 38, 7.5);
-
-  // ── Content box ────────────────────────────────────────────
+  // ── Content box (same position on every page) ──────────────
   const lx = 4, ly = 13, lw = PW - 8, lh = PH - ly - 4;
-  pdf.setFillColor(255, 255, 255); pdf.rect(lx, ly, lw, lh, 'F');
-  pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.15); pdf.rect(lx, ly, lw, lh, 'S');
-
-  // Title bar
   const TITLE_H = 10;
-  pdf.setFillColor(242, 244, 240); pdf.rect(lx, ly, lw, TITLE_H, 'F');
-  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
-  pdf.text(cs('DOCHÁZKOVÝ LIST'), lx + 3, ly + TITLE_H * 0.65);
-
-  // "Datum konání KD:" label + editable text field
-  const dateLabel = 'Datum konani KD:';
-  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 85, 75);
-  const dateLabelW = pdf.getStringUnitWidth(dateLabel) * 7 / PT_MM;
-  const dateLabelX = lx + lw * 0.42;
-  const dateFieldX = dateLabelX + dateLabelW + 2;
-  const dateFieldW = 52;
-  pdf.text(dateLabel, dateLabelX, ly + TITLE_H * 0.65);
-
-  // Underline for the date field fallback
-  pdf.setDrawColor(140, 145, 130); pdf.setLineWidth(0.25);
-  pdf.line(dateFieldX, ly + TITLE_H * 0.70, dateFieldX + dateFieldW, ly + TITLE_H * 0.70);
-
-  // Interactive text field for date
-  try {
-    const tf = new pdf.AcroForm.TextField();
-    tf.fieldName = 'datum_kd_' + (rec.id || 'x');
-    tf.Rect = [dateFieldX, ly + 1.5, dateFieldW, TITLE_H - 3];
-    tf.value = rec.date ? rec.date.split('-').reverse().join('.') : '';
-    tf.fontSize = 7;
-    tf.borderColor = [180, 185, 170];
-    tf.borderWidth = 0.4;
-    pdf.addField(tf);
-  } catch(e) { /* fallback: underline already drawn */ }
-
-  // ── "Odeslat zápis" mailto button in title bar ────────────────
-  const allEmails = (appState.profese || []).flatMap(p => getProfEmails(p)).filter(Boolean);
-  if (allEmails.length) {
-    const btnLabel = cs('Odeslat zapis (' + allEmails.length + ')');
-    const btnW = pdf.getStringUnitWidth(btnLabel) * 6 / PT_MM + 6;
-    const btnX = lx + lw - btnW - 2, btnY = ly + (TITLE_H - 5.5) / 2;
-    pdf.setFillColor(60, 90, 25); pdf.roundedRect(btnX, btnY, btnW, 5.5, 0.8, 0.8, 'F');
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(255, 255, 255);
-    pdf.text(btnLabel, btnX + 3, btnY + 5.5 * 0.72);
-    pdf.link(btnX, btnY, btnW, 5.5, { url: 'mailto:' + allEmails.join(';') });
-  }
+  const COLH_Y = ly + TITLE_H;
+  const COLH_H = 6;
 
   // ── Column definitions ─────────────────────────────────────
   const COL_NR    = { x: lx + 1,   w: 8   };
@@ -10312,26 +10260,98 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   const COL_VCF   = { x: lx + 253, w: 12  };
   const COL_CHECK = { x: lx + 265, w: lw - 265 - 1 };
 
-  // ── Column header row ───────────────────────────────────────
-  const COLH_Y = ly + TITLE_H;
-  const COLH_H = 6;
-  pdf.setFillColor(228, 232, 220); pdf.rect(lx, COLH_Y, lw, COLH_H, 'F');
-  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55, 70, 30);
-  const colHdrY = COLH_Y + COLH_H * 0.68;
-  pdf.text('#',                   COL_NR.x,    colHdrY);
-  pdf.text('Firma / Dodavatel',   COL_FIRMA.x, colHdrY);
-  pdf.text('Profese / Role',      COL_ROLE.x,  colHdrY);
-  pdf.text('Kontaktni osoba',     COL_KONT.x,  colHdrY);
-  pdf.text('Telefon',             COL_TEL.x,   colHdrY);
-  pdf.text('E-mail',              COL_EMAIL.x, colHdrY);
-  pdf.text('Vizitka',             COL_VCF.x + 0.5, colHdrY);
-  pdf.text('Pritomen',            COL_CHECK.x, colHdrY);
+  const allEmails = (appState.profese || []).flatMap(p => getProfEmails(p)).filter(Boolean);
 
-  // Vertical header separators
-  pdf.setDrawColor(200, 205, 190); pdf.setLineWidth(0.12);
-  [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_VCF, COL_CHECK].forEach(c => {
-    pdf.line(c.x - 1, COLH_Y, c.x - 1, COLH_Y + COLH_H);
-  });
+  // Draws everything that repeats on every page (top bar, box, title, column
+  // headers, footer note) and returns the Y where data rows start. Called again
+  // for each continuation page so a long supplier list keeps going instead of
+  // being silently cut off at the bottom of page one.
+  function drawChrome(pageNum) {
+    // Page header (shared with KD pages)
+    pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, PW, 11, 'F');
+    pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
+    const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
+    if (pdfLogo) pdf.addImage(pdfLogo, 'PNG', _lX, _lY, _lW, _lH);
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
+    pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
+    pdf.text(cs(currentProject?.name || ''), 38, 7.5);
+
+    // Content box
+    pdf.setFillColor(255, 255, 255); pdf.rect(lx, ly, lw, lh, 'F');
+    pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.15); pdf.rect(lx, ly, lw, lh, 'S');
+
+    // Title bar
+    pdf.setFillColor(242, 244, 240); pdf.rect(lx, ly, lw, TITLE_H, 'F');
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
+    pdf.text(cs(pageNum === 1 ? 'DOCHÁZKOVÝ LIST' : `DOCHÁZKOVÝ LIST (pokracovani, str. ${pageNum})`), lx + 3, ly + TITLE_H * 0.65);
+
+    if (pageNum === 1) {
+      // "Datum konání KD:" label + editable text field
+      const dateLabel = 'Datum konani KD:';
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 85, 75);
+      const dateLabelW = pdf.getStringUnitWidth(dateLabel) * 7 / PT_MM;
+      const dateLabelX = lx + lw * 0.42;
+      const dateFieldX = dateLabelX + dateLabelW + 2;
+      const dateFieldW = 52;
+      pdf.text(dateLabel, dateLabelX, ly + TITLE_H * 0.65);
+
+      // Underline for the date field fallback
+      pdf.setDrawColor(140, 145, 130); pdf.setLineWidth(0.25);
+      pdf.line(dateFieldX, ly + TITLE_H * 0.70, dateFieldX + dateFieldW, ly + TITLE_H * 0.70);
+
+      // Interactive text field for date
+      try {
+        const tf = new pdf.AcroForm.TextField();
+        tf.fieldName = 'datum_kd_' + (rec.id || 'x');
+        tf.Rect = [dateFieldX, ly + 1.5, dateFieldW, TITLE_H - 3];
+        tf.value = rec.date ? rec.date.split('-').reverse().join('.') : '';
+        tf.fontSize = 7;
+        tf.borderColor = [180, 185, 170];
+        tf.borderWidth = 0.4;
+        pdf.addField(tf);
+      } catch(e) { /* fallback: underline already drawn */ }
+
+      // "Odeslat zápis" mailto button in title bar
+      if (allEmails.length) {
+        const btnLabel = cs('Odeslat zapis (' + allEmails.length + ')');
+        const btnW = pdf.getStringUnitWidth(btnLabel) * 6 / PT_MM + 6;
+        const btnX = lx + lw - btnW - 2, btnY = ly + (TITLE_H - 5.5) / 2;
+        pdf.setFillColor(60, 90, 25); pdf.roundedRect(btnX, btnY, btnW, 5.5, 0.8, 0.8, 'F');
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(255, 255, 255);
+        pdf.text(btnLabel, btnX + 3, btnY + 5.5 * 0.72);
+        pdf.link(btnX, btnY, btnW, 5.5, { url: 'mailto:' + allEmails.join(';') });
+      }
+    }
+
+    // Column header row
+    pdf.setFillColor(228, 232, 220); pdf.rect(lx, COLH_Y, lw, COLH_H, 'F');
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55, 70, 30);
+    const colHdrY = COLH_Y + COLH_H * 0.68;
+    pdf.text('#',                   COL_NR.x,    colHdrY);
+    pdf.text('Firma / Dodavatel',   COL_FIRMA.x, colHdrY);
+    pdf.text('Profese / Role',      COL_ROLE.x,  colHdrY);
+    pdf.text('Kontaktni osoba',     COL_KONT.x,  colHdrY);
+    pdf.text('Telefon',             COL_TEL.x,   colHdrY);
+    pdf.text('E-mail',              COL_EMAIL.x, colHdrY);
+    pdf.text('Vizitka',             COL_VCF.x + 0.5, colHdrY);
+    pdf.text('Pritomen',            COL_CHECK.x, colHdrY);
+
+    // Vertical header separators
+    pdf.setDrawColor(200, 205, 190); pdf.setLineWidth(0.12);
+    [COL_FIRMA, COL_ROLE, COL_KONT, COL_TEL, COL_EMAIL, COL_VCF, COL_CHECK].forEach(c => {
+      pdf.line(c.x - 1, COLH_Y, c.x - 1, COLH_Y + COLH_H);
+    });
+
+    // Footer note
+    pdf.setFont('helvetica', 'italic'); pdf.setFontSize(4.5); pdf.setTextColor(150, 155, 140);
+    pdf.text('* Datum konani KD a pritomnost ucastniku lze upravit primo v PDF readeru.', lx + 2, ly + lh - 1.5);
+
+    return COLH_Y + COLH_H;
+  }
+
+  let pageNum = 1;
+  let curY = drawChrome(pageNum);
 
   // ── Data rows — height scales so all suppliers fit on one page ─
   const minRows      = 8;
@@ -10340,9 +10360,9 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
   const BASE_ROW_H  = Math.min(9, Math.max(4, Math.floor(availForRows / rowCount)));
   const ROW_FS = Math.max(4, BASE_ROW_H * 0.67);
   const LINE_H = ROW_FS / (72 / 25.4) * 1.4; // line height in mm
-  let curY = COLH_Y + COLH_H;
 
-  suppliers.forEach((p, i) => {
+  for (let i = 0; i < suppliers.length; i++) {
+    const p = suppliers[i];
     const pEmails = getProfEmails(p);
 
     // Pack emails side-by-side; wrap to next line only when column is full
@@ -10371,8 +10391,14 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const numCLines   = Math.max(1, _ctacts.length);
     const numRowLines = Math.max(numELines, numCLines);
     const ROW_H = numRowLines > 1 ? Math.max(BASE_ROW_H, LINE_H * numRowLines + 2) : BASE_ROW_H;
-    const rowY = curY;
-    if (rowY + ROW_H > ly + lh) return; // overflow guard
+    let rowY = curY;
+    if (rowY + ROW_H > ly + lh) {
+      // Doesn't fit on this page — start a new one instead of dropping the rest.
+      pdf.addPage();
+      pageNum++;
+      curY = drawChrome(pageNum);
+      rowY = curY;
+    }
 
     // Supplier color
     const [r, g, b] = hexToRgb(p.color || '#888888');
@@ -10466,7 +10492,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
 
     curY += ROW_H;
-  });
+  }
 
   // Empty rows if fewer than minRows suppliers
   for (let i = suppliers.length; i < minRows && curY + BASE_ROW_H <= ly + lh; i++) {
@@ -10496,10 +10522,6 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
     curY += BASE_ROW_H;
   }
-
-  // Footer note
-  pdf.setFont('helvetica', 'italic'); pdf.setFontSize(4.5); pdf.setTextColor(150, 155, 140);
-  pdf.text('* Datum konani KD a pritomnost ucastniku lze upravit primo v PDF readeru.', lx + 2, ly + lh - 1.5);
 }
 
 function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = [], pinnedProfNames = []) {
