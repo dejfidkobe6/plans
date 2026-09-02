@@ -1743,41 +1743,6 @@ option { background: var(--card); color: var(--text); }
   background: var(--bg);
   border-bottom: 2px solid var(--olive);
 }
-/* Section-headers chip bar: built for the old single-row horizontal-scroll layout,
-   where each chip's x-position matched a card column. Cards now wrap onto multiple
-   rows, so the chips no longer track which row a card actually ended up on — disabled. */
-.kd-card-headers-bar {
-  display: none;
-  position: sticky; top: 40px; z-index: 10;
-  height: 0; overflow: visible;
-  margin-bottom: -8px; /* cancel flex gap so layout is unaffected */
-}
-.kd-card-headers-bar-inner {
-  display: none;
-  flex-direction: row; align-items: center; gap: 6px;
-  padding: 4px 0;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 3px 8px rgba(0,0,0,0.10);
-  position: relative; overflow: visible;
-  min-width: 100vw;
-}
-.kd-card-headers-bar-inner::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: -1px; left: 100%;
-  width: 9999px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-.kd-card-headers-bar.active .kd-card-headers-bar-inner { display: flex; }
-.kd-card-hdr-chip {
-  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-  color: var(--text-bright); background: var(--panel);
-  border: 1px solid var(--border); border-radius: 4px;
-  padding: 3px 10px; white-space: nowrap; flex-shrink: 0;
-  box-sizing: border-box; text-align: center; overflow: hidden; text-overflow: ellipsis;
-}
 .kd-chapter-title-input {
   flex: 1; background: transparent; border: none; outline: none;
   font-family: var(--font-mono); font-size: 24px; font-weight: 700;
@@ -3138,10 +3103,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     padding-bottom: 12px;
   }
   .kd-chapter-header { z-index: 6; }
-  /* Force zoom=1 on cards row so .kd-card-header sticky works inside the card */
+  /* Cancel out any desktop zoom level carried over into the mobile layout */
   .kd-chapter-cards { zoom: 1 !important; }
-  /* On mobile, each .kd-card is its own scroll viewport with sticky .kd-card-header */
-  .kd-card-headers-bar { display: none !important; }
   /* Cards: vertical stacking, full width */
   .kd-chapter-cards {
     display: flex !important;
@@ -12650,34 +12613,6 @@ function kdApplyZoom() {
   document.querySelectorAll('#kd-cards-inner .kd-chapter-cards').forEach(el => {
     el.style.zoom = String(_kdZoom);
   });
-  // Sticky chip bar keeps its unzoomed px width/gap (set in kdBuildChapter)
-  // and gets the same `zoom` applied here — identical browser scaling as
-  // the real row, so columns stay aligned instead of drifting per-chip.
-  document.querySelectorAll('#kd-cards-inner .kd-card-headers-bar-inner').forEach(inner => {
-    inner.style.zoom = String(_kdZoom);
-  });
-  _kdUpdateSectionBar();
-}
-
-function _kdUpdateSectionBar() {
-  const scroll = document.getElementById('kd-cards-scroll');
-  if (!scroll) return;
-  const scrollTop = scroll.getBoundingClientRect().top;
-
-  // .kd-card-headers-bar is permanently display:none (see its CSS rule) — the board
-  // no longer scrolls horizontally, so this only tracks vertical scroll past the header.
-  const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
-  document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
-    const bar = ch.querySelector(':scope > .kd-card-headers-bar');
-    const cardsRow = ch.querySelector(':scope > .kd-chapter-cards');
-    if (!bar || !cardsRow) return;
-    const rowTop = cardsRow.getBoundingClientRect().top;
-    if (rowTop < scrollTop + CHAPTER_HDR_H) {
-      bar.classList.add('active');
-    } else {
-      bar.classList.remove('active');
-    }
-  });
 }
 
 function kdApplyCardWidth() {
@@ -12991,7 +12926,6 @@ function kdRenderContent() {
   }
   scroll.appendChild(inner);
   kdApplyZoom();
-  _kdUpdateSectionBar(); // sync section-headers-bar .active state to current vertical scroll
   // On mobile: force overflow:visible so CSS sticky works on .kd-card-header
   if (window.innerWidth <= 768) {
     inner.querySelectorAll('.kd-chapter-cards, .kd-card').forEach(el => {
@@ -13029,23 +12963,6 @@ function kdBuildChapter(rec, ch, isLive) {
   hdr.appendChild(titleInp);
   el.appendChild(hdr);
 
-  // Sticky section-names bar. Mirrors the real card row using the same
-  // unzoomed px width/gap as .kd-chapter-cards/.kd-card — kdApplyZoom()
-  // then applies the identical `zoom` factor to both, so they scale
-  // through the same browser math and stay pixel-aligned at any zoom
-  // level (manually rounding px per chip drifted more with each column).
-  const hdrsBar = document.createElement('div'); hdrsBar.className = 'kd-card-headers-bar';
-  const hdrsBarInner = document.createElement('div'); hdrsBarInner.className = 'kd-card-headers-bar-inner';
-  hdrsBarInner.style.gap = '12px';
-  (ch.cards || []).forEach(card => {
-    const chip = document.createElement('div'); chip.className = 'kd-card-hdr-chip';
-    chip.dataset.cardId = card.id; chip.textContent = card.title || 'Úsek';
-    chip.style.width = _kdCardWidth + 'px'; chip.style.minWidth = '240px';
-    hdrsBarInner.appendChild(chip);
-  });
-  hdrsBar.appendChild(hdrsBarInner);
-  el.appendChild(hdrsBar);
-
   const cardsRow = document.createElement('div'); cardsRow.className = 'kd-chapter-cards';
   (ch.cards || []).forEach(card => cardsRow.appendChild(kdBuildCard(rec, ch, card, isLive)));
 
@@ -13071,8 +12988,6 @@ function kdBuildCard(rec, ch, card, isLive) {
   inp.placeholder = 'Název úseku...'; inp.readOnly = !isLive;
   inp.onchange = () => {
     card.title = inp.value;
-    const chip = document.querySelector(`.kd-card-hdr-chip[data-card-id="${card.id}"]`);
-    if (chip) chip.textContent = inp.value || 'Úsek';
     kdSave(); kdRenderSidebar();
   };
   const cnt = document.createElement('span'); cnt.className = 'kd-card-count';
@@ -13534,7 +13449,6 @@ function kdSetupPage() {
     const dm = document.getElementById('kdf-search-m'); if (dm) dm.value = _kdFilter.search;
     kdRenderContent();
   });
-  document.getElementById('kd-cards-scroll').addEventListener('scroll', _kdUpdateSectionBar, { passive: true });
   document.addEventListener('focusout', e => {
     if (!_kdPendingRender) return;
     // relatedTarget is where focus is moving — if still an editable field, defer further
