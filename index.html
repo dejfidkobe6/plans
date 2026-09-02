@@ -1592,12 +1592,19 @@ option { background: var(--card); color: var(--text); }
   display: flex; flex-direction: column; flex-shrink: 0;
   max-height: calc(100vh - var(--kd-cards-chrome));
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  overflow: hidden;
+  /* visible, not hidden: .kd-card itself never scrolls (only .kd-tasks-list
+     does), but `overflow: hidden` still makes it a scroll container per spec —
+     that broke position:sticky below, which needs #kd-cards-scroll as the
+     nearest ancestor to stick against. .kd-tasks-list's own overflow-y:auto
+     already clips its content, so nothing escapes the rounded card border. */
+  overflow: visible;
 }
 .kd-card-header {
   display: flex; align-items: center; gap: 5px;
   padding: 7px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
   background: var(--panel); border-radius: 8px 8px 0 0;
+  /* Keeps the section name/count visible while its task list scrolls past. */
+  position: sticky; top: 40px; z-index: 5;
 }
 .kd-card-title {
   flex: 1; background: transparent; border: none; outline: none;
@@ -3157,10 +3164,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
     margin: 0 !important;
     overflow: visible !important;
   }
-  /* Not sticky: pinning detached the header from the card's border while scrolling
-     (the card box scrolls away above the viewport, leaving the header floating with
-     no visible frame around it) — keep it in normal flow so the card always looks the same. */
+  /* Not sticky: mobile cards stack full-width with no capped height, so pinning
+     detached the header from the card's border while scrolling (the card box
+     scrolls away above the viewport, leaving the header floating with no visible
+     frame around it) — keep it in normal flow so the card always looks the same. */
   .kd-card-header {
+    position: static !important;
     background: var(--panel) !important;
     border-radius: 8px 8px 0 0 !important;
   }
