@@ -4179,6 +4179,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
     <button class="tb-btn tool-btn mob-tool" data-tool="partition" title="Příčka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.35"/><line x1="7" y1="9" x2="7" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="pin" title="Špendlík"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></button>
     <button class="tb-btn tool-btn mob-tool" data-tool="text" title="Text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>
+    <button class="tb-btn mob-tool" title="Symbol" onclick="closeMobileMenu();_symPickerOpenMobile()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 20,8 20,16 12,21 4,16 4,8"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
     <div class="tb-separator"></div>
     <button class="tb-btn mob-tool" onclick="document.getElementById('zoom-in-btn').click()" title="Přiblížit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
     <button class="tb-btn mob-tool" onclick="document.getElementById('zoom-out-btn').click()" title="Oddálit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
@@ -4501,6 +4502,10 @@ body.viewer-mode #kd-backup-next { display: none !important; }
     <button class="mob-draw-tool tool-btn" data-tool="text" onclick="setTool('text');closeMobDrawMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
       Text
+    </button>
+    <button class="mob-draw-tool tool-btn" id="tool-symbol-mob" data-tool="symbol" onclick="closeMobDrawMenu();_symPickerOpenMobile()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 20,8 20,16 12,21 4,16 4,8"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+      Symbol
     </button>
   </div>
 </div>
@@ -7841,20 +7846,60 @@ function _symPickerOpen() {
 
 function _symPickerClose() {
   const p = document.getElementById('symbol-picker-popup');
-  if (p) p.classList.remove('open');
+  if (!p) return;
+  p.classList.remove('open');
+  p.style.bottom = '';
+  p.style.left   = '';
+  p.style.transform = '';
+}
+
+function _symPickerOpenMobile() {
+  _symPickerBuild();
+  const popup = document.getElementById('symbol-picker-popup');
+  // Center horizontally, sit above the bottom bar (54px)
+  popup.style.top   = '';
+  popup.style.right = '';
+  popup.style.bottom = '62px';
+  popup.style.left  = '50%';
+  popup.style.transform = 'translateX(-50%)';
+  popup.classList.add('open');
+  setTimeout(() => {
+    const handler = e => {
+      if (!popup.contains(e.target) && !e.target.closest('#tool-symbol-mob')) {
+        _symPickerClose();
+        document.removeEventListener('touchstart', handler);
+        document.removeEventListener('mousedown', handler);
+      }
+    };
+    document.addEventListener('touchstart', handler);
+    document.addEventListener('mousedown', handler);
+  }, 0);
+}
+
+function _symPickerCloseResetPos() {
+  const p = document.getElementById('symbol-picker-popup');
+  if (!p) return;
+  p.classList.remove('open');
+  // restore desktop positioning (cleared inline styles)
+  p.style.bottom = '';
+  p.style.left   = '';
+  p.style.transform = '';
 }
 
 function _symSelect(key) {
   _pendingSymbolKey = key;
   document.querySelectorAll('.sym-picker-item').forEach(el =>
     el.classList.toggle('active', el.dataset.key === key));
-  _symPickerClose();
+  _symPickerCloseResetPos();
   // Activate symbol tool
   appState.tool = 'symbol';
   fabricCanvas.isDrawingMode = false;
   fabricCanvas.defaultCursor = 'crosshair';
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tool-symbol').classList.add('active');
+  const dsBtn = document.getElementById('tool-symbol');
+  if (dsBtn) dsBtn.classList.add('active');
+  const mobBtn = document.getElementById('tool-symbol-mob');
+  if (mobBtn) mobBtn.classList.add('active');
 }
 
 function placeSymbolAt(x, y) {
