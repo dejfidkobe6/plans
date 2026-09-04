@@ -343,7 +343,7 @@ body {
   display: none; position: fixed; z-index: 9000;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 8px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.28); width: 256px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.28); width: 306px; max-width: calc(100vw - 24px);
 }
 #symbol-picker-popup.open { display: block; }
 .sym-picker-title {
@@ -351,7 +351,7 @@ body {
   text-transform: uppercase; letter-spacing: .06em;
   padding: 0 2px 6px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
 }
-.sym-picker-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.sym-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 .sym-picker-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px; padding: 6px 2px; border-radius: 7px; cursor: pointer;
@@ -7783,21 +7783,156 @@ function createArrow(x1, y1, x2, y2, color) {
 // SYMBOL TOOL — construction activity symbols
 // ══════════════════════════════════════════════════════════════
 const SYMBOL_DEFS = [
-  { key: 'crane',     label: 'Jeřáb',         d: 'M 1 10 L 1 -9 M 1 -9 L -9 -9 M 1 -9 L 5 -9 M -9 -9 L 1 -5 M -4 -9 L -4 -1 M -6 0 L -4 -1 L -2 0' },
-  { key: 'excavator', label: 'Rypadlo',        d: 'M -8 10 L 8 10 L 8 7 L -8 7 Z M -5 7 L -5 2 L 3 2 L 3 7 M 3 4 L 7 -2 M 7 -2 L 9 -6 L 6 -7 L 7 -2' },
-  { key: 'mixer',     label: 'Betonmixy',      d: 'M -6 10 A 2 2 0 1 0 -2 10 M 2 10 A 2 2 0 1 0 6 10 M -7 8 L 7 8 L 7 3 L -5 3 Z M -1 3 L 1 -7 L 5 -7 L 6 3 M 7 6 L 10 9' },
-  { key: 'truck',     label: 'Nákl. auto',     d: 'M -9 8 A 2 2 0 1 0 -5 8 M 4 8 A 2 2 0 1 0 8 8 M -9 6 L 5 6 L 5 0 L 1 0 L 1 2 L -9 2 Z M 5 6 L 10 6 L 10 1 L 5 0' },
-  { key: 'scaffold',  label: 'Lešení',         d: 'M -7 10 L -7 -10 M 0 10 L 0 -10 M 7 10 L 7 -10 M -7 5 L 7 5 M -7 0 L 7 0 M -7 -5 L 7 -5 M -7 5 L 0 0 M 0 5 L 7 0 M -7 0 L 0 -5 M 0 0 L 7 -5' },
-  { key: 'helmet',    label: 'Přilba',         d: 'M -7 1 A 7 9 0 0 1 7 1 L 9 3 L -9 3 Z M -2 3 L -2 7 L 2 7 L 2 3' },
-  { key: 'electric',  label: 'Elektrika',      d: 'M 4 -10 L -2 0 L 2 0 L -4 10 L 10 -2 L 5 -2 Z' },
-  { key: 'plumbing',  label: 'Instalace',      d: 'M -1 10 L -1 -2 L 1 -2 L 1 10 M -5 -2 L 5 -2 L 5 -5 L -5 -5 Z M 0 -5 L 0 -9 M -3 -7 L 3 -7' },
-  { key: 'welding',   label: 'Svařování',      d: 'M -8 9 L 3 -2 M 3 -2 L 5 -4 L 9 -4 L 7 -2 Z M 7 -4 L 5 -8 M 7 -4 L 9 -8 M 7 -4 L 10 -5' },
-  { key: 'barrier',   label: 'Zápora',         d: 'M -10 -1 L 10 -1 L 10 3 L -10 3 Z M -8 -1 L -4 3 M -2 -1 L 2 3 M 4 -1 L 8 3 M -10 -1 L -10 -8 M 10 -1 L 10 -8' },
-  { key: 'drill',     label: 'Vrtání',         d: 'M 0 -10 L 0 7 M -4 7 L 4 7 L 0 11 Z M -3 -3 Q 1 -5 -3 -7 M 3 -5 Q -1 -7 3 -9' },
-  { key: 'concrete',  label: 'Betonáž',        d: 'M -7 -8 L -3 4 L 3 4 L 7 -8 Z M -1 4 L -1 10 M 1 4 L 1 10 M -3 7 L 3 7' },
-  { key: 'survey',    label: 'Měření',         d: 'M -5 -5 A 5 5 0 1 0 5 -5 A 5 5 0 0 0 -5 -5 M 0 0 L 0 5 M -9 10 L 0 5 L 9 10 M -6 10 L 6 10' },
-  { key: 'material',  label: 'Materiál',       d: 'M -8 10 L 8 10 L 8 8 L -8 8 Z M -6 8 L -6 5 L 6 5 L 6 8 M -6 6 L 6 6 M -6 5 L -6 2 L 6 2 L 6 5 M -6 3 L 6 3 M 0 5 L 0 2 M 0 8 L 0 10' },
-  { key: 'hoist',     label: 'Stav. výtah',    d: 'M -8 10 L -8 -10 M 8 10 L 8 -10 M -8 -6 L 8 -6 M -8 -2 L 8 -2 M -8 2 L 8 2 M -8 6 L 8 6 M -5 -2 L -5 2 L 5 2 L 5 -2 Z' },
+  // ── Těžká technika ──────────────────────────────────────────────────────────
+  { key: 'crane', label: 'Jeřáb', d:
+    'M -1.5 10 L -1.5 -8 L 1.5 -8 L 1.5 10 Z ' +
+    'M 1.5 -8 L 10 -8 L 10 -5.5 L 1.5 -5.5 Z ' +
+    'M -6 -8 L -1.5 -8 L -1.5 -5.5 L -6 -5.5 Z ' +
+    'M 8.5 -5.5 L 9.5 -5.5 L 9.5 0 L 8.5 0 Z ' +
+    'M 7.5 0 L 10.5 0 L 10.5 2 L 7.5 2 Z'
+  },
+  { key: 'excavator', label: 'Rypadlo', d:
+    'M -8 10 L 8 10 L 8 7 L -8 7 Z ' +
+    'M -6 7 L 1 7 L 1 3 L -6 3 Z ' +
+    'M 1 5.5 L 8 2.5 L 7 0.5 L 0 3.5 Z ' +
+    'M 7.5 2 L 10 -1 L 8 -2 L 5.5 1 Z ' +
+    'M 7 -1 L 11 -1 L 11 -4.5 L 7 -4.5 Z'
+  },
+  { key: 'mixer', label: 'Betonmixér', d:
+    'M -8 10 L 4 10 L 4 6 L -8 6 Z ' +
+    'M 4 9 L 9 9 L 9 5 L 4 5 Z ' +
+    'M -5 6 Q -5 0 0 -4 Q 5 0 5 6 Z ' +
+    'M -7 10 Q -7 12 -4.5 12 Q -2 12 -2 10 Z ' +
+    'M 5 10 Q 5 12 7.5 12 Q 10 12 10 10 Z'
+  },
+  { key: 'truck', label: 'Nákl. auto', d:
+    'M -9 8 L 4 8 L 4 3 L -9 3 Z ' +
+    'M 4 8 L 9 8 L 9 3 L 4 3 Z ' +
+    'M -7.5 8 Q -7.5 11 -5 11 Q -2.5 11 -2.5 8 Z ' +
+    'M 5.5 8 Q 5.5 11 8 11 Q 10.5 11 10.5 8 Z'
+  },
+  { key: 'bulldozer', label: 'Buldozer', d:
+    'M -7 8 L 5 8 L 5 5 L -7 5 Z ' +
+    'M -5 5 L 3 5 L 3 1 L -5 1 Z ' +
+    'M 3 4 L 6 4 L 8 1 L 3 1 Z ' +
+    'M -10 3.5 L 8 3.5 L 8 5.5 L -10 5.5 Z'
+  },
+  { key: 'forklift', label: 'Vysokozdvižný', d:
+    'M -7 7 L 3 7 L 3 2 L -7 2 Z ' +
+    'M 3 7 L 8 7 L 8 3 L 3 3 Z ' +
+    'M -6 7 Q -6 10 -3.5 10 Q -1 10 -1 7 Z ' +
+    'M 5.5 7 Q 5.5 10 8 10 Q 10.5 10 10.5 7 Z ' +
+    'M -9 -9 L -7 -9 L -7 4 L -9 4 Z ' +
+    'M -9 -9 L -4 -9 L -4 -7 L -9 -7 Z'
+  },
+  // ── Bezpečnost & osoby ──────────────────────────────────────────────────────
+  { key: 'helmet', label: 'Přilba', d:
+    'M 0 -9 Q 8.5 -9 8.5 0 L -8.5 0 Q -8.5 -9 0 -9 Z ' +
+    'M -9.5 0 L 9.5 0 L 9.5 3 L -9.5 3 Z ' +
+    'M -1.5 3 L 1.5 3 L 1.5 7 L -1.5 7 Z'
+  },
+  { key: 'worker', label: 'Pracovník', d:
+    'M 0 -10 Q 3.5 -10 3.5 -6.5 Q 3.5 -3 0 -3 Q -3.5 -3 -3.5 -6.5 Q -3.5 -10 0 -10 Z ' +
+    'M -4.5 -2 L 4.5 -2 L 5.5 5 L -5.5 5 Z ' +
+    'M -4.5 -2 L -7.5 4 L -5.5 5 L -2.5 0 Z ' +
+    'M 4.5 -2 L 7.5 4 L 5.5 5 L 2.5 0 Z ' +
+    'M -4 5 L -5 10 L -2 10 L -1 5 Z ' +
+    'M 4 5 L 5 10 L 2 10 L 1 5 Z'
+  },
+  { key: 'warning', label: 'Upozornění', d:
+    'M 0 -10 L 10 8 L -10 8 Z ' +
+    'M -1.5 2 L 1.5 2 L 1.5 5 L -1.5 5 Z ' +
+    'M -1.5 -3 L 1.5 -3 L 1.5 0 L -1.5 0 Z'
+  },
+  // ── Elektro & energie ───────────────────────────────────────────────────────
+  { key: 'electric', label: 'Elektrika', d:
+    'M 3 -10 L -3 -1 L 1.5 -1 L -5 10 L 11 -1 L 5.5 -1 Z'
+  },
+  { key: 'generator', label: 'Generátor', d:
+    'M -8 -6 L 8 -6 L 8 6 L -8 6 Z ' +
+    'M -3 -6 L 3 -6 L 3 -10 L -3 -10 Z ' +
+    'M -5 6 L -3 6 L -3 10 L -5 10 Z ' +
+    'M 3 6 L 5 6 L 5 10 L 3 10 Z ' +
+    'M -1.5 -3 L 1.5 -3 L 0 3 Z'
+  },
+  // ── Instalace & potrubí ─────────────────────────────────────────────────────
+  { key: 'plumbing', label: 'Voda/Potrubí', d:
+    'M -2 10 L -2 3 L -6 3 L -6 -3 L -2 -3 L -2 -7 L 2 -7 L 2 -3 L 6 -3 L 6 3 L 2 3 L 2 10 Z'
+  },
+  { key: 'waterdrop', label: 'Vodoinstalace', d:
+    'M 0 -10 Q 7 -3 7 3 Q 7 9 0 9 Q -7 9 -7 3 Q -7 -3 0 -10 Z'
+  },
+  // ── Zemní práce & vrtání ────────────────────────────────────────────────────
+  { key: 'drill', label: 'Vrtání', d:
+    'M -3 -10 L 3 -10 L 3 4 L -3 4 Z ' +
+    'M -5 4 L 5 4 L 0 10 Z ' +
+    'M -3 -10 Q 0 -7 3 -10 L 3 -8 Q 0 -5 -3 -8 Z'
+  },
+  { key: 'shovel', label: 'Výkop', d:
+    'M -2.5 -10 L 2.5 -10 L 2.5 0 L -2.5 0 Z ' +
+    'M -6 0 L 6 0 L 3.5 10 L -3.5 10 Z'
+  },
+  // ── Stavební konstrukce ─────────────────────────────────────────────────────
+  { key: 'scaffold', label: 'Lešení', d:
+    'M -8 -10 L -6 -10 L -6 10 L -8 10 Z ' +
+    'M -1 -10 L 1 -10 L 1 10 L -1 10 Z ' +
+    'M 6 -10 L 8 -10 L 8 10 L 6 10 Z ' +
+    'M -8 -7 L 8 -7 L 8 -5 L -8 -5 Z ' +
+    'M -8 -1 L 8 -1 L 8 1 L -8 1 Z ' +
+    'M -8 5 L 8 5 L 8 7 L -8 7 Z'
+  },
+  { key: 'brick', label: 'Zdění', d:
+    'M -9 -8 L 9 -8 L 9 -4 L -9 -4 Z ' +
+    'M -9 -2 L 1 -2 L 1 2 L -9 2 Z ' +
+    'M 3 -2 L 9 -2 L 9 2 L 3 2 Z ' +
+    'M -9 4 L 9 4 L 9 8 L -9 8 Z'
+  },
+  { key: 'stairs', label: 'Schody', d:
+    'M -8 10 L -8 4 L -4 4 L -4 -1 L 0 -1 L 0 -6 L 4 -6 L 4 -10 L 8 -10 L 8 10 Z'
+  },
+  { key: 'barrier', label: 'Zápora/Pažení', d:
+    'M -9 -3 L 9 -3 L 9 3 L -9 3 Z ' +
+    'M -9 3 L -7 3 L -7 9 L -9 9 Z ' +
+    'M 7 3 L 9 3 L 9 9 L 7 9 Z'
+  },
+  { key: 'hoist', label: 'Stav. výtah', d:
+    'M -7 -10 L -5 -10 L -5 10 L -7 10 Z ' +
+    'M 5 -10 L 7 -10 L 7 10 L 5 10 Z ' +
+    'M -5 -6 L 5 -6 L 5 0 L -5 0 Z ' +
+    'M -8 8 L 8 8 L 8 10 L -8 10 Z'
+  },
+  // ── Dokončovací práce ───────────────────────────────────────────────────────
+  { key: 'concrete', label: 'Betonáž', d:
+    'M -6 -8 L 6 -8 L 4 2 L -4 2 Z ' +
+    'M -2 2 L 2 2 L 2 10 L -2 10 Z'
+  },
+  { key: 'insulation', label: 'Izolace', d:
+    'M -9 -8 Q -6 -11 -3 -8 Q 0 -5 3 -8 Q 6 -11 9 -8 L 9 -5 Q 6 -8 3 -5 Q 0 -2 -3 -5 Q -6 -8 -9 -5 Z ' +
+    'M -9 -3 Q -6 -6 -3 -3 Q 0 0 3 -3 Q 6 -6 9 -3 L 9 0 Q 6 -3 3 0 Q 0 3 -3 0 Q -6 -3 -9 0 Z ' +
+    'M -9 2 Q -6 -1 -3 2 Q 0 5 3 2 Q 6 -1 9 2 L 9 5 Q 6 2 3 5 Q 0 8 -3 5 Q -6 2 -9 5 Z'
+  },
+  { key: 'paint', label: 'Malování', d:
+    'M -8 -7 L 4 -7 L 4 1 L -8 1 Z ' +
+    'M -6 -9 L 6 -9 L 6 -7 L -6 -7 Z ' +
+    'M 4 -2 L 8 -2 L 8 5 L 6 5 L 6 -1 L 4 -1 Z ' +
+    'M 4 5 L 8 5 L 8 10 L 4 10 Z'
+  },
+  // ── Měření & kontrola ───────────────────────────────────────────────────────
+  { key: 'survey', label: 'Měření/Geodézie', d:
+    'M -1.5 10 L 1.5 10 L 1.5 5 L -1.5 5 Z ' +
+    'M -7 10 L -1.5 5 L 1.5 5 L -4 10 Z ' +
+    'M 7 10 L 1.5 5 L -1.5 5 L 4 10 Z ' +
+    'M -4 5 L 4 5 L 4 -1 L -4 -1 Z ' +
+    'M -6 -1 L 6 -1 L 6 -3 L -6 -3 Z ' +
+    'M -1 -3 L 1 -3 L 1 -7 L -1 -7 Z'
+  },
+  // ── Svařování ───────────────────────────────────────────────────────────────
+  { key: 'welding', label: 'Svařování', d:
+    'M -8 9 L 4 -4 L 6 -2 L -6 11 Z ' +
+    'M 4 -4 L 6 -6 L 10 -6 L 8 -4 Z ' +
+    'M 9 -4 L 8 -8 L 10 -7 Z ' +
+    'M 9 -4 L 11 -6 L 12 -4 Z'
+  },
 ];
 let _pendingSymbolKey = 'crane';
 
@@ -7809,7 +7944,7 @@ function _symPickerBuild() {
     el.className = 'sym-picker-item' + (sym.key === _pendingSymbolKey ? ' active' : '');
     el.dataset.key = sym.key;
     el.title = sym.label;
-    el.innerHTML = `<svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${sym.d}"/></svg><span>${sym.label}</span>`;
+    el.innerHTML = `<svg viewBox="-12 -12 24 24" fill="currentColor" stroke="none"><path d="${sym.d}"/></svg><span>${sym.label}</span>`;
     el.addEventListener('click', e => { e.stopPropagation(); _symSelect(sym.key); });
     grid.appendChild(el);
   });
@@ -7883,9 +8018,8 @@ function placeSymbolAt(x, y) {
   const shape = new fabric.Path(sym.d, {
     left: x, top: y,
     originX: 'center', originY: 'center',
-    fill: 'transparent',
-    stroke: color, strokeWidth: 1.8, strokeUniform: true,
-    strokeLineCap: 'round', strokeLineJoin: 'round',
+    fill: color,
+    stroke: 'none',
     scaleX: 2, scaleY: 2,
     selectable: true,
   });
