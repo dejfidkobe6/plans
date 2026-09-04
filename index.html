@@ -55,6 +55,7 @@
   --vlastni: #6B7280;
   --font-mono: 'IBM Plex Mono', monospace;
   --font-main: 'Barlow Condensed', sans-serif;
+  --kd-chapter-hdr-h: 42px;
 }
 #annot-tooltip {
   display: none;
@@ -1761,7 +1762,7 @@ option { background: var(--card); color: var(--text); }
 }
 /* Section-headers bar: zero-height sticky outside zoomed .kd-chapter-cards */
 .kd-card-headers-bar {
-  position: sticky; top: 40px; z-index: 10;
+  position: sticky; top: var(--kd-chapter-hdr-h); z-index: 10;
   height: 0; overflow: visible;
   margin-bottom: -8px; /* cancel flex gap so layout is unaffected */
 }
@@ -3180,7 +3181,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Section header sticks below chapter header while scrolling through section tasks */
   .kd-card-header {
     position: sticky !important;
-    top: 40px !important;
+    top: var(--kd-chapter-hdr-h) !important;
     z-index: 5;
     background: var(--panel) !important;
     border-radius: 8px 8px 0 0 !important;
@@ -5067,7 +5068,7 @@ const TOOL_NAMES = {
   select: 'Výběr', pan: 'Posun', freehand: 'Volná čára',
   rect: 'Obdélník', circle: 'Kruh', arrow: 'Šipka',
   pin: 'Špendlík', text: 'Text', polygon: 'Víceuhelník',
-  polyline: 'Lom', partition: 'Příčka'
+  polyline: 'Lom', partition: 'Příčka', symbol: 'Symbol'
 };
 
 window.appState = {
@@ -6042,6 +6043,9 @@ function setTool(tool) {
   }
 
   document.getElementById('status-tool-info').textContent = 'Nástroj: ' + (TOOL_NAMES[tool] || tool);
+  // #tool-symbol has no data-tool attr so the forEach above misses it
+  const _symDesktopBtn = document.getElementById('tool-symbol');
+  if (_symDesktopBtn) _symDesktopBtn.classList.toggle('active', tool === 'symbol');
 
   // Freeze existing annotations while any drawing tool is active
   const isDrawing = (tool !== 'select' && tool !== 'pan');
@@ -7811,38 +7815,31 @@ function _symPickerBuild() {
   });
 }
 
+let _symOutsideCleanup = null;
+
 function _symPickerOpen() {
   _symPickerBuild();
   const btn = document.getElementById('tool-symbol');
   const popup = document.getElementById('symbol-picker-popup');
   const r = btn.getBoundingClientRect();
-  popup.style.top  = (r.bottom + 4) + 'px';
+  popup.style.top   = (r.bottom + 4) + 'px';
   popup.style.right = (window.innerWidth - r.right) + 'px';
+  popup.style.bottom = '';
+  popup.style.left   = '';
+  popup.style.transform = '';
   popup.classList.add('open');
   setTimeout(() => {
     const handler = e => {
-      if (!popup.contains(e.target) && e.target.id !== 'tool-symbol') {
-        _symPickerClose();
-        document.removeEventListener('mousedown', handler);
-      }
+      if (!popup.contains(e.target) && e.target.id !== 'tool-symbol') _symPickerClose();
     };
     document.addEventListener('mousedown', handler);
+    _symOutsideCleanup = () => document.removeEventListener('mousedown', handler);
   }, 0);
-}
-
-function _symPickerClose() {
-  const p = document.getElementById('symbol-picker-popup');
-  if (!p) return;
-  p.classList.remove('open');
-  p.style.bottom = '';
-  p.style.left   = '';
-  p.style.transform = '';
 }
 
 function _symPickerOpenMobile() {
   _symPickerBuild();
   const popup = document.getElementById('symbol-picker-popup');
-  // Center horizontally, sit above the bottom bar (54px)
   popup.style.top   = '';
   popup.style.right = '';
   popup.style.bottom = '62px';
@@ -7851,22 +7848,22 @@ function _symPickerOpenMobile() {
   popup.classList.add('open');
   setTimeout(() => {
     const handler = e => {
-      if (!popup.contains(e.target) && !e.target.closest('#tool-symbol-mob')) {
-        _symPickerClose();
-        document.removeEventListener('touchstart', handler);
-        document.removeEventListener('mousedown', handler);
-      }
+      if (!popup.contains(e.target) && !e.target.closest('#tool-symbol-mob')) _symPickerClose();
     };
     document.addEventListener('touchstart', handler);
     document.addEventListener('mousedown', handler);
+    _symOutsideCleanup = () => {
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('mousedown', handler);
+    };
   }, 0);
 }
 
-function _symPickerCloseResetPos() {
+function _symPickerClose() {
+  if (_symOutsideCleanup) { _symOutsideCleanup(); _symOutsideCleanup = null; }
   const p = document.getElementById('symbol-picker-popup');
   if (!p) return;
   p.classList.remove('open');
-  // restore desktop positioning (cleared inline styles)
   p.style.bottom = '';
   p.style.left   = '';
   p.style.transform = '';
@@ -7876,16 +7873,8 @@ function _symSelect(key) {
   _pendingSymbolKey = key;
   document.querySelectorAll('.sym-picker-item').forEach(el =>
     el.classList.toggle('active', el.dataset.key === key));
-  _symPickerCloseResetPos();
-  // Activate symbol tool
-  appState.tool = 'symbol';
-  fabricCanvas.isDrawingMode = false;
-  fabricCanvas.defaultCursor = 'crosshair';
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  const dsBtn = document.getElementById('tool-symbol');
-  if (dsBtn) dsBtn.classList.add('active');
-  const mobBtn = document.getElementById('tool-symbol-mob');
-  if (mobBtn) mobBtn.classList.add('active');
+  _symPickerClose();
+  setTool('symbol');
 }
 
 function placeSymbolAt(x, y) {
@@ -12837,7 +12826,7 @@ function _kdUpdateSectionBar() {
     el.style.transform = tx;
   });
 
-  const CHAPTER_HDR_H = 42; // .kd-chapter-header is ~42px, sticks at top:0
+  const CHAPTER_HDR_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--kd-chapter-hdr-h')) || 42;
   document.querySelectorAll('#kd-cards-inner > .kd-chapter').forEach(ch => {
     const bar = ch.querySelector(':scope > .kd-card-headers-bar');
     const cardsRow = ch.querySelector(':scope > .kd-chapter-cards');
