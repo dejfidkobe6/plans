@@ -345,6 +345,7 @@ body {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 8px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.28); width: 306px; max-width: calc(100vw - 24px);
+  max-height: min(420px, calc(100vh - 80px)); overflow-y: auto;
 }
 #symbol-picker-popup.open { display: block; }
 .sym-picker-title {
@@ -4503,7 +4504,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
       Text
     </button>
-    <button class="mob-draw-tool tool-btn" id="tool-symbol-mob" data-tool="symbol" onclick="closeMobDrawMenu();_symPickerOpenMobile()">
+    <button class="mob-draw-tool" id="tool-symbol-mob" onclick="closeMobDrawMenu();_symPickerOpenMobile()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 20,8 20,16 12,21 4,16 4,8"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
       Symbol
     </button>
@@ -6056,9 +6057,11 @@ function setTool(tool) {
   }
 
   document.getElementById('status-tool-info').textContent = 'Nástroj: ' + (TOOL_NAMES[tool] || tool);
-  // #tool-symbol has no data-tool attr so the forEach above misses it
-  const _symDesktopBtn = document.getElementById('tool-symbol');
-  if (_symDesktopBtn) _symDesktopBtn.classList.toggle('active', tool === 'symbol');
+  // Symbol buttons are not .tool-btn (they open the picker instead of calling setTool directly)
+  ['tool-symbol', 'tool-symbol-mob'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', tool === 'symbol');
+  });
 
   // Freeze existing annotations while any drawing tool is active
   const isDrawing = (tool !== 'select' && tool !== 'pan');
@@ -7837,6 +7840,17 @@ const SYMBOL_DEFS = [
   { key: 'tape', label: 'Metr/Pásmo', d: 'M9,5A7,7 0 0,1 16,12H17V15H16V19H9A7,7 0 0,1 2,12A7,7 0 0,1 9,5M9,8A4,4 0 0,0 5,12A4,4 0 0,0 9,16A4,4 0 0,0 13,12A4,4 0 0,0 9,8M17,17H22V19L22,21H20V19H17V17Z' },
   { key: 'level', label: 'Vodováha', d: 'M22 8H2V16H22V8M18 14V10H20V14H18M11 12H13C14.1 12 15 11.11 15 10H17V14H7V10H9C9 11.11 9.9 12 11 12M4 14V10H6V14H4Z' },
 ];
+// Keys that existed in earlier versions of SYMBOL_DEFS but were removed or renamed.
+// Saved annotations keep their own path geometry, so this only matters when a
+// legacy key is looked up (e.g. picker highlight, future filtering by symbol type).
+const SYMBOL_LEGACY_KEYS = {
+  mixer: 'truck', generator: 'electric', drill: 'pickaxe', jackhammer: 'pickaxe',
+  gloves: 'goggles', survey: 'level', welding: 'toolbox',
+};
+function symbolDefFor(key) {
+  const k = SYMBOL_LEGACY_KEYS[key] || key;
+  return SYMBOL_DEFS.find(s => s.key === k) || SYMBOL_DEFS[0];
+}
 let _pendingSymbolKey = 'crane';
 
 function _symPickerBuild() {
@@ -7916,7 +7930,7 @@ function _symSelect(key) {
 }
 
 function placeSymbolAt(x, y) {
-  const sym = SYMBOL_DEFS.find(s => s.key === _pendingSymbolKey) || SYMBOL_DEFS[0];
+  const sym = symbolDefFor(_pendingSymbolKey);
   const color = getActiveProfeseColor();
   const shape = new fabric.Path(sym.d, {
     left: x, top: y,
