@@ -7815,6 +7815,7 @@ const SYMBOL_DEFS = [
   { key: 'worker', label: 'Pracovník', d: 'M12,15C7.58,15 4,16.79 4,19V21H20V19C20,16.79 16.42,15 12,15M8,9A4,4 0 0,0 12,13A4,4 0 0,0 16,9M11.5,2C11.2,2 11,2.21 11,2.5V5.5H10V3C10,3 7.75,3.86 7.75,6.75C7.75,6.75 7,6.89 7,8H17C16.95,6.89 16.25,6.75 16.25,6.75C16.25,3.86 14,3 14,3V5.5H13V2.5C13,2.21 12.81,2 12.5,2H11.5Z' },
   { key: 'goggles', label: 'Ochr. brýle', d: 'M18,9C19.11,9 20,9.89 20,11V14C20,15.11 19.11,16 18,16H15.77L14.53,14.77C13.78,14 12.77,13.6 11.7,13.6C10.63,13.6 9.63,14 8.87,14.77L7.64,16H6C4.89,16 4,15.11 4,14V11C4,9.89 4.89,9 6,9H18M18,7H6A4,4 0 0,0 2,11H2L1,11V14H2V14A4,4 0 0,0 6,18H8.5C8.54,17.94 8.59,17.88 10.29,16.18C10.68,15.79 11.19,15.6 11.7,15.6C12.22,15.6 12.73,15.79 13.12,16.18L14.91,18H18A4,4 0 0,0 22,14H22L23,14V11H22V11A4,4 0 0,0 18,7Z' },
   { key: 'warning', label: 'Výstraha', d: 'M2,3H22V13H18V21H16V13H8V21H6V13H2V3M18.97,11L20,9.97V7.15L16.15,11H18.97M13.32,11L19.32,5H16.5L10.5,11H13.32M7.66,11L13.66,5H10.83L4.83,11H7.66M5.18,5L4,6.18V9L8,5H5.18Z' },
+  { key: 'noentry', label: 'Zákaz vstupu', d: 'M17,13H7V11H17M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z' },
   // ── Elektro & instalace ────────────────────────────────────────────────────────
   { key: 'electric', label: 'Elektrika', d: 'M11 15H6L13 1V9H18L11 23V15Z' },
   { key: 'plumbing', label: 'Potrubí', d: 'M22,14H20V16H14V13H16V11H14V6A2,2 0 0,0 12,4H4V2H2V10H4V8H10V11H8V13H10V18A2,2 0 0,0 12,20H20V22H22' },
@@ -13175,7 +13176,7 @@ function kdRenderContent() {
   }
 
   const isLive = !_kdViewingBackup && canEdit();
-  const savedScrollTop = scroll.scrollTop;
+  const savedScroll = _kdCaptureScroll(scroll);
   scroll.innerHTML = '';
   const inner = document.createElement('div'); inner.id = 'kd-cards-inner';
   (rec.chapters || []).forEach(ch => inner.appendChild(kdBuildChapter(rec, ch, isLive)));
@@ -13196,7 +13197,56 @@ function kdRenderContent() {
       el.style.overflow = 'visible';
     });
   }
-  requestAnimationFrame(() => { scroll.scrollTop = savedScrollTop; });
+  // Textareas start at rows=1 and grow to fit; size them now (synchronously, they are
+  // in the DOM) so the layout is final before the scroll position is restored.
+  inner.querySelectorAll('textarea.kd-task-text').forEach(ta => {
+    ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
+  });
+  _kdRestoreScroll(scroll, savedScroll);
+  // Re-apply once more after paint in case fonts/zoom shift the layout
+  requestAnimationFrame(() => _kdRestoreScroll(scroll, savedScroll));
+}
+
+// ── Scroll preservation across re-renders ─────────────────────────
+// Re-rendering rebuilds the whole board, so a raw scrollTop restore drifts whenever
+// content above the viewport changes height (textarea auto-size, zoom, done filter…).
+// Instead remember which task/card is at the top of the viewport and its offset, plus
+// the inner scroll of every desktop card (.kd-tasks-list), and put them back.
+function _kdCaptureScroll(scroll) {
+  const state = { top: scroll.scrollTop, anchor: null, lists: {} };
+  try {
+    const sRect = scroll.getBoundingClientRect();
+    const els = scroll.querySelectorAll('.kd-task[data-task-id], .kd-card[data-card-id]');
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom <= sRect.top || r.height === 0) continue;
+      state.anchor = {
+        sel: el.dataset.taskId ? `.kd-task[data-task-id="${el.dataset.taskId}"]` : `.kd-card[data-card-id="${el.dataset.cardId}"]`,
+        offset: r.top - sRect.top
+      };
+      break;
+    }
+    scroll.querySelectorAll('.kd-card[data-card-id]').forEach(card => {
+      const list = card.querySelector('.kd-tasks-list');
+      if (list && list.scrollTop) state.lists[card.dataset.cardId] = list.scrollTop;
+    });
+  } catch(e) {}
+  return state;
+}
+
+function _kdRestoreScroll(scroll, state) {
+  if (!state) return;
+  Object.entries(state.lists).forEach(([cardId, top]) => {
+    const list = scroll.querySelector(`.kd-card[data-card-id="${cardId}"] .kd-tasks-list`);
+    if (list) list.scrollTop = top;
+  });
+  scroll.scrollTop = state.top;
+  if (!state.anchor) return;
+  const el = scroll.querySelector(state.anchor.sel);
+  if (!el) return;
+  const sRect = scroll.getBoundingClientRect();
+  const delta = (el.getBoundingClientRect().top - sRect.top) - state.anchor.offset;
+  if (Math.abs(delta) > 0.5) scroll.scrollTop += delta;
 }
 
 function kdAllTasks(rec) {
