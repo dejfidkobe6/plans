@@ -1,6 +1,6 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v4';
+const CACHE = 'besix-plans-v5';
 
 const PRECACHE = [
   './',
@@ -60,17 +60,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Pozadí výkresů /uploads/bg/ → network-first (mění se při ořezu)
+  // Pozadí výkresů /uploads/bg/
+  //  - verzované URL (?v=<mtime>) se po ořezu změní → obsah pod danou URL je neměnný,
+  //    proto cache-first: přepnutí podlaží nečeká na síť ani při pomalém připojení
+  //  - staré URL bez verze → stale-while-revalidate (cache hned, obnova na pozadí)
   if (url.pathname.startsWith('/uploads/bg/') || url.pathname.includes('/uploads/bg/')) {
     e.respondWith(
-      fetch(e.request).then(resp => {
-        if (resp.ok) caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
-        return resp;
-      }).catch(() =>
-        caches.match(e.request).then(cached =>
-          cached || new Response('', { status: 503 })
-        )
-      )
+      caches.open(CACHE).then(async cache => {
+        const cached = await cache.match(e.request, { ignoreVary: true });
+        if (cached && url.searchParams.has('v')) return cached;
+        const network = fetch(e.request).then(resp => {
+          if (resp.ok) cache.put(e.request, resp.clone());
+          return resp;
+        });
+        if (cached) { e.waitUntil(network.catch(() => {})); return cached; }
+        return network.catch(() => new Response('', { status: 503 }));
+      })
     );
     return;
   }
