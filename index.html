@@ -5027,6 +5027,9 @@ function applyAnnotColorToCanvas(obj) {
     obj.set({ stroke: color, fill: color + '22' });
   } else if (obj.type === 'path' && obj.annotType === 'pin') {
     obj.set({ stroke: color, fill: color, fillRule: 'evenodd' });
+  } else if (obj.type === 'path' && obj.annotType === 'symbol') {
+    // Symboly jsou plné siluety – vždy vyplněné barvou dodavatele, bez obrysu
+    obj.set({ fill: color, stroke: null });
   } else if (obj.type === 'path' || obj.type === 'polyline') {
     obj.set({ stroke: color, fill: 'transparent' });
   } else if (obj.type === 'i-text' || obj.type === 'text') {
@@ -5053,6 +5056,8 @@ function recolorAnnotationsByProfese(profeseName) {
         o.stroke = color; o.fill = color + fa;
       } else if (o.type === 'ellipse' || o.type === 'polygon') {
         o.stroke = color; o.fill = color + '22';
+      } else if (o.type === 'path' && o.annotType === 'symbol') {
+        o.fill = color; o.stroke = null;
       } else if (o.type === 'polyline' || o.type === 'path') {
         o.stroke = color;
       }
@@ -5296,6 +5301,8 @@ function switchLevel(idx) {
       fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
+      // Symboly uložené dřívější verzí mohly skončit jen s obrysem – sjednotit na plnou výplň
+      fabricCanvas.getObjects().filter(o => o.annotType === 'symbol').forEach(applyAnnotColorToCanvas);
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
       } else if (level.bgServerUrl) {
@@ -7940,7 +7947,7 @@ function placeSymbolAt(x, y) {
     left: x, top: y,
     originX: 'center', originY: 'center',
     fill: color,
-    stroke: 'none',
+    stroke: null,
     scaleX: 2, scaleY: 2,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
