@@ -7969,7 +7969,9 @@ function placeSymbolAt(x, y) {
     left: x, top: y,
     originX: 'center', originY: 'center',
     fill: color,
-    stroke: null,
+    stroke: 'none',
+    // viewBox 24x24 × 0.625 = 15 → stejná výška jako špendlík (placePinAt), žádný symbol ho nepřevyšuje.
+    scaleX: 0.625, scaleY: 0.625,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
