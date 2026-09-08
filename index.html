@@ -11788,8 +11788,10 @@ async function bgDBLoadAll(pid, levels) {
 // se stáhnou do mezipaměti zařízení všechna podlaží, takže přepínání mezi nimi
 // nečeká na síť (prezentace při špatném připojení). Anotace zůstávají live.
 // ============================================================
-const LS_BG_URLS   = (pid) => `besix_plans_bg_urls_${pid}`;
-const LS_BG_RECENT = 'besix_plans_bg_recent';
+// Klíče jsou vázané na přihlášeného uživatele: na sdíleném zařízení se nesmí zahřívat
+// výkresy projektů, které naposledy otevřel někdo jiný (při odhlášení viz _bgForgetUser).
+const LS_BG_URLS   = (uid, pid) => `besix_plans_bg_urls_${uid}_${pid}`;
+const LS_BG_RECENT = (uid) => `besix_plans_bg_recent_${uid}`;
 const _bgWarm = new Map();     // url → HTMLImageElement (drží dekódovaný obrázek v paměti)
 const _BG_WARM_MAX = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 0 : 8;
 let _bgPrefetchRun = 0;
@@ -11798,14 +11800,44 @@ function _isRemoteBgUrl(u) {
   return typeof u === 'string' && u.length > 0 && !u.startsWith('data:') && !u.startsWith('blob:');
 }
 
-// URL výkresů pro daná podlaží (bez duplicit); skipIdx = podlaží, které se právě načítá samo
+// URL výkresů pro daná podlaží (bez duplicit); skipIdx = podlaží, které se právě načítá samo.
+// Je-li skipIdx zadán, řadí se podle vzdálenosti od něj – nejbližší podlaží mají přednost.
 function _bgUrlsForLevels(levels, skipIdx) {
   const urls = [];
-  (levels || []).forEach((l, i) => {
-    if (i === skipIdx) return;
+  const idx = (levels || []).map((_, i) => i).filter(i => i !== skipIdx);
+  if (Number.isInteger(skipIdx)) idx.sort((a, b) => Math.abs(a - skipIdx) - Math.abs(b - skipIdx));
+  idx.forEach(i => {
+    const l = levels[i];
     [l.backgroundImage, l.bgServerUrl].forEach(u => { if (_isRemoteBgUrl(u) && !urls.includes(u)) urls.push(u); });
   });
   return urls;
+}
+
+// Rozpočet prefetche podle připojení: Data Saver / 2G = nic, 3G = jen nejbližší podlaží,
+// jinak bez limitu. Vrací max. počet URL, které se smí stáhnout na pozadí.
+function _bgPrefetchBudget() {
+  const c = navigator.connection;
+  if (!c) return Infinity;
+  const t = c.effectiveType || '';
+  if (c.saveData || /2g$/.test(t)) return 0;
+  if (t === '3g') return 3;
+  return Infinity;
+}
+
+// Odstraní z Cache Storage staré verze výkresů projektu. Po ořezu dostane soubor novou ?v=,
+// klient, který byl v tu chvíli offline, live-sync eviction nezachytil a stará položka by
+// jinak zůstala navždy. Ponechá jen URL, které projekt aktuálně používá.
+async function _bgPruneProjectCache(pid, keepUrls) {
+  try {
+    const keep = new Set(keepUrls.map(u => new URL(u, location.href).href));
+    const marker = `/uploads/bg/${pid}/`;
+    for (const k of await caches.keys()) {
+      const cache = await caches.open(k);
+      for (const req of await cache.keys()) {
+        if (req.url.includes(marker) && !keep.has(req.url)) await cache.delete(req);
+      }
+    }
+  } catch {}
 }
 
 async function _bgIsCached(url) {
@@ -11843,11 +11875,14 @@ function _bgPlural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 4
 
 // Stáhne výkresy všech podlaží projektu (max 2 souběžně). Uživatele informuje jen tehdy,
 // když se něco skutečně stahuje – jinak jsou výkresy už v mezipaměti a není co hlásit.
-async function _bgPrefetchAll(levels, skipIdx) {
+async function _bgPrefetchAll(levels, skipIdx, pid) {
   if (!('caches' in window)) return;
   const run = ++_bgPrefetchRun;
-  const urls = _bgUrlsForLevels(levels, skipIdx);
-  if (!urls.length) return;
+  const budget = _bgPrefetchBudget();
+  if (budget === 0) return; // Data Saver / 2G – na pozadí se nestahuje nic
+  const urls = _bgUrlsForLevels(levels, skipIdx).slice(0, budget);
+  const total = urls.length;
+  if (!total) return;
   try { await navigator.serviceWorker.ready; } catch {}
   const missing = [];
   for (const u of urls) if (!(await _bgIsCached(u))) missing.push(u);
@@ -11863,35 +11898,60 @@ async function _bgPrefetchAll(levels, skipIdx) {
     }
   };
   await Promise.all([worker(), worker()]);
-  if (run !== _bgPrefetchRun || !missing.length) return;
+  if (run !== _bgPrefetchRun) return;
+  if (pid) _bgPruneProjectCache(pid, _bgUrlsForLevels(levels));
+  if (!missing.length) return;
   if (failed) {
     showToast(`Výkresy: ${missing.length - failed}/${missing.length} uloženo do mezipaměti, ${failed} se nepodařilo stáhnout`, 'warn');
   } else {
-    showToast(`Všechny výkresy projektu (${_bgUrlsForLevels(levels).length}) jsou v mezipaměti zařízení`, 'success');
+    showToast(`Výkresy projektu jsou v mezipaměti zařízení (${total})`, 'success');
   }
 }
 
 // Zapamatuje si URL výkresů projektu, aby se daly zahřát hned při příštím otevření stránky
 function _bgRememberProject(pid, levels) {
+  const uid = currentUser && currentUser.id;
+  if (uid == null) return;
   try {
-    localStorage.setItem(LS_BG_URLS(pid), JSON.stringify(_bgUrlsForLevels(levels)));
-    const recent = JSON.parse(localStorage.getItem(LS_BG_RECENT) || '[]').filter(p => p !== pid);
+    localStorage.setItem(LS_BG_URLS(uid, pid), JSON.stringify(_bgUrlsForLevels(levels)));
+    const recent = JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]').filter(p => p !== pid);
     recent.unshift(pid);
-    localStorage.setItem(LS_BG_RECENT, JSON.stringify(recent.slice(0, 3)));
+    localStorage.setItem(LS_BG_RECENT(uid), JSON.stringify(recent.slice(0, 3)));
+  } catch {}
+}
+
+// Při odhlášení zapomenout zapamatované URL výkresů (sdílené zařízení)
+function _bgForgetUser(uid) {
+  if (uid == null) return;
+  try {
+    const prefix = `besix_plans_bg_urls_${uid}_`;
+    Object.keys(localStorage).filter(k => k.startsWith(prefix)).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem(LS_BG_RECENT(uid));
   } catch {}
 }
 
 // Při otevření stránky (ještě před kliknutím na projekt): tiše doplnit do mezipaměti
-// výkresy naposledy otevřených projektů. Jakmile uživatel otevře projekt, končí –
+// výkresy naposledy otevřených projektů. Zahřívají se jen projekty, jejichž členem je
+// přihlášený uživatel podle serveru. Jakmile uživatel otevře projekt, končí –
 // prefetch daného projektu má přednost.
 async function _bgPrefetchRecent() {
   if (!('caches' in window) || !navigator.serviceWorker) return;
+  const uid = currentUser && currentUser.id;
+  if (uid == null || _bgPrefetchBudget() === 0) return;
   try { await navigator.serviceWorker.ready; } catch { return; }
   let recent = [];
-  try { recent = JSON.parse(localStorage.getItem(LS_BG_RECENT) || '[]'); } catch {}
+  try { recent = JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]'); } catch {}
+  if (!recent.length) return;
+  let allowed = null;
+  try {
+    const { ok, data } = await apiFetch('api/projects.php');
+    if (ok && Array.isArray(data.plan_projects)) allowed = new Set(data.plan_projects.map(p => String(p.id)));
+  } catch {}
+  if (!allowed) return; // bez potvrzení členství se nic nestahuje
   for (const pid of recent) {
+    if (!allowed.has(String(pid))) { localStorage.removeItem(LS_BG_URLS(uid, pid)); continue; }
     let urls = [];
-    try { urls = JSON.parse(localStorage.getItem(LS_BG_URLS(pid)) || '[]'); } catch {}
+    try { urls = JSON.parse(localStorage.getItem(LS_BG_URLS(uid, pid)) || '[]'); } catch {}
     for (const u of urls) {
       if (currentProject) return;
       if (!(await _bgIsCached(u))) { try { await fetch(u, { credentials: 'same-origin' }); } catch {} }
@@ -13377,6 +13437,10 @@ function kdRenderContent() {
 // content above the viewport changes height (textarea auto-size, zoom, done filter…).
 // Instead remember which task/card is at the top of the viewport and its offset, plus
 // the inner scroll of every desktop card (.kd-tasks-list), and put them back.
+// ID do CSS selektoru vždy escapovat – kdGenId() dnes generuje jen [a-z0-9], ale
+// querySelector by na uvozovku/závorku v ID vyhodil výjimku.
+const _cssId = (id) => (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id);
+
 function _kdCaptureScroll(scroll) {
   const state = { top: scroll.scrollTop, anchor: null, lists: {} };
   try {
@@ -13386,7 +13450,7 @@ function _kdCaptureScroll(scroll) {
       const r = el.getBoundingClientRect();
       if (r.bottom <= sRect.top || r.height === 0) continue;
       state.anchor = {
-        sel: el.dataset.taskId ? `.kd-task[data-task-id="${el.dataset.taskId}"]` : `.kd-card[data-card-id="${el.dataset.cardId}"]`,
+        sel: el.dataset.taskId ? `.kd-task[data-task-id="${_cssId(el.dataset.taskId)}"]` : `.kd-card[data-card-id="${_cssId(el.dataset.cardId)}"]`,
         offset: r.top - sRect.top
       };
       break;
@@ -13402,7 +13466,7 @@ function _kdCaptureScroll(scroll) {
 function _kdRestoreScroll(scroll, state) {
   if (!state) return;
   Object.entries(state.lists).forEach(([cardId, top]) => {
-    const list = scroll.querySelector(`.kd-card[data-card-id="${cardId}"] .kd-tasks-list`);
+    const list = scroll.querySelector(`.kd-card[data-card-id="${_cssId(cardId)}"] .kd-tasks-list`);
     if (list) list.scrollTop = top;
   });
   scroll.scrollTop = state.top;
@@ -13484,7 +13548,7 @@ function kdBuildCard(rec, ch, card, isLive) {
   inp.placeholder = 'Název úseku...'; inp.readOnly = !isLive;
   inp.onchange = () => {
     card.title = inp.value;
-    const chip = document.querySelector(`.kd-card-hdr-chip[data-card-id="${card.id}"]`);
+    const chip = document.querySelector(`.kd-card-hdr-chip[data-card-id="${_cssId(card.id)}"]`);
     if (chip) chip.textContent = inp.value || 'Úsek';
     kdSave(); kdRenderSidebar();
   };
@@ -13691,7 +13755,7 @@ function kdBuildTask(rec, card, task, isLive) {
 function kdAddCard(rec, ch) {
   const card = { id: kdGenId(), title: '', tasks: [] };
   ch.cards.push(card); kdSave(); kdRenderContent();
-  setTimeout(() => { const t = document.querySelector(`.kd-card[data-card-id="${card.id}"] .kd-card-title`); if (t) t.focus(); }, 60);
+  setTimeout(() => { const t = document.querySelector(`.kd-card[data-card-id="${_cssId(card.id)}"] .kd-card-title`); if (t) t.focus(); }, 60);
 }
 
 function kdAddTask(rec, card) {
@@ -13700,7 +13764,7 @@ function kdAddTask(rec, card) {
   // On mobile, keyboard popup shifts the viewport — wait 350 ms so it settles before centering
   const scrollDelay = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 350 : 0;
   setTimeout(() => {
-    const el = document.querySelector(`.kd-task[data-task-id="${task.id}"] .kd-task-text`);
+    const el = document.querySelector(`.kd-task[data-task-id="${_cssId(task.id)}"] .kd-task-text`);
     if (!el) return;
     el.focus();
     requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
@@ -13712,7 +13776,7 @@ function kdAddChapter(rec) {
   const ch = { id: kdGenId(), title: '', cards: [] };
   rec.chapters.push(ch); kdSave(); kdRenderPage();
   setTimeout(() => {
-    const el = document.querySelector(`.kd-chapter[data-chapter-id="${ch.id}"] .kd-chapter-title-input`);
+    const el = document.querySelector(`.kd-chapter[data-chapter-id="${_cssId(ch.id)}"] .kd-chapter-title-input`);
     if (el) el.focus();
   }, 60);
 }
@@ -14350,6 +14414,7 @@ async function doLogout() {
   }
   clearTimeout(saveTimer);
   await apiFetch('api/auth.php?action=logout', { method: 'POST' });
+  _bgForgetUser(currentUser && currentUser.id);
   currentUser = null;
   currentProject = null;
   appState.levels = [];
@@ -14647,7 +14712,7 @@ async function openProject(proj) {
     switchLevel(appState.activeLevel);
     // Výkresy ostatních podlaží stáhnout do mezipaměti hned teď – přepínání pak nečeká na síť
     _bgRememberProject(pid, appState.levels);
-    _bgPrefetchAll(appState.levels, appState.activeLevel);
+    _bgPrefetchAll(appState.levels, appState.activeLevel, pid);
     // Safety fallback: clear loading flag after 8s even if async callbacks don't fire
     setTimeout(() => { _isProjectLoading = false; }, 8000);
     // Initial backup after project fully loads
