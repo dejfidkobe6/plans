@@ -5027,6 +5027,9 @@ function applyAnnotColorToCanvas(obj) {
     obj.set({ stroke: color, fill: color + '22' });
   } else if (obj.type === 'path' && obj.annotType === 'pin') {
     obj.set({ stroke: color, fill: color, fillRule: 'evenodd' });
+  } else if (obj.type === 'path' && obj.annotType === 'symbol') {
+    // Symboly jsou plné siluety – vždy vyplněné barvou dodavatele, bez obrysu
+    obj.set({ fill: color, stroke: null });
   } else if (obj.type === 'path' || obj.type === 'polyline') {
     obj.set({ stroke: color, fill: 'transparent' });
   } else if (obj.type === 'i-text' || obj.type === 'text') {
@@ -5053,6 +5056,8 @@ function recolorAnnotationsByProfese(profeseName) {
         o.stroke = color; o.fill = color + fa;
       } else if (o.type === 'ellipse' || o.type === 'polygon') {
         o.stroke = color; o.fill = color + '22';
+      } else if (o.type === 'path' && o.annotType === 'symbol') {
+        o.fill = color; o.stroke = null;
       } else if (o.type === 'polyline' || o.type === 'path') {
         o.stroke = color;
       }
@@ -5296,6 +5301,11 @@ function switchLevel(idx) {
       fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
+      // Symboly uložené dřívější verzí: sjednotit na plnou výplň a omezit velikost na špendlík
+      fabricCanvas.getObjects().filter(o => o.annotType === 'symbol').forEach(o => {
+        applyAnnotColorToCanvas(o);
+        symbolCapSize(o);
+      });
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
       } else if (level.bgServerUrl) {
@@ -7831,7 +7841,9 @@ const SYMBOL_DEFS = [
   { key: 'barrier', label: 'Oplocení', d: 'M9 9V11H7V9H5V11H3V9H1V21H3V19H5V21H7V19H9V21H11V19H13V21H15V19H17V21H19V19H21V21H23V9H21V11H19V9H17V11H15V9H13V11H11V9H9M3 13H5V17H3V13M7 13H9V17H7V13M11 13H13V17H11V13M15 13H17V17H15V13M19 13H21V17H19V13Z' },
   { key: 'hoist', label: 'Stav. výtah', d: 'M7,2L11,6H8V10H6V6H3L7,2M17,10L13,6H16V2H18V6H21L17,10M7,12H17A2,2 0 0,1 19,14V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V14A2,2 0 0,1 7,12M7,14V20H17V14H7Z' },
   { key: 'stairs', label: 'Schody', d: 'M15,5V9H11V13H7V17H3V20H10V16H14V12H18V8H22V5H15Z' },
+  { key: 'steel', label: 'Ocel. konstrukce', d: 'M1.85 0.89 L15.16 12.8 h6.98 L8.84 0.89 zM1.17 1.41 v1.21 L14.58 14.62 v-1.21 zm3 5.03 v1.62 L17.58 20.06 v-3.98 l-3 -0.61 zM3.64 8.71 l-2.01 0.5 l13.49 12.07 l2.01 -0.5 zM1.17 9.94 v1.12 L14.58 23.06 v-1.12 zM15.42 13.64 v1.03 l3 0.75 v5.91 l-3 0.75 V23.11 h7.41 v-1.03 l-3 -0.75 V15.42 l3 -0.75 V13.64 zm5.25 6.37 v0.66 l1.03 0.26 z' }, // Game Icons "i-beam" (CC BY 3.0), rescaled 512→24
   // ── Nářadí ─────────────────────────────────────────────────────────────────────
+  { key: 'works', label: 'Prováděné práce', d: 'M13.78 15.3L19.78 21.3L21.89 19.14L15.89 13.14L13.78 15.3M17.5 10.1C17.11 10.1 16.69 10.05 16.36 9.91L4.97 21.25L2.86 19.14L10.27 11.74L8.5 9.96L7.78 10.66L6.33 9.25V12.11L5.63 12.81L2.11 9.25L2.81 8.55H5.62L4.22 7.14L7.78 3.58C8.95 2.41 10.83 2.41 12 3.58L9.89 5.74L11.3 7.14L10.59 7.85L12.38 9.63L14.2 7.75C14.06 7.42 14 7 14 6.63C14 4.66 15.56 3.11 17.5 3.11C18.09 3.11 18.61 3.25 19.08 3.53L16.41 6.2L17.91 7.7L20.58 5.03C20.86 5.5 21 6 21 6.63C21 8.55 19.45 10.1 17.5 10.1Z' },
   { key: 'saw', label: 'Pila', d: 'M9.8,17L5.9,11.6L20,2L22,5V8H19V11H16V14H13V17M9.7,18.7L9.2,21.5L7.6,22.7C6.7,23.3 5.5,23.1 4.8,22.2L1.3,17.3C0.7,16.4 0.9,15.2 1.8,14.5L5.1,12.2L9.7,18.7M4.6,15L3,16.1L6.5,21L8.1,19.8L4.6,15Z' },
   { key: 'hammer', label: 'Kladivo', d: 'M2 19.63L13.43 8.2L12.72 7.5L14.14 6.07L12 3.89C13.2 2.7 15.09 2.7 16.27 3.89L19.87 7.5L18.45 8.91H21.29L22 9.62L18.45 13.21L17.74 12.5V9.62L16.27 11.04L15.56 10.33L4.13 21.76L2 19.63Z' },
   { key: 'wrench', label: 'Montáž', d: 'M22.7,19L13.6,9.9C14.5,7.6 14,4.9 12.1,3C10.1,1 7.1,0.6 4.7,1.7L9,6L6,9L1.6,4.7C0.4,7.1 0.9,10.1 2.9,12.1C4.8,14 7.5,14.5 9.8,13.6L18.9,22.7C19.3,23.1 19.9,23.1 20.3,22.7L22.6,20.4C23.1,20 23.1,19.3 22.7,19Z' },
@@ -7856,6 +7868,23 @@ function symbolDefFor(key) {
   return SYMBOL_DEFS.find(s => s.key === k) || SYMBOL_DEFS[0];
 }
 let _pendingSymbolKey = 'crane';
+
+// Symboly nesmí být větší než špendlík (výška 15, šířka 12 – viz placePinAt).
+// Měřítko se počítá z reálného rozměru glyfu, takže i nízké/široké ikony drží limit.
+const SYMBOL_MAX_H = 15;
+const SYMBOL_MAX_W = 18;
+function symbolFitScale(obj) {
+  const w = obj.width || 1, h = obj.height || 1;
+  return Math.min(SYMBOL_MAX_H / h, SYMBOL_MAX_W / w);
+}
+// Zmenší symbol na limit, pokud ho překračuje (ručně zmenšené nechá být)
+function symbolCapSize(obj) {
+  const s = symbolFitScale(obj);
+  if ((obj.scaleX || 1) > s + 1e-6 || (obj.scaleY || 1) > s + 1e-6) {
+    obj.set({ scaleX: s, scaleY: s });
+    obj.setCoords();
+  }
+}
 
 function _symPickerBuild() {
   const grid = document.getElementById('sym-picker-grid');
@@ -7946,6 +7975,9 @@ function placeSymbolAt(x, y) {
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
+  const _s = symbolFitScale(shape);
+  shape.set({ scaleX: _s, scaleY: _s });
+  shape.setCoords();
   addAnnotationProperties(shape, 'symbol');
   shape.annotSymbol = sym.key;
   fabricCanvas.add(shape);

@@ -16,6 +16,12 @@ dostupné na odkazovaných adresách.
 - Použití: ikona `trowel` (symbol „Betonáž“), přeškálovaná z 576 px na 24 px mřížku.
 - Attribution: Font Awesome Free by Fonticons, Inc. (https://fontawesome.com)
 
+### Game Icons
+- Zdroj: https://game-icons.net, balíček `@iconify-json/game-icons` 1.2.4
+- Licence: CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/
+- Použití: ikona `i-beam` (symbol „Ocel. konstrukce“), přeškálovaná z 512 px na 24 px mřížku.
+- Attribution: game-icons.net (https://game-icons.net)
+
 Symboly `platform` (Plošina) a `silo` (Stavební silo) jsou vlastní kresby projektu.
 
 ## Knihovny načítané z CDN (`index.html`)
