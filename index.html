@@ -5301,8 +5301,11 @@ function switchLevel(idx) {
       fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
-      // Symboly uložené dřívější verzí mohly skončit jen s obrysem – sjednotit na plnou výplň
-      fabricCanvas.getObjects().filter(o => o.annotType === 'symbol').forEach(applyAnnotColorToCanvas);
+      // Symboly uložené dřívější verzí: sjednotit na plnou výplň a omezit velikost na špendlík
+      fabricCanvas.getObjects().filter(o => o.annotType === 'symbol').forEach(o => {
+        applyAnnotColorToCanvas(o);
+        symbolCapSize(o);
+      });
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
       } else if (level.bgServerUrl) {
@@ -7864,6 +7867,23 @@ function symbolDefFor(key) {
 }
 let _pendingSymbolKey = 'crane';
 
+// Symboly nesmí být větší než špendlík (výška 15, šířka 12 – viz placePinAt).
+// Měřítko se počítá z reálného rozměru glyfu, takže i nízké/široké ikony drží limit.
+const SYMBOL_MAX_H = 15;
+const SYMBOL_MAX_W = 18;
+function symbolFitScale(obj) {
+  const w = obj.width || 1, h = obj.height || 1;
+  return Math.min(SYMBOL_MAX_H / h, SYMBOL_MAX_W / w);
+}
+// Zmenší symbol na limit, pokud ho překračuje (ručně zmenšené nechá být)
+function symbolCapSize(obj) {
+  const s = symbolFitScale(obj);
+  if ((obj.scaleX || 1) > s + 1e-6 || (obj.scaleY || 1) > s + 1e-6) {
+    obj.set({ scaleX: s, scaleY: s });
+    obj.setCoords();
+  }
+}
+
 function _symPickerBuild() {
   const grid = document.getElementById('sym-picker-grid');
   if (!grid || grid.children.length) return;
@@ -7948,10 +7968,12 @@ function placeSymbolAt(x, y) {
     originX: 'center', originY: 'center',
     fill: color,
     stroke: null,
-    scaleX: 2, scaleY: 2,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
+  const _s = symbolFitScale(shape);
+  shape.set({ scaleX: _s, scaleY: _s });
+  shape.setCoords();
   addAnnotationProperties(shape, 'symbol');
   shape.annotSymbol = sym.key;
   fabricCanvas.add(shape);
