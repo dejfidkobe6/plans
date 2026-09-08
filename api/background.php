@@ -60,8 +60,8 @@ if ($method === 'GET') {
     $stmt->execute([$projectId, $levelId]);
     $row = $stmt->fetch();
     jsonOk([
-        'url'      => $row['image_url']    ?? null,
-        'origUrl'  => $row['original_url'] ?? null,
+        'url'      => _versionedUrl($row['image_url']    ?? null),
+        'origUrl'  => _versionedUrl($row['original_url'] ?? null),
     ]);
 }
 
@@ -107,7 +107,7 @@ if ($method === 'POST') {
             updated_at   = NOW()
     ')->execute([$projectId, $levelId, $imageUrl, $originalUrl]);
 
-    jsonOk(['url' => $imageUrl, 'origUrl' => $originalUrl]);
+    jsonOk(['url' => _versionedUrl($imageUrl), 'origUrl' => _versionedUrl($originalUrl)]);
 }
 
 // ============================================================
@@ -134,6 +134,18 @@ if ($method === 'DELETE') {
 jsonError('Metoda není povolena', 405);
 
 // ============================================================
+// Přidá k URL verzi podle času a velikosti souboru. Soubor se při ořezu přepisuje
+// pod stejným názvem, verze v URL tak umožňuje klientům (service worker) držet
+// výkres cache-first a přitom rozpoznat, že se změnil.
+function _versionedUrl(?string $url): ?string {
+    if (!$url) return $url;
+    $path = __DIR__ . '/..' . $url;
+    clearstatcache(true, $path);
+    $mtime = @filemtime($path);
+    if (!$mtime) return $url;
+    return $url . '?v=' . $mtime . '-' . (int)@filesize($path);
+}
+
 function _guessExtFromMime(string $mime): string {
     return match($mime) {
         'image/jpeg'    => 'jpg',

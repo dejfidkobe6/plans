@@ -11685,7 +11685,10 @@ function bgDBSave(pid, levelId, dataUrl, originalUrl) {
     const tx = db.transaction('bg', 'readwrite');
     const store = tx.objectStore('bg');
     const key = pid + '_' + levelId;
-    if (dataUrl) store.put({ dataUrl, originalUrl: originalUrl || null }, key);
+    // Do IndexedDB patří jen skutečná obrazová data (lokálně nahraný výkres jako data: URL).
+    // Serverové URL se neukládají – jejich bajty drží Cache Storage (service worker)
+    // a samotná URL je součástí stavu projektu (bgServerUrl).
+    if (dataUrl && dataUrl.startsWith('data:')) store.put({ dataUrl, originalUrl: originalUrl || null }, key);
     else store.delete(key);
   }).catch(() => {});
 }
@@ -11717,20 +11720,148 @@ async function bgDBLoad(pid, levelId) {
   } catch { return null; }
 }
 async function bgDBLoadAll(pid, levels) {
-  for (const lvl of levels) {
+  // Všechna podlaží paralelně – při pomalé síti by sériové volání API otevření projektu
+  // zdržovalo o N round-tripů. API se volá jen pro podlaží, která URL nemají ve stavu.
+  await Promise.all(levels.map(async lvl => {
     const rec = await bgDBLoad(pid, lvl.id);
-    if (rec) {
-      lvl.backgroundImage = rec.dataUrl || null;
+    if (rec && typeof rec.dataUrl === 'string' && rec.dataUrl.startsWith('data:')) {
+      // Lokálně nahraný výkres na tomto zařízení – má přednost
+      lvl.backgroundImage = rec.dataUrl;
       lvl.backgroundImageOriginal = rec.originalUrl || null;
-    } else if (currentProject) {
-      // Fallback: URL ze serveru pokud není v IndexedDB
-      try {
-        const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&level_id=${encodeURIComponent(lvl.id)}`);
-        if (ok && data.url) {
-          lvl.backgroundImage = data.url;
-          lvl.backgroundImageOriginal = data.origUrl || null;
-        }
-      } catch {}
+      return;
+    }
+    if (lvl.bgServerUrl) {
+      // URL je ve stavu projektu – obrázek obslouží Cache Storage / síť, API netřeba
+      lvl.backgroundImage = lvl.bgServerUrl;
+      lvl.backgroundImageOriginal = lvl.bgOrigServerUrl || lvl.bgServerUrl;
+      return;
+    }
+    if (!currentProject) return;
+    try {
+      const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&level_id=${encodeURIComponent(lvl.id)}`);
+      if (ok && data.url) {
+        lvl.backgroundImage = data.url;
+        lvl.backgroundImageOriginal = data.origUrl || null;
+        lvl.bgServerUrl = data.url;
+        lvl.bgOrigServerUrl = data.origUrl || data.url;
+      }
+    } catch {}
+  }));
+}
+
+// ============================================================
+// PREFETCH VÝKRESŮ – Cache Storage (přes service worker) + dekódování
+// Výkresy tvoří pozadí anotací a mění se jen výjimečně. Při otevření projektu
+// se stáhnou do mezipaměti zařízení všechna podlaží, takže přepínání mezi nimi
+// nečeká na síť (prezentace při špatném připojení). Anotace zůstávají live.
+// ============================================================
+const LS_BG_URLS   = (pid) => `besix_plans_bg_urls_${pid}`;
+const LS_BG_RECENT = 'besix_plans_bg_recent';
+const _bgWarm = new Map();     // url → HTMLImageElement (drží dekódovaný obrázek v paměti)
+const _BG_WARM_MAX = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 0 : 8;
+let _bgPrefetchRun = 0;
+
+function _isRemoteBgUrl(u) {
+  return typeof u === 'string' && u.length > 0 && !u.startsWith('data:') && !u.startsWith('blob:');
+}
+
+// URL výkresů pro daná podlaží (bez duplicit); skipIdx = podlaží, které se právě načítá samo
+function _bgUrlsForLevels(levels, skipIdx) {
+  const urls = [];
+  (levels || []).forEach((l, i) => {
+    if (i === skipIdx) return;
+    [l.backgroundImage, l.bgServerUrl].forEach(u => { if (_isRemoteBgUrl(u) && !urls.includes(u)) urls.push(u); });
+  });
+  return urls;
+}
+
+async function _bgIsCached(url) {
+  try { return !!(await caches.match(url, { ignoreVary: true })); } catch { return false; }
+}
+
+// Stáhne výkres přes service worker do Cache Storage; na desktopu ho i dekóduje.
+// Vrací true, pokud je výkres k dispozici (síť nebo cache).
+async function _bgWarmOne(url) {
+  let ok = false;
+  try { ok = (await fetch(url, { credentials: 'same-origin' })).ok; } catch {}
+  if (!ok) ok = await _bgIsCached(url);
+  if (ok && _BG_WARM_MAX > 0 && !_bgWarm.has(url)) {
+    const img = new Image();
+    img.src = url;
+    try {
+      await img.decode();
+      _bgWarm.set(url, img);
+      while (_bgWarm.size > _BG_WARM_MAX) _bgWarm.delete(_bgWarm.keys().next().value);
+    } catch {}
+  }
+  return ok;
+}
+
+// Odstraní starou verzi výkresu z mezipaměti (po ořezu na jiném zařízení)
+async function _bgCacheEvict(url) {
+  if (!_isRemoteBgUrl(url)) return;
+  _bgWarm.delete(url);
+  try {
+    for (const k of await caches.keys()) await (await caches.open(k)).delete(url, { ignoreVary: true });
+  } catch {}
+}
+
+function _bgPlural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 4 ? few : many); }
+
+// Stáhne výkresy všech podlaží projektu (max 2 souběžně). Uživatele informuje jen tehdy,
+// když se něco skutečně stahuje – jinak jsou výkresy už v mezipaměti a není co hlásit.
+async function _bgPrefetchAll(levels, skipIdx) {
+  if (!('caches' in window)) return;
+  const run = ++_bgPrefetchRun;
+  const urls = _bgUrlsForLevels(levels, skipIdx);
+  if (!urls.length) return;
+  try { await navigator.serviceWorker.ready; } catch {}
+  const missing = [];
+  for (const u of urls) if (!(await _bgIsCached(u))) missing.push(u);
+  if (run !== _bgPrefetchRun) return;
+  if (missing.length) {
+    showToast(`Stahuji ${missing.length} ${_bgPlural(missing.length, 'výkres', 'výkresy', 'výkresů')} do mezipaměti zařízení…`, 'info');
+  }
+  let i = 0, failed = 0;
+  const worker = async () => {
+    while (i < urls.length && run === _bgPrefetchRun) {
+      const u = urls[i++];
+      if (!(await _bgWarmOne(u))) failed++;
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  if (run !== _bgPrefetchRun || !missing.length) return;
+  if (failed) {
+    showToast(`Výkresy: ${missing.length - failed}/${missing.length} uloženo do mezipaměti, ${failed} se nepodařilo stáhnout`, 'warn');
+  } else {
+    showToast(`Všechny výkresy projektu (${_bgUrlsForLevels(levels).length}) jsou v mezipaměti zařízení`, 'success');
+  }
+}
+
+// Zapamatuje si URL výkresů projektu, aby se daly zahřát hned při příštím otevření stránky
+function _bgRememberProject(pid, levels) {
+  try {
+    localStorage.setItem(LS_BG_URLS(pid), JSON.stringify(_bgUrlsForLevels(levels)));
+    const recent = JSON.parse(localStorage.getItem(LS_BG_RECENT) || '[]').filter(p => p !== pid);
+    recent.unshift(pid);
+    localStorage.setItem(LS_BG_RECENT, JSON.stringify(recent.slice(0, 3)));
+  } catch {}
+}
+
+// Při otevření stránky (ještě před kliknutím na projekt): tiše doplnit do mezipaměti
+// výkresy naposledy otevřených projektů. Jakmile uživatel otevře projekt, končí –
+// prefetch daného projektu má přednost.
+async function _bgPrefetchRecent() {
+  if (!('caches' in window) || !navigator.serviceWorker) return;
+  try { await navigator.serviceWorker.ready; } catch { return; }
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem(LS_BG_RECENT) || '[]'); } catch {}
+  for (const pid of recent) {
+    let urls = [];
+    try { urls = JSON.parse(localStorage.getItem(LS_BG_URLS(pid)) || '[]'); } catch {}
+    for (const u of urls) {
+      if (currentProject) return;
+      if (!(await _bgIsCached(u))) { try { await fetch(u, { credentials: 'same-origin' }); } catch {} }
     }
   }
 }
@@ -14481,6 +14612,9 @@ async function openProject(proj) {
     renderLevelTabs();
     _isProjectLoading = true;
     switchLevel(appState.activeLevel);
+    // Výkresy ostatních podlaží stáhnout do mezipaměti hned teď – přepínání pak nečeká na síť
+    _bgRememberProject(pid, appState.levels);
+    _bgPrefetchAll(appState.levels, appState.activeLevel);
     // Safety fallback: clear loading flag after 8s even if async callbacks don't fire
     setTimeout(() => { _isProjectLoading = false; }, 8000);
     // Initial backup after project fully loads
@@ -14525,6 +14659,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (ok && data.user) {
     currentUser = data.user;
     document.getElementById('auth-screen').classList.add('hidden');
+    // Na pozadí zahřát výkresy naposledy otevřených projektů (běží, dokud uživatel neotevře projekt)
+    setTimeout(_bgPrefetchRecent, 1500);
     const _params = new URLSearchParams(window.location.search);
     const _inviteOk = _params.get('invite_ok');
     const _inviteToken = _params.get('invite') || data.pending_invite || null;
@@ -14824,6 +14960,7 @@ async function _pollLiveSync() {
       if (_hasPendingSave) return; // local has unsaved edits – don't overwrite
       // Detect background replacement (crop) before overwriting the stored URL
       const bgChanged = remLvl.bgServerUrl && remLvl.bgServerUrl !== appState.levels[i].bgServerUrl;
+      const _oldBgUrl = appState.levels[i].bgServerUrl;
       appState.levels[i].fabricJSON       = remLvl.fabricJSON;
       appState.levels[i].annotations      = remLvl.annotations;
       appState.levels[i].bgServerUrl      = remLvl.bgServerUrl     || appState.levels[i].bgServerUrl;
@@ -14838,6 +14975,9 @@ async function _pollLiveSync() {
         appState.levels[i].backgroundImageOriginal = null;
         // Also evict from IndexedDB so a page reload doesn't restore the stale image
         if (currentProject) bgDBSave(String(currentProject.id), appState.levels[i].id, null, null);
+        // Starou verzi vyhodit z Cache Storage a novou rovnou stáhnout, ať je přepnutí okamžité
+        _bgCacheEvict(_oldBgUrl);
+        _bgWarmOne(remLvl.bgServerUrl).catch(() => {});
       }
       changed = true;
     });
@@ -15039,6 +15179,7 @@ document.getElementById('status-sync-info').addEventListener('click', async () =
   if (!remLvl) return;
   const lvl = appState.levels[appState.activeLevel];
   const bgChanged = remLvl.bgServerUrl && remLvl.bgServerUrl !== lvl?.bgServerUrl;
+  const _oldBgUrl = lvl?.bgServerUrl;
   lvl.fabricJSON        = remLvl.fabricJSON;
   lvl.annotations       = remLvl.annotations;
   lvl.bgLeft            = remLvl.bgLeft;
@@ -15052,6 +15193,7 @@ document.getElementById('status-sync-info').addEventListener('click', async () =
     lvl.backgroundImage         = null;
     lvl.backgroundImageOriginal = null;
     if (currentProject) bgDBSave(String(currentProject.id), lvl.id, null, null);
+    _bgCacheEvict(_oldBgUrl);
   }
   _isProjectLoading = true;
   switchLevel(appState.activeLevel);
