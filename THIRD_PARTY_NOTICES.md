@@ -22,7 +22,8 @@ dostupné na odkazovaných adresách.
 - Použití: ikona `i-beam` (symbol „Ocel. konstrukce“), přeškálovaná z 512 px na 24 px mřížku.
 - Attribution: game-icons.net (https://game-icons.net)
 
-Symboly `platform` (Plošina) a `silo` (Stavební silo) jsou vlastní kresby projektu.
+Symboly `platform` (Plošina), `silo` (Stavební silo), `tiles` (Obklady a dlažba),
+`tree` (Sázení zeleně) a `irrigation` (Závlaha) jsou vlastní kresby projektu.
 
 ## Knihovny načítané z CDN (`index.html`)
 
