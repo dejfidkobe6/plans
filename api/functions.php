@@ -64,8 +64,21 @@ function _ensureRememberTable(): void {
         INDEX idx_uid (user_id),
         INDEX idx_exp (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    // Table may already exist from before idx_exp was added — add it if missing.
-    try { $db->exec('ALTER TABLE remember_tokens ADD INDEX idx_exp (expires_at)'); } catch (\PDOException $e) {}
+    // Tabulka mohla existovat už předtím, než byl přidán idx_exp. Nejdřív ověřit přes
+    // information_schema (levný SELECT, žádný metadata lock) a ALTER TABLE spustit
+    // jen když index opravdu chybí — jinak by se kvůli tomuto self-healing kroku
+    // zbytečně zatěžovala DB při každém requestu (remember-me se ověřuje i při pollingu).
+    $hasIdx = (int) $db->query(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'remember_tokens' AND INDEX_NAME = 'idx_exp'"
+    )->fetchColumn();
+    if (!$hasIdx) {
+        try {
+            $db->exec('ALTER TABLE remember_tokens ADD INDEX idx_exp (expires_at)');
+        } catch (\PDOException $e) {
+            error_log('[remember_tokens] add idx_exp failed: ' . $e->getMessage());
+        }
+    }
     $done = true;
 }
 
