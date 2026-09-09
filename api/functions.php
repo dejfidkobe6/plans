@@ -36,6 +36,19 @@ function jsonError(string $msg, int $code = 400): void {
 // ============================================================
 define('REMEMBER_COOKIE', 'BESIX_REM');
 define('REMEMBER_DAYS',   30);
+// Po rotaci zůstává starý token ještě chvíli platný: klient posílá několik požadavků
+// souběžně (ukládání + polly každé 2 s) a ty, které už letí se starou cookie, nesmí
+// dostat 401 „Nepřihlášen“ jen proto, že jiný požadavek právě obnovil session.
+define('REMEMBER_ROTATE_GRACE', 300);
+
+/** Hash tokenu z aktuální remember cookie (null, pokud cookie chybí nebo má špatný tvar). */
+function _currentRememberHash(): ?string {
+    $raw = $_COOKIE[REMEMBER_COOKIE] ?? '';
+    if (!$raw) return null;
+    $parts = explode(':', $raw, 2);
+    if (count($parts) !== 2 || !ctype_digit($parts[0]) || strlen($parts[1]) !== 64) return null;
+    return hash('sha256', $parts[1]);
+}
 
 /** Ensure remember_tokens table exists (idempotent). */
 function _ensureRememberTable(): void {
@@ -62,9 +75,18 @@ function setRememberCookie(int $userId): void {
         $hash  = hash('sha256', $token);
         $exp   = date('Y-m-d H:i:s', time() + 86400 * REMEMBER_DAYS);
 
-        // Remove all existing tokens for this user + any expired tokens
-        $db->prepare("DELETE FROM remember_tokens WHERE user_id = ? OR expires_at < NOW()")
-           ->execute([$userId]);
+        // Uklidit jen prošlé tokeny. Tokeny ostatních zařízení uživatele zůstávají platné –
+        // přihlášení na telefonu nesmí odhlásit notebook.
+        $db->prepare("DELETE FROM remember_tokens WHERE expires_at < NOW()")->execute();
+
+        // Token, který má prohlížeč teď v cookie, nechat krátce doběhnout (grace okno),
+        // ne smazat – souběžné požadavky s ním ještě mohou být na cestě.
+        $old = _currentRememberHash();
+        if ($old !== null) {
+            $db->prepare("UPDATE remember_tokens SET expires_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
+                           WHERE token_hash = ? AND expires_at > DATE_ADD(NOW(), INTERVAL ? SECOND)")
+               ->execute([REMEMBER_ROTATE_GRACE, $old, REMEMBER_ROTATE_GRACE]);
+        }
 
         $db->prepare("INSERT INTO remember_tokens (user_id, token_hash, expires_at) VALUES (?,?,?)")
            ->execute([$userId, $hash, $exp]);
@@ -114,8 +136,17 @@ function checkRememberCookie(): ?array {
 
     if (!$user) return null;
 
-    // Rotate: issue a fresh token (old one deleted inside setRememberCookie)
-    setRememberCookie((int)$user['user_id']);
+    // Rotace: nový token vydá jen ten požadavek, který jako první přepne starý token do
+    // grace okna (podmíněný UPDATE). Souběžné požadavky se stejnou cookie UPDATE minou,
+    // token ale ještě přijmou a cookie nemění – prohlížeč tak dostane jedinou novou cookie.
+    try {
+        $st = getDB()->prepare("UPDATE remember_tokens SET expires_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
+                                 WHERE token_hash = ? AND expires_at > DATE_ADD(NOW(), INTERVAL ? SECOND)");
+        $st->execute([REMEMBER_ROTATE_GRACE, $hash, REMEMBER_ROTATE_GRACE]);
+        if ($st->rowCount() === 1) setRememberCookie((int)$user['user_id']);
+    } catch (\Throwable $e) {
+        error_log('remember token rotation failed: ' . $e->getMessage());
+    }
     return $user;
 }
 

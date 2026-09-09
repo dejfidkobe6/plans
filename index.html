@@ -12068,6 +12068,7 @@ function _serverSave() {
   _srvTimer = setTimeout(_serverSaveNow, 2000);
 }
 let _saving = false;
+let _saveAuthRetries = 0; // počet opakování uložení po 401 (obnova session z remember-me)
 let _deletedLevelIds = [];
 async function _serverSaveNow() {
   // Keep _hasPendingSave = true until save fully completes — prevents _pollLiveSync
@@ -12115,7 +12116,7 @@ async function _serverSaveNow() {
     // Use URL-encoded form body to avoid potential mod_security/WAF blocks
     // on application/json content type
     const formBody = 'data=' + encodeURIComponent(bodyStr);
-    const { ok, data } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
+    const { ok, data, status } = await apiFetch(`api/canvas.php?project_id=${currentProject.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formBody
@@ -12123,9 +12124,17 @@ async function _serverSaveNow() {
     const saveEl = document.getElementById('status-save-info');
     if (!ok) {
       console.error('[canvas] save failed:', data?.error, '| payload was', bodyStr.length, 'bytes');
-      showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
-      if (saveEl) { saveEl.textContent = '💾 Chyba'; saveEl.style.color = '#e74c3c'; }
+      if (status === 401 && _saveAuthRetries < 2) {
+        // Session se právě obnovuje z remember-me cookie – data neztrácet, uložit znovu za chvíli
+        _saveAuthRetries++;
+        clearTimeout(_srvTimer); _srvTimer = setTimeout(_serverSaveNow, 2500);
+        if (saveEl) { saveEl.textContent = '💾 Opakuji…'; saveEl.style.color = '#e67e22'; }
+      } else {
+        showToast('Chyba uložení na server: ' + (data?.error || 'neznámá chyba'), 'error');
+        if (saveEl) { saveEl.textContent = '💾 Chyba'; saveEl.style.color = '#e74c3c'; }
+      }
     } else {
+      _saveAuthRetries = 0;
       const t = new Date().toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
       console.log('[canvas] saved', data?.saved, 'compressed bytes at', t);
       if (saveEl) { saveEl.textContent = '💾 ' + t; saveEl.style.color = 'var(--text-dim)'; }
@@ -14318,8 +14327,15 @@ function uid() {
 }
 
 // --- API helper ---
-async function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}, _retried = false) {
   const res = await fetch(url, { credentials: 'include', ...options });
+  // 401 uprostřed práce bývá závod při obnově session z remember-me cookie: jiný souběžný
+  // požadavek právě rotoval token / regeneroval session a prohlížeč dostal novou cookie
+  // až po odeslání tohoto. Po krátké pauze zkusit jednou znovu (ne pro auth endpointy).
+  if (res.status === 401 && !_retried && !/auth\.php/.test(url)) {
+    await new Promise(r => setTimeout(r, 700));
+    return apiFetch(url, options, true);
+  }
   const resClone = res.clone();
   let json;
   try {
