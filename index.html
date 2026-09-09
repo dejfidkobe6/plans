@@ -9941,6 +9941,48 @@ function csText(s) {
         ů:'u',Ů:'U',ď:'d',Ď:'D',ť:'t',Ť:'T',š:'s',Š:'S',ž:'z',Ž:'Z'}[c] || c));
 }
 
+// Symbol pro PDF: stejný tvar jako v aplikaci. Path z fabric JSON se nechá vykreslit
+// samotným Fabricem (stejný engine, stejné transformace, stejný pathOffset) na malém
+// StaticCanvasu do PNG s průhledností, které se vloží do PDF v přesné pozici, velikosti
+// a natočení. jsPDF umí jen cubic křivky bez oblouků, ruční převod by tvar mohl změnit.
+const _symPngCache = new Map();
+function _symbolToPNG(o, rgb) {
+  try {
+    if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
+    const sx = o.scaleX || 1, sy = o.scaleY || 1;
+    const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    const key = [JSON.stringify(o.path), sx, sy, o.angle || 0, o.fillRule || '', o.stroke || '', o.strokeWidth || 0, col].join('|');
+    let hit = _symPngCache.get(key);
+    if (!hit) {
+      const shape = new fabric.Path(o.path, {
+        originX: 'center', originY: 'center',
+        scaleX: sx, scaleY: sy, angle: o.angle || 0,
+        fill: col, fillRule: o.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
+        stroke: (o.stroke && o.stroke !== 'none') ? col : null,   // starší symboly kreslené obrysem
+        strokeWidth: (o.stroke && o.stroke !== 'none') ? (o.strokeWidth || 0) : 0,
+        strokeUniform: !!o.strokeUniform,
+        objectCaching: false,
+      });
+      const w0 = shape.getScaledWidth(), h0 = shape.getScaledHeight();
+      const ang = ((o.angle || 0) * Math.PI) / 180;
+      // Obálka natočeného symbolu + 1 jednotka okraje na antialiasing
+      const w = Math.ceil(Math.abs(w0 * Math.cos(ang)) + Math.abs(h0 * Math.sin(ang))) + 2;
+      const h = Math.ceil(Math.abs(w0 * Math.sin(ang)) + Math.abs(h0 * Math.cos(ang))) + 2;
+      const sc = new fabric.StaticCanvas(null, { width: w, height: h, enableRetinaScaling: false });
+      shape.set({ left: w / 2, top: h / 2 });
+      sc.add(shape); sc.renderAll();
+      const RES = 12; // px na jednotku plátna – symbol ~15 jednotek → ~180 px, ostré i v tisku
+      hit = { data: sc.toDataURL({ format: 'png', multiplier: RES }), w, h };
+      sc.dispose();
+      _symPngCache.set(key, hit);
+    }
+    const oCX = (o.originX || 'left') === 'center', oCY = (o.originY || 'top') === 'center';
+    const cx = oCX ? o.left : o.left + (o.width || 0) * sx / 2;
+    const cy = oCY ? o.top  : o.top  + (o.height || 0) * sy / 2;
+    return { data: hit.data, w: hit.w, h: hit.h, cx, cy };
+  } catch (e) { return null; }
+}
+
 // Draws the level's background image + annotation shapes + ID labels directly
 // into the PDF as vectors (shapes) and a compact JPEG (background only).
 // Returns a Promise that resolves when done.
@@ -10084,6 +10126,11 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           // White inner hole (evenodd equivalent)
           pdf.setFillColor(255, 255, 255);
           pdf.circle(hcX, hcY, holeR, 'F');
+
+        } else if (type === 'path' && o.annotType === 'symbol' && _symbolToPNG(o, [r, g, b])) {
+          // Symbol: přesně stejný tvar jako v aplikaci (rasterizovaný Path2D, plná barva dodavatele)
+          const s = _symbolToPNG(o, [r, g, b]);
+          pdf.addImage(s.data, 'PNG', toX(s.cx) - toMX(s.w) / 2, toY(s.cy) - toMY(s.h) / 2, toMX(s.w), toMY(s.h));
 
         } else {
           // Fallback: filled circle at object centre
