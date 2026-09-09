@@ -7852,9 +7852,13 @@ const SYMBOL_DEFS = [
   { key: 'concrete', label: 'Betonáž', d: 'M17 8.89L11.55 14.33 14.28 17.06c0.33 0.33 0.46 0.81 0.35 1.26s-0.45 0.82-0.9 0.95l-10.67 3.33c-0.47 0.15-0.99 0.02-1.34-0.33s-0.48-0.87-0.33-1.34l3.33-10.67c0.14-0.45 0.5-0.79 0.95-0.9s0.93 0.02 1.26 0.35L9.67 12.45 15.11 7c-0.6-0.61-0.59-1.58 0.01-2.19l3.98-3.98c1.12-1.12 2.94-1.12 4.06 0s1.12 2.94 0 4.06l-3.98 3.98c-0.6 0.6-1.58 0.61-2.19 0.01z' }, // Font Awesome Free "trowel" (CC BY 4.0), rescaled 576→24
   { key: 'insulation', label: 'Izolace', d: 'M20,12H22V14H20C18.62,14 17.26,13.65 16,13C13.5,14.3 10.5,14.3 8,13C6.74,13.65 5.37,14 4,14H2V12H4C5.39,12 6.78,11.53 8,10.67C10.44,12.38 13.56,12.38 16,10.67C17.22,11.53 18.61,12 20,12M20,6H22V8H20C18.62,8 17.26,7.65 16,7C13.5,8.3 10.5,8.3 8,7C6.74,7.65 5.37,8 4,8H2V6H4C5.39,6 6.78,5.53 8,4.67C10.44,6.38 13.56,6.38 16,4.67C17.22,5.53 18.61,6 20,6M20,18H22V20H20C18.62,20 17.26,19.65 16,19C13.5,20.3 10.5,20.3 8,19C6.74,19.65 5.37,20 4,20H2V18H4C5.39,18 6.78,17.53 8,16.67C10.44,18.38 13.56,18.38 16,16.67C17.22,17.53 18.61,18 20,18Z' },
   { key: 'paint', label: 'Malování', d: 'M18,4V3A1,1 0 0,0 17,2H5A1,1 0 0,0 4,3V7A1,1 0 0,0 5,8H17A1,1 0 0,0 18,7V6H19V10H9V21A1,1 0 0,0 10,22H12A1,1 0 0,0 13,21V12H21V4H18Z' },
+  { key: 'tiles', label: 'Obklady a dlažba', d: 'M1,1H11V11H1ZM13,1H23V11H13ZM1,13H11V23H1ZM13,13H23V23H13Z' },
   // ── Měření & kontrola ──────────────────────────────────────────────────────────
   { key: 'tape', label: 'Metr/Pásmo', d: 'M9,5A7,7 0 0,1 16,12H17V15H16V19H9A7,7 0 0,1 2,12A7,7 0 0,1 9,5M9,8A4,4 0 0,0 5,12A4,4 0 0,0 9,16A4,4 0 0,0 13,12A4,4 0 0,0 9,8M17,17H22V19L22,21H20V19H17V17Z' },
   { key: 'level', label: 'Vodováha', d: 'M22 8H2V16H22V8M18 14V10H20V14H18M11 12H13C14.1 12 15 11.11 15 10H17V14H7V10H9C9 11.11 9.9 12 11 12M4 14V10H6V14H4Z' },
+  // ── Terénní úpravy & zeleň ─────────────────────────────────────────────────────
+  { key: 'tree', label: 'Sázení zeleně', d: 'M5,9A7,7 0 1,0 19,9A7,7 0 1,0 5,9ZM10.5,16H13.5V21H10.5Z' },
+  { key: 'irrigation', label: 'Závlaha', d: 'M2,3H22V5H2ZM4.8,7A1.2,1.2 0 1,1 7.2,7L6,13ZM10.8,7A1.2,1.2 0 1,1 13.2,7L12,13ZM16.8,7A1.2,1.2 0 1,1 19.2,7L18,13Z' },
 ];
 // Keys that existed in earlier versions of SYMBOL_DEFS but were removed or renamed.
 // Saved annotations keep their own path geometry, so this only matters when a
@@ -7970,11 +7974,10 @@ function placeSymbolAt(x, y) {
     originX: 'center', originY: 'center',
     fill: color,
     stroke: 'none',
-    // viewBox 24x24 × 0.625 = 15 → stejná výška jako špendlík (placePinAt), žádný symbol ho nepřevyšuje.
-    scaleX: 0.625, scaleY: 0.625,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
+  // Zmenšit na výšku špendlíku (placePinAt) – viz symbolFitScale, žádný symbol ho nepřevyšuje.
   const _s = symbolFitScale(shape);
   shape.set({ scaleX: _s, scaleY: _s });
   shape.setCoords();
@@ -9951,7 +9954,11 @@ function _symbolToPNG(o, rgb) {
     if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
     const sx = o.scaleX || 1, sy = o.scaleY || 1;
     const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-    const key = [JSON.stringify(o.path), sx, sy, o.angle || 0, o.fillRule || '', o.stroke || '', o.strokeWidth || 0, col].join('|');
+    // Úhel zaokrouhlený na celé stupně — symboly se volně otáčejí myší, takže bez
+    // zaokrouhlení by cache téměř nikdy nezasáhla (skoro každý úhel unikátní).
+    // Rozdíl pod 1° není v tisku vidět.
+    const angleKey = Math.round(o.angle || 0);
+    const key = [JSON.stringify(o.path), sx, sy, angleKey, o.fillRule || '', o.stroke || '', o.strokeWidth || 0, !!o.strokeUniform, col].join('|');
     let hit = _symPngCache.get(key);
     if (!hit) {
       const shape = new fabric.Path(o.path, {
@@ -10074,6 +10081,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         const type = (o.type || '').toLowerCase();
         const oCX  = (o.originX || 'left') === 'center';
         const oCY  = (o.originY || 'top')  === 'center';
+        const symPng = (type === 'path' && o.annotType === 'symbol') ? _symbolToPNG(o, [r, g, b]) : null;
 
         if (type === 'ellipse') {
           const rx = (o.rx||20)*(o.scaleX||1), ry = (o.ry||20)*(o.scaleY||1);
@@ -10127,10 +10135,9 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setFillColor(255, 255, 255);
           pdf.circle(hcX, hcY, holeR, 'F');
 
-        } else if (type === 'path' && o.annotType === 'symbol' && _symbolToPNG(o, [r, g, b])) {
+        } else if (symPng) {
           // Symbol: přesně stejný tvar jako v aplikaci (rasterizovaný Path2D, plná barva dodavatele)
-          const s = _symbolToPNG(o, [r, g, b]);
-          pdf.addImage(s.data, 'PNG', toX(s.cx) - toMX(s.w) / 2, toY(s.cy) - toMY(s.h) / 2, toMX(s.w), toMY(s.h));
+          pdf.addImage(symPng.data, 'PNG', toX(symPng.cx) - toMX(symPng.w) / 2, toY(symPng.cy) - toMY(symPng.h) / 2, toMX(symPng.w), toMY(symPng.h));
 
         } else {
           // Fallback: filled circle at object centre
@@ -10598,10 +10605,23 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     return { p, emailWrapped, ctacts, ROW_H };
   });
 
+  // ── Kolik stran bude potřeba — nanečisto projít řádky stejnou logikou
+  // jako hlavní vykreslovací smyčka níže, aby se na pokračovacích stranách
+  // dalo napsat "strana X/Y" ────────────────────────────────────────────
+  const dataStartY = ly + TITLE_H + COLH_H;
+  const pageBottom = ly + lh - FOOTER_H;
+  let totalPages = 1, _simY = dataStartY;
+  rows.forEach(({ ROW_H }) => {
+    if (_simY + ROW_H > pageBottom) { totalPages++; _simY = dataStartY; }
+    _simY += ROW_H;
+  });
+  let pageIndex = 1;
+
   // ── Hlavička stránky (top bar, rámeček, titulek, hlavička sloupců) ──────
   // Na první straně navíc datum KD a mailto tlačítko; na dalších stranách
   // jen štítek "pokračování" — stejný vzor jako drawKDRecordToPDF.
   const drawHeader = isFirstPage => {
+    if (!isFirstPage) pageIndex++;
     pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, PW, 11, 'F');
     pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
     const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
@@ -10657,7 +10677,8 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
       }
     } else {
       pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6); pdf.setTextColor(120, 125, 115);
-      pdf.text(cs('pokracovani...'), lx + lw * 0.42, ly + TITLE_H * 0.65);
+      const _contLabel = totalPages > 1 ? 'pokracovani - strana ' + pageIndex + '/' + totalPages : 'pokracovani...';
+      pdf.text(cs(_contLabel), lx + lw * 0.42, ly + TITLE_H * 0.65);
     }
 
     // Column header row
@@ -10686,13 +10707,18 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     return COLH_Y + COLH_H;
   };
 
-  const pageBottom = ly + lh - FOOTER_H;
   let curY = drawHeader(true);
 
   rows.forEach(({ p, emailWrapped, ctacts, ROW_H }, i) => {
     if (curY + ROW_H > pageBottom) {
       pdf.addPage();
       curY = drawHeader(false);
+      if (ROW_H > pageBottom - curY) {
+        // Extrémní okrajový případ: dodavatel s tolika kontakty/e-maily, že se
+        // jeho řádek nevejde ani na čerstvou stránku. Vykreslí se dál (přesáhne
+        // rámeček tabulky), aspoň se to zaloguje pro budoucí ladění.
+        console.warn('[dochazka] Řádek dodavatele "' + (p.firma || p.name) + '" je vyšší než celá stránka a přesáhne rámeček tabulky.');
+      }
     }
     const rowY = curY;
 
@@ -12149,6 +12175,7 @@ async function _serverSaveNow() {
     return; // _hasPendingSave stays true until the retry completes
   }
   _saving = true;
+  let _retryScheduled = false; // 401 retry in flight – keep _hasPendingSave true until it resolves
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
     const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel']);
@@ -12191,6 +12218,7 @@ async function _serverSaveNow() {
       if (status === 401 && _saveAuthRetries < 2) {
         // Session se právě obnovuje z remember-me cookie – data neztrácet, uložit znovu za chvíli
         _saveAuthRetries++;
+        _retryScheduled = true;
         clearTimeout(_srvTimer); _srvTimer = setTimeout(_serverSaveNow, 2500);
         if (saveEl) { saveEl.textContent = '💾 Opakuji…'; saveEl.style.color = '#e67e22'; }
       } else {
@@ -12212,7 +12240,12 @@ async function _serverSaveNow() {
       }
     }
   } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
-  finally { _saving = false; _hasPendingSave = false; }
+  finally {
+    _saving = false;
+    // Keep _hasPendingSave true while a 401-retry is pending — _pollLiveSync
+    // must not overwrite unsaved local edits before the retry actually saves them.
+    if (!_retryScheduled) _hasPendingSave = false;
+  }
 }
 
 // ---- Apply server-added objects (concurrent-save merge) ----
