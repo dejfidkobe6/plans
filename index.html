@@ -7970,11 +7970,10 @@ function placeSymbolAt(x, y) {
     originX: 'center', originY: 'center',
     fill: color,
     stroke: 'none',
-    // viewBox 24x24 × 0.625 = 15 → stejná výška jako špendlík (placePinAt), žádný symbol ho nepřevyšuje.
-    scaleX: 0.625, scaleY: 0.625,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
+  // Zmenšit na výšku špendlíku (placePinAt) – viz symbolFitScale, žádný symbol ho nepřevyšuje.
   const _s = symbolFitScale(shape);
   shape.set({ scaleX: _s, scaleY: _s });
   shape.setCoords();
@@ -9951,7 +9950,11 @@ function _symbolToPNG(o, rgb) {
     if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
     const sx = o.scaleX || 1, sy = o.scaleY || 1;
     const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-    const key = [JSON.stringify(o.path), sx, sy, o.angle || 0, o.fillRule || '', o.stroke || '', o.strokeWidth || 0, col].join('|');
+    // Úhel zaokrouhlený na celé stupně — symboly se volně otáčejí myší, takže bez
+    // zaokrouhlení by cache téměř nikdy nezasáhla (skoro každý úhel unikátní).
+    // Rozdíl pod 1° není v tisku vidět.
+    const angleKey = Math.round(o.angle || 0);
+    const key = [JSON.stringify(o.path), sx, sy, angleKey, o.fillRule || '', o.stroke || '', o.strokeWidth || 0, !!o.strokeUniform, col].join('|');
     let hit = _symPngCache.get(key);
     if (!hit) {
       const shape = new fabric.Path(o.path, {
@@ -10074,6 +10077,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         const type = (o.type || '').toLowerCase();
         const oCX  = (o.originX || 'left') === 'center';
         const oCY  = (o.originY || 'top')  === 'center';
+        const symPng = (type === 'path' && o.annotType === 'symbol') ? _symbolToPNG(o, [r, g, b]) : null;
 
         if (type === 'ellipse') {
           const rx = (o.rx||20)*(o.scaleX||1), ry = (o.ry||20)*(o.scaleY||1);
@@ -10127,10 +10131,9 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
           pdf.setFillColor(255, 255, 255);
           pdf.circle(hcX, hcY, holeR, 'F');
 
-        } else if (type === 'path' && o.annotType === 'symbol' && _symbolToPNG(o, [r, g, b])) {
+        } else if (symPng) {
           // Symbol: přesně stejný tvar jako v aplikaci (rasterizovaný Path2D, plná barva dodavatele)
-          const s = _symbolToPNG(o, [r, g, b]);
-          pdf.addImage(s.data, 'PNG', toX(s.cx) - toMX(s.w) / 2, toY(s.cy) - toMY(s.h) / 2, toMX(s.w), toMY(s.h));
+          pdf.addImage(symPng.data, 'PNG', toX(symPng.cx) - toMX(symPng.w) / 2, toY(symPng.cy) - toMY(symPng.h) / 2, toMX(symPng.w), toMY(symPng.h));
 
         } else {
           // Fallback: filled circle at object centre
@@ -10598,10 +10601,23 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     return { p, emailWrapped, ctacts, ROW_H };
   });
 
+  // ── Kolik stran bude potřeba — nanečisto projít řádky stejnou logikou
+  // jako hlavní vykreslovací smyčka níže, aby se na pokračovacích stranách
+  // dalo napsat "strana X/Y" ────────────────────────────────────────────
+  const dataStartY = ly + TITLE_H + COLH_H;
+  const pageBottom = ly + lh - FOOTER_H;
+  let totalPages = 1, _simY = dataStartY;
+  rows.forEach(({ ROW_H }) => {
+    if (_simY + ROW_H > pageBottom) { totalPages++; _simY = dataStartY; }
+    _simY += ROW_H;
+  });
+  let pageIndex = 1;
+
   // ── Hlavička stránky (top bar, rámeček, titulek, hlavička sloupců) ──────
   // Na první straně navíc datum KD a mailto tlačítko; na dalších stranách
   // jen štítek "pokračování" — stejný vzor jako drawKDRecordToPDF.
   const drawHeader = isFirstPage => {
+    if (!isFirstPage) pageIndex++;
     pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, PW, 11, 'F');
     pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
     const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
@@ -10657,7 +10673,8 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
       }
     } else {
       pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6); pdf.setTextColor(120, 125, 115);
-      pdf.text(cs('pokracovani...'), lx + lw * 0.42, ly + TITLE_H * 0.65);
+      const _contLabel = totalPages > 1 ? 'pokracovani - strana ' + pageIndex + '/' + totalPages : 'pokracovani...';
+      pdf.text(cs(_contLabel), lx + lw * 0.42, ly + TITLE_H * 0.65);
     }
 
     // Column header row
@@ -10686,13 +10703,18 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     return COLH_Y + COLH_H;
   };
 
-  const pageBottom = ly + lh - FOOTER_H;
   let curY = drawHeader(true);
 
   rows.forEach(({ p, emailWrapped, ctacts, ROW_H }, i) => {
     if (curY + ROW_H > pageBottom) {
       pdf.addPage();
       curY = drawHeader(false);
+      if (ROW_H > pageBottom - curY) {
+        // Extrémní okrajový případ: dodavatel s tolika kontakty/e-maily, že se
+        // jeho řádek nevejde ani na čerstvou stránku. Vykreslí se dál (přesáhne
+        // rámeček tabulky), aspoň se to zaloguje pro budoucí ladění.
+        console.warn('[dochazka] Řádek dodavatele "' + (p.firma || p.name) + '" je vyšší než celá stránka a přesáhne rámeček tabulky.');
+      }
     }
     const rowY = curY;
 
@@ -12149,6 +12171,7 @@ async function _serverSaveNow() {
     return; // _hasPendingSave stays true until the retry completes
   }
   _saving = true;
+  let _retryScheduled = false; // 401 retry in flight – keep _hasPendingSave true until it resolves
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
     const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel']);
@@ -12191,6 +12214,7 @@ async function _serverSaveNow() {
       if (status === 401 && _saveAuthRetries < 2) {
         // Session se právě obnovuje z remember-me cookie – data neztrácet, uložit znovu za chvíli
         _saveAuthRetries++;
+        _retryScheduled = true;
         clearTimeout(_srvTimer); _srvTimer = setTimeout(_serverSaveNow, 2500);
         if (saveEl) { saveEl.textContent = '💾 Opakuji…'; saveEl.style.color = '#e67e22'; }
       } else {
@@ -12212,7 +12236,12 @@ async function _serverSaveNow() {
       }
     }
   } catch(e) { console.error('[canvas] save network error:', e); showToast('Chyba uložení: síťová chyba', 'error'); }
-  finally { _saving = false; _hasPendingSave = false; }
+  finally {
+    _saving = false;
+    // Keep _hasPendingSave true while a 401-retry is pending — _pollLiveSync
+    // must not overwrite unsaved local edits before the retry actually saves them.
+    if (!_retryScheduled) _hasPendingSave = false;
+  }
 }
 
 // ---- Apply server-added objects (concurrent-save merge) ----

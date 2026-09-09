@@ -54,14 +54,18 @@ function _currentRememberHash(): ?string {
 function _ensureRememberTable(): void {
     static $done = false;
     if ($done) return;
-    getDB()->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
+    $db = getDB();
+    $db->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
         id         INT AUTO_INCREMENT PRIMARY KEY,
         user_id    INT NOT NULL,
         token_hash CHAR(64) NOT NULL,
         expires_at DATETIME NOT NULL,
         INDEX idx_tok (token_hash),
-        INDEX idx_uid (user_id)
+        INDEX idx_uid (user_id),
+        INDEX idx_exp (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Table may already exist from before idx_exp was added — add it if missing.
+    try { $db->exec('ALTER TABLE remember_tokens ADD INDEX idx_exp (expires_at)'); } catch (\PDOException $e) {}
     $done = true;
 }
 
