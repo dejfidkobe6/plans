@@ -5301,10 +5301,18 @@ function switchLevel(idx) {
       fabricCanvas.backgroundColor = '#f0f0ec';
       cleanupOrphanedHelpers();
       applyAnnotationLocks();
-      // Symboly uložené dřívější verzí: sjednotit na plnou výplň a omezit velikost na špendlík
+      // Symboly uložené dřívější verzí: sjednotit na plnou výplň a doladit velikost.
       fabricCanvas.getObjects().filter(o => o.annotType === 'symbol').forEach(o => {
         applyAnnotColorToCanvas(o);
-        symbolCapSize(o);
+        if (o.annotSymGen !== SYMBOL_SIZE_GEN) {
+          // Jednorázová migrace na novou generaci velikosti (viz SYMBOL_SIZE_GEN) —
+          // zachová aktuální poměr velikosti symbolu, jen ho zvětší na dvojnásobek.
+          o.set({ scaleX: (o.scaleX || 1) * 2, scaleY: (o.scaleY || 1) * 2 });
+          o.annotSymGen = SYMBOL_SIZE_GEN;
+          o.setCoords();
+        } else {
+          symbolCapSize(o);
+        }
       });
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
@@ -7873,10 +7881,15 @@ function symbolDefFor(key) {
 }
 let _pendingSymbolKey = 'crane';
 
-// Symboly nesmí být větší než špendlík (výška 15, šířka 12 – viz placePinAt).
+// Standardní velikost symbolu (na přání uživatele zvětšeno na dvojnásobek
+// oproti původní výšce špendlíku 15×12 – viz placePinAt).
 // Měřítko se počítá z reálného rozměru glyfu, takže i nízké/široké ikony drží limit.
-const SYMBOL_MAX_H = 15;
-const SYMBOL_MAX_W = 18;
+const SYMBOL_MAX_H = 30;
+const SYMBOL_MAX_W = 36;
+// Verze "generace" velikosti symbolu — když se štítek zvedne (jako teď z 1 na 2),
+// staré uložené symboly se při načtení podlaží jednorázově zvětší, aby doběhly na
+// novou velikost, a označí se aktuální generací, takže se znovu nezdvojnásobí.
+const SYMBOL_SIZE_GEN = 2;
 function symbolFitScale(obj) {
   const w = obj.width || 1, h = obj.height || 1;
   return Math.min(SYMBOL_MAX_H / h, SYMBOL_MAX_W / w);
@@ -7973,13 +7986,16 @@ function placeSymbolAt(x, y) {
     left: x, top: y,
     originX: 'center', originY: 'center',
     fill: color,
-    stroke: 'none',
+    // POZOR: musí být `null`, ne řetězec 'none' — canvas takovou barvu neumí a potichu
+    // ji ignoruje, takže objektu zůstane výchozí černý obrys (viz symbolFitScale).
+    stroke: null,
     fillRule: sym.fillRule || 'nonzero',
     selectable: true,
   });
-  // Zmenšit na výšku špendlíku (placePinAt) – viz symbolFitScale, žádný symbol ho nepřevyšuje.
+  // Zmenšit/zvětšit na standardní velikost symbolu — viz symbolFitScale.
   const _s = symbolFitScale(shape);
   shape.set({ scaleX: _s, scaleY: _s });
+  shape.annotSymGen = SYMBOL_SIZE_GEN;
   shape.setCoords();
   addAnnotationProperties(shape, 'symbol');
   shape.annotSymbol = sym.key;
@@ -8320,7 +8336,7 @@ function drawGrid() {
 // ============================================================
 // UNDO / REDO
 // ============================================================
-const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper','linkToLevel'];
+const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper','linkToLevel','annotSymGen'];
 
 function _canvasJSON() {
   const json = fabricCanvas.toJSON(_JSON_FIELDS);
@@ -12178,7 +12194,7 @@ async function _serverSaveNow() {
   let _retryScheduled = false; // 401 retry in flight – keep _hasPendingSave true until it resolves
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel']);
+    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel','annotSymGen']);
     _snap.objects = (_snap.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
     appState.levels[appState.activeLevel].fabricJSON = _snap;
     // refresh annotations list for this level
