@@ -6574,7 +6574,22 @@ function createLevelLinkLine(x1, y1, x2, y2) {
   });
 }
 
-function updateAllLabelScales() {
+// deconflictLabels() is O(n²) in the number of annotations (checks every label
+// pair) — on projects with a few hundred pins it measurably takes 100ms+, which
+// is fine once, but not on every animation frame of a zoom gesture. When called
+// with deconflict:false (continuous zoom), labels still reposition every frame
+// (cheap, keeps them visually attached) but the expensive overlap pass is
+// debounced until the gesture actually settles.
+let _deconflictSettleTimer = null;
+function _scheduleDeconflictSettle() {
+  clearTimeout(_deconflictSettleTimer);
+  _deconflictSettleTimer = setTimeout(() => {
+    deconflictLabels();
+    fabricCanvas.renderAll();
+  }, 150);
+}
+
+function updateAllLabelScales(deconflict = true) {
   if (!fabricCanvas) return;
   const zoom    = fabricCanvas.getZoom();
   const compact = zoom < LABEL_COMPACT_ZOOM;
@@ -6597,7 +6612,12 @@ function updateAllLabelScales() {
     const annot = _annotById.get(o.annotLabelFor);
     if (annot) positionLabel(o, annot);
   });
-  deconflictLabels();
+  if (deconflict) {
+    clearTimeout(_deconflictSettleTimer);
+    deconflictLabels();
+  } else {
+    _scheduleDeconflictSettle();
+  }
   fabricCanvas.renderAll();
 }
 
@@ -7225,11 +7245,13 @@ function setupEventListeners() {
     saveCurrentLevel();
   });
 
-  // rAF throttle for label repositioning during zoom (wheel + pinch both use this)
+  // rAF throttle for label repositioning during zoom (wheel + pinch both use this).
+  // deconflict:false — the expensive O(n²) overlap pass is debounced separately
+  // (see updateAllLabelScales) so it doesn't run on every frame of the gesture.
   let _labelRaf = null;
   function _scheduleLabels() {
     if (_labelRaf) return;
-    _labelRaf = requestAnimationFrame(() => { _labelRaf = null; updateAllLabelScales(); });
+    _labelRaf = requestAnimationFrame(() => { _labelRaf = null; updateAllLabelScales(false); });
   }
 
   // Wheel zoom
@@ -7242,7 +7264,11 @@ function setupEventListeners() {
     cw.zoomToPoint({ x: e.offsetX, y: e.offsetY }, zoom);
     updateZoomDisplay();
     _scheduleLabels();
-    cw.renderAll();
+    // requestRenderAll (not renderAll): coalesces the many 'wheel' events fired during
+    // one scroll gesture into a single render per frame instead of one full canvas
+    // redraw per event — on canvases with lots of annotations this was the main
+    // source of stutter while zooming.
+    cw.requestRenderAll();
   }, { passive: false });
 
   // Touch – two-finger pan/pinch-zoom + tap-to-select in pan mode
@@ -7340,7 +7366,7 @@ function setupEventListeners() {
       cw.setViewportTransform(vpt);
       updateZoomDisplay();
       _scheduleLabels();
-      cw.renderAll();
+      cw.requestRenderAll();
     }
   }, { passive: false });
   wrapper.addEventListener('touchend', (e) => {
