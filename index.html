@@ -5280,6 +5280,7 @@ async function removeLevel(idx) {
 }
 
 function switchLevel(idx) {
+  cancelPendingDeconflict(); // odložený deconflict ze zoomu nesmí doběhnout nad novým patrem
   // Save current canvas state ONLY when actually switching away from a different level.
   // If idx === appState.activeLevel (e.g. during openProject after server load), the
   // canvas is empty and saving it would overwrite the fabricJSON we just loaded from DB.
@@ -6584,9 +6585,18 @@ let _deconflictSettleTimer = null;
 function _scheduleDeconflictSettle() {
   clearTimeout(_deconflictSettleTimer);
   _deconflictSettleTimer = setTimeout(() => {
+    _deconflictSettleTimer = null;
+    if (!fabricCanvas) return;
     deconflictLabels();
     fabricCanvas.renderAll();
   }, 150);
+}
+// Zrušit odložený průchod popisky – volat všude, kde se plátno maže nebo nahrazuje
+// (přepnutí patra, otevření projektu, obnova zálohy), jinak by timeout doběhl nad
+// popisky nového patra a zbytečně je přeskládal.
+function cancelPendingDeconflict() {
+  clearTimeout(_deconflictSettleTimer);
+  _deconflictSettleTimer = null;
 }
 
 function updateAllLabelScales(deconflict = true) {
@@ -6594,13 +6604,20 @@ function updateAllLabelScales(deconflict = true) {
   const zoom    = fabricCanvas.getZoom();
   const compact = zoom < LABEL_COMPACT_ZOOM;
 
-  // Rebuild labels when crossing compact/full threshold
+  // Rebuild labels when crossing compact/full threshold.
+  // Během plynulého zoomu (deconflict=false) i tady jen naplánovat odložený průchod –
+  // zoom oscilující kolem prahu by jinak drahý O(n²) deconflict spouštěl při každém přechodu.
   if (compact !== _labelsCompact) {
     _labelsCompact = compact;
     const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
     existing.forEach(l => fabricCanvas.remove(l));
     getAnnotObjects().forEach(obj => createAnnotLabel(obj));
-    deconflictLabels();
+    if (deconflict) {
+      cancelPendingDeconflict();
+      deconflictLabels();
+    } else {
+      _scheduleDeconflictSettle();
+    }
     fabricCanvas.renderAll();
     return;
   }
@@ -6613,7 +6630,7 @@ function updateAllLabelScales(deconflict = true) {
     if (annot) positionLabel(o, annot);
   });
   if (deconflict) {
-    clearTimeout(_deconflictSettleTimer);
+    cancelPendingDeconflict();
     deconflictLabels();
   } else {
     _scheduleDeconflictSettle();
@@ -14675,6 +14692,7 @@ async function openProject(proj) {
   document.getElementById('project-screen').classList.add('hidden');
   updateTopbarUserInfo();
   applyViewerMode();
+  cancelPendingDeconflict();
   if (fabricCanvas) {
     fabricCanvas.clear();
     fabricCanvas.backgroundColor = '#f0f0ec';
