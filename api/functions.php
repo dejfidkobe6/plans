@@ -76,7 +76,11 @@ function _ensureRememberTable(): void {
         try {
             $db->exec('ALTER TABLE remember_tokens ADD INDEX idx_exp (expires_at)');
         } catch (\PDOException $e) {
-            error_log('[remember_tokens] add idx_exp failed: ' . $e->getMessage());
+            // 1061 = Duplicate key name: souběžný request těsně po deployi index právě
+            // přidal – neškodné, nelogovat. Ostatní chyby logovat jako dosud.
+            if (($e->errorInfo[1] ?? null) !== 1061) {
+                error_log('[remember_tokens] add idx_exp failed: ' . $e->getMessage());
+            }
         }
     }
     $done = true;
