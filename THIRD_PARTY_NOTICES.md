@@ -10,12 +10,6 @@ dostupné na odkazovaných adresách.
 - Licence: Apache License 2.0 — https://github.com/Templarian/MaterialDesign/blob/master/LICENSE
 - Použití: SVG path data většiny symbolů stavebních činností.
 
-### Font Awesome Free
-- Zdroj: https://fontawesome.com, balíček `@fortawesome/free-solid-svg-icons` 7.3.1
-- Licence ikon: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
-- Použití: ikona `trowel` (symbol „Betonáž“), přeškálovaná z 576 px na 24 px mřížku.
-- Attribution: Font Awesome Free by Fonticons, Inc. (https://fontawesome.com)
-
 ### Game Icons
 - Zdroj: https://game-icons.net, balíček `@iconify-json/game-icons` 1.2.4
 - Licence: CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/
@@ -23,7 +17,8 @@ dostupné na odkazovaných adresách.
 - Attribution: game-icons.net (https://game-icons.net)
 
 Symboly `platform` (Plošina), `silo` (Stavební silo), `tiles` (Obklady a dlažba),
-`tree` (Sázení zeleně) a `irrigation` (Závlaha) jsou vlastní kresby projektu.
+`tree` (Sázení zeleně), `irrigation` (Závlaha) a `concrete` (Autodomíchávač)
+jsou vlastní kresby projektu.
 
 ## Knihovny načítané z CDN (`index.html`)
 
