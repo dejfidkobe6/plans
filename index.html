@@ -10133,7 +10133,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
       if (_gsTrans) pdf.setGState(_gsTrans);
 
       annotObjs.forEach(o => {
-        const [r,g,b] = hexToRgb((appState.profese||[]).find(p=>p.name===o.profese)?.color || o.stroke || '#4a8f3f');
+        const [r,g,b] = annotExportRgb(o);
         pdf.setDrawColor(r, g, b);
         pdf.setFillColor(
           Math.round(r*FILL_A + 255*(1-FILL_A)),
@@ -10263,8 +10263,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
 
       annotObjs.forEach(o => {
         if (!o.annotId) return;
-        const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
-        const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
+        const [r,g,b] = annotExportRgb(o);
         const firmaRaw = getFirmaDisplay(o.profese);
         const popRaw   = o.annotId || '';
 
@@ -10407,6 +10406,16 @@ function pdfTextWithLinks(pdf, text, x, y, fspt, defaultRgb) {
 
 // Pure-vector annotation list — draws directly into the PDF using jsPDF commands.
 // No canvas image; zero raster overhead → tiny file size, infinite zoom quality.
+// Barva anotace v exportu – stejné pravidlo jako v aplikaci (getAnnotColor):
+// odkaz na podlaží tyrkysově, Urgence červeně, jinak barva dodavatele.
+// `o` může být fabric objekt i záznam ze soupisu – stačí annotType, status, profese.
+function annotExportRgb(o) {
+  if (o && o.annotType === 'levellink') return hexToRgb('#06B6D4');
+  if (o && o.status === 'Urgence')      return hexToRgb('#EF4444');
+  const prof = (appState.profese || []).find(p => p.name === (o && o.profese));
+  return hexToRgb(prof?.color || (o && (o.stroke || o.fill)) || '#4a8f3f');
+}
+
 // ── Mini náhled tvaru anotace pro soupis v PDF ──────────────────────────────
 // V soupisu se vedle úkolu kreslí stejný tvar, jakým je anotace zobrazená na
 // výkrese, aby se dal úkol spárovat s anotací i bez čtení čísla. Symboly se
@@ -10681,10 +10690,19 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
     const tY1 = curY + LH * 0.8; // first line baseline (same for ALL rows)
     const gBox = Math.max(1.2, Math.min(GLYPH_W, LH, rowH - 0.3));
     const shape = shapeById && shapeById.get(ann.annotId);
+    // Barva glyfu podle stejného pravidla jako na výkrese (Urgence červeně),
+    // aby se řádek soupisu dal spárovat s anotací i podle barvy
+    const gRgb = annotExportRgb({
+      annotType: (shape && shape.annotType) || ann.annotType,
+      status:  ann.status,
+      profese: ann.profese,
+      stroke: shape && shape.stroke,
+      fill:   shape && shape.fill,
+    });
     if (shape) {
-      drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, pRgb);
+      drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, gRgb);
     } else {
-      pdf.setFillColor(...pRgb);
+      pdf.setFillColor(...gRgb);
       pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
     }
 
