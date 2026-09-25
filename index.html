@@ -10407,7 +10407,133 @@ function pdfTextWithLinks(pdf, text, x, y, fspt, defaultRgb) {
 
 // Pure-vector annotation list — draws directly into the PDF using jsPDF commands.
 // No canvas image; zero raster overhead → tiny file size, infinite zoom quality.
-function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
+// ── Mini náhled tvaru anotace pro soupis v PDF ──────────────────────────────
+// V soupisu se vedle úkolu kreslí stejný tvar, jakým je anotace zobrazená na
+// výkrese, aby se dal úkol spárovat s anotací i bez čtení čísla. Symboly se
+// renderují Fabricem do malého PNG (stejný engine jako plátno), ostatní tvary
+// jako PDF vektory. Glyf se vždy vejde do čtverce `box` se středem v (cx, cy).
+const _glyphPngCache = new Map();
+function _symbolGlyphPNG(o, rgb, px) {
+  try {
+    if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
+    const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    const key = JSON.stringify(o.path) + '|' + (o.fillRule || '') + '|' + col + '|' + px;
+    if (_glyphPngCache.has(key)) return _glyphPngCache.get(key);
+    // Glyf je legenda, ne kopie umístěné instance – kreslí se bez rotace a měřítka
+    const shape = new fabric.Path(o.path, {
+      originX: 'center', originY: 'center',
+      fill: col, fillRule: o.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
+      stroke: null, strokeWidth: 0, objectCaching: false,
+    });
+    const w = Math.max(1, shape.width), h = Math.max(1, shape.height);
+    const pad = Math.max(w, h) * 0.04;                 // okraj na antialiasing
+    const cw = w + pad * 2, ch = h + pad * 2;
+    const sc = new fabric.StaticCanvas(null, { width: cw, height: ch, enableRetinaScaling: false });
+    shape.set({ left: cw / 2, top: ch / 2 });
+    sc.add(shape); sc.renderAll();
+    // Pevný počet pixelů na glyf (ne na jednotku plátna) – i dlouhá cesta dá malé PNG
+    const out = { data: sc.toDataURL({ format: 'png', multiplier: px / Math.max(cw, ch) }), w: cw, h: ch };
+    sc.dispose();
+    _glyphPngCache.set(key, out);
+    return out;
+  } catch (e) { return null; }
+}
+
+function drawAnnotGlyphToPDF(pdf, o, cx, cy, box, rgb) {
+  const [r, g, b] = rgb;
+  const half = box / 2;
+  const type = ((o && o.type) || '').toLowerCase();
+  const at   = o && o.annotType;
+  pdf.setDrawColor(r, g, b);
+  pdf.setFillColor(r, g, b);
+  pdf.setLineWidth(Math.max(0.12, box * 0.075));
+  const tint = [Math.round(r * 0.28 + 255 * 0.72),
+                Math.round(g * 0.28 + 255 * 0.72),
+                Math.round(b * 0.28 + 255 * 0.72)];
+
+  // Symbol – skutečná silueta ze SYMBOL_DEFS
+  if (type === 'path' && at === 'symbol') {
+    const png = _symbolGlyphPNG(o, rgb, 64);
+    if (png) {
+      const s = box / Math.max(png.w, png.h);
+      pdf.addImage(png.data, 'PNG', cx - png.w * s / 2, cy - png.h * s / 2, png.w * s, png.h * s);
+      return;
+    }
+  }
+
+  // Špendlík – kapka s bílým kolečkem
+  if (type === 'path' && at === 'pin') {
+    const hr = box * 0.30, hcy = cy - box * 0.12;
+    pdf.circle(cx, hcy, hr, 'F');
+    pdf.lines([[hr * 0.8, box * 0.34], [-hr * 1.6, 0]], cx - hr * 0.8, hcy + hr * 0.62, [1, 1], 'F', true);
+    pdf.setFillColor(255, 255, 255);
+    pdf.circle(cx, hcy, hr * 0.42, 'F');
+    return;
+  }
+
+  // Text – písmeno T
+  if (type === 'i-text' || type === 'text' || at === 'text') {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(box * 2.6);
+    pdf.setTextColor(r, g, b);
+    pdf.text('T', cx - box * 0.22, cy + box * 0.33);
+    return;
+  }
+
+  if (type === 'ellipse' || at === 'circle') {
+    pdf.setFillColor(...tint);
+    pdf.ellipse(cx, cy, half * 0.92, half * 0.72, 'FD');
+    return;
+  }
+
+  if (type === 'rect') {
+    pdf.setFillColor(...tint);
+    pdf.rect(cx - half * 0.92, cy - half * 0.70, box * 0.92, box * 0.70, 'FD');
+    return;
+  }
+
+  // Polygon / lomená čára / šipka / příčka – skutečné body, zmenšené na box
+  if ((type === 'polygon' || type === 'polyline') && Array.isArray(o.points) && o.points.length >= 2) {
+    const pts = o.points, sx = o.scaleX || 1, sy = o.scaleY || 1;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const w = (Math.max(...xs) - Math.min(...xs)) * sx;
+    const h = (Math.max(...ys) - Math.min(...ys)) * sy;
+    if (w > 1e-4 || h > 1e-4) {
+      const s  = Math.min(box * 0.92 / Math.max(w, 1e-4), box * 0.92 / Math.max(h, 1e-4));
+      const ox = cx - w * s / 2, oy = cy - h * s / 2;
+      const mnX = Math.min(...xs), mnY = Math.min(...ys);
+      const pp = pts.map(p => [ox + (p.x - mnX) * sx * s, oy + (p.y - mnY) * sy * s]);
+      const segs = [];
+      for (let i = 1; i < pp.length; i++) segs.push([pp[i][0] - pp[i-1][0], pp[i][1] - pp[i-1][1]]);
+      if (type === 'polygon') { pdf.setFillColor(...tint); pdf.lines(segs, pp[0][0], pp[0][1], [1,1], 'FD', true); }
+      else                    { pdf.lines(segs, pp[0][0], pp[0][1], [1,1], 'S', false); }
+      return;
+    }
+  }
+
+  // Volná čára a ostatní cesty – krátká vlnovka
+  if (type === 'path') {
+    pdf.lines([[box * 0.30, -box * 0.34], [box * 0.30, box * 0.34], [box * 0.30, -box * 0.34]],
+              cx - box * 0.45, cy + box * 0.17, [1, 1], 'S', false);
+    return;
+  }
+
+  pdf.circle(cx, cy, box * 0.22, 'F');   // neznámý typ – původní tečka
+}
+
+// Mapa annotId → fabric objekt podlaží; zdroj tvaru pro soupis v PDF
+function _annotShapeMap(levelIdx) {
+  const m = new Map();
+  const level = appState.levels[levelIdx];
+  if (!level) return m;
+  if (levelIdx === appState.activeLevel) saveCurrentLevel();  // ať je fabricJSON čerstvý
+  ((level.fabricJSON && level.fabricJSON.objects) || []).forEach(o => {
+    if (o.annotId && !o.annotLabelFor && !o.isBackground) m.set(o.annotId, o);
+  });
+  return m;
+}
+
+function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
   const PT_MM = 72 / 25.4;  // points per mm (2.835)
 
   // Text width in mm at given pt font size (helvetica normal metrics)
@@ -10436,8 +10562,10 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
   const DOT_R    = 0.7, ROW_MAX = 3.5;
   const BADGE_FS = 5;   // pt — badge / row text cap
 
+  const GLYPH_W = 3.6;                       // mm — sloupec s náhledem tvaru anotace
   const C_DOT  = lx + 0.012 * lw;
-  const C_ID   = lx + 0.045 * lw;
+  // ID musí začít až za glyfem; u širokého soupisu zůstává původní podíl
+  const C_ID   = Math.max(lx + 0.045 * lw, C_DOT + GLYPH_W + 0.8);
   const C_PROF = lx + 0.14  * lw;
   const C_POPIS= lx + 0.32  * lw;
   const C_TERM = lx + 0.68  * lw;
@@ -10547,11 +10675,18 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
       pdf.rect(lx, curY, 0.8, rowH, 'F');
     }
 
-    // Profese dot — centred on first text line
+    // Náhled tvaru anotace — vystředěný na první řádek textu.
+    // Velikost je omezená výškou řádku i šířkou sloupce, aby glyf nepřesahoval řádek.
     const LH = rowFS / PT_MM * 1.55;
     const tY1 = curY + LH * 0.8; // first line baseline (same for ALL rows)
-    pdf.setFillColor(...pRgb);
-    pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
+    const gBox = Math.max(1.2, Math.min(GLYPH_W, LH, rowH - 0.3));
+    const shape = shapeById && shapeById.get(ann.annotId);
+    if (shape) {
+      drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, pRgb);
+    } else {
+      pdf.setFillColor(...pRgb);
+      pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
+    }
 
     // All rows: normal weight — bold was causing different text metrics
     // and wrong word-wrap vs layout pass
@@ -11591,6 +11726,7 @@ async function doExportPDF() {
 
       let anns = [...(level.annotations || [])];
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
+      const shapeById = _annotShapeMap(idx);   // tvary anotací pro soupis
       // Urgence first, then alphabetically by firma within each group
       anns.sort((a, b) => {
         const au = a.status === 'Urgence' ? 0 : 1, bu = b.status === 'Urgence' ? 0 : 1;
@@ -11656,10 +11792,10 @@ async function doExportPDF() {
           pdf.setDrawColor(60, 70, 45);
           pdf.line(drawW, BY, drawW, BY + BH);
           // drawAnnotListToPDF draws the list as pure PDF vectors — no raster image
-          drawAnnotListToPDF(pdf, anns, drawW + 1, BY, listW - 2, BH, maxAnns);
+          drawAnnotListToPDF(pdf, anns, drawW + 1, BY, listW - 2, BH, maxAnns, shapeById);
         }
       } else if (includeList) {
-        drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
+        drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns, shapeById);
       }
     }
 
