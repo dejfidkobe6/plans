@@ -7881,6 +7881,8 @@ const SYMBOL_DEFS = [
   { key: 'noentry', label: 'Zákaz vstupu', d: 'M17,13H7V11H17M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z' },
   // ── Elektro & instalace ────────────────────────────────────────────────────────
   { key: 'electric', label: 'Elektrika', d: 'M11 15H6L13 1V9H18L11 23V15Z' },
+  { key: 'lowvoltage', label: 'Slaboproud', d: 'M10,2C8.89,2 8,2.89 8,4V7C8,8.11 8.89,9 10,9H11V11H2V13H6V15H5C3.89,15 3,15.89 3,17V20C3,21.11 3.89,22 5,22H9C10.11,22 11,21.11 11,20V17C11,15.89 10.11,15 9,15H8V13H16V15H15C13.89,15 13,15.89 13,17V20C13,21.11 13.89,22 15,22H19C20.11,22 21,21.11 21,20V17C21,15.89 20.11,15 19,15H18V13H22V11H13V9H14C15.11,9 16,8.11 16,7V4C16,2.89 15.11,2 14,2H10M10,4H14V7H10V4M5,17H9V20H5V17M15,17H19V20H15V17Z' },
+  { key: 'camera', label: 'Kamera/CCTV', d: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z' },
   { key: 'plumbing', label: 'Potrubí', d: 'M22,14H20V16H14V13H16V11H14V6A2,2 0 0,0 12,4H4V2H2V10H4V8H10V11H8V13H10V18A2,2 0 0,0 12,20H20V22H22' },
   { key: 'waterdrop', label: 'Voda', d: 'M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z' },
   // ── Zemní práce & bourání ──────────────────────────────────────────────────────
@@ -7890,6 +7892,7 @@ const SYMBOL_DEFS = [
   { key: 'scaffolding', label: 'Lešení', d: 'M2 1H4.4V23H2ZM19.6 1H22V23H19.6ZM4.4 3H19.6V5.2H4.4ZM4.4 10.9H19.6V13.1H4.4ZM4.4 18.8H19.6V21H4.4ZM4.4 5.2H7L19.6 10.4V13.1L4.4 6.8ZM4.4 13.1H7L19.6 18.3V21L4.4 14.7Z' }, // vlastní kresba (rámové lešení se zavětrováním)
   { key: 'scaffold', label: 'Žebřík', d: 'M14 1V3H10V1H8V22H10V20H14V22H16V1H14M14 5V8H10V5H14M14 10V13H10V10H14M10 18V15H14V18H10Z' },
   { key: 'brick', label: 'Zdění', d: 'M3,16H12V21H3V16M2,10H8V15H2V10M9,10H15V15H9V10M16,10H22V15H16V10M13,16H21V21H13V16M3,4H11V9H3V4M12,4H21V9H12V4Z' },
+  { key: 'drywall', label: 'Sádrokarton', d: 'M1,2H14V4.6H1ZM1,19.4H14V22H1ZM2.6,4.6H5.4V19.4H2.6ZM9.6,4.6H12.4V19.4H9.6ZM15.5,2H23V22H15.5Z' }, // vlastní kresba (UW profily + CW stojky + deska)
   { key: 'house', label: 'Stavba domu', d: 'M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z' },
   { key: 'barrier', label: 'Oplocení', d: 'M9 9V11H7V9H5V11H3V9H1V21H3V19H5V21H7V19H9V21H11V19H13V21H15V19H17V21H19V19H21V21H23V9H21V11H19V9H17V11H15V9H13V11H11V9H9M3 13H5V17H3V13M7 13H9V17H7V13M11 13H13V17H11V13M15 13H17V17H15V13M19 13H21V17H19V13Z' },
   { key: 'hoist', label: 'Stav. výtah', d: 'M7,2L11,6H8V10H6V6H3L7,2M17,10L13,6H16V2H18V6H21L17,10M7,12H17A2,2 0 0,1 19,14V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V14A2,2 0 0,1 7,12M7,14V20H17V14H7Z' },
@@ -10130,7 +10133,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
       if (_gsTrans) pdf.setGState(_gsTrans);
 
       annotObjs.forEach(o => {
-        const [r,g,b] = hexToRgb((appState.profese||[]).find(p=>p.name===o.profese)?.color || o.stroke || '#4a8f3f');
+        const [r,g,b] = annotExportRgb(o);
         pdf.setDrawColor(r, g, b);
         pdf.setFillColor(
           Math.round(r*FILL_A + 255*(1-FILL_A)),
@@ -10260,8 +10263,7 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
 
       annotObjs.forEach(o => {
         if (!o.annotId) return;
-        const profeseObj = (appState.profese||[]).find(p=>p.name===o.profese);
-        const [r,g,b] = hexToRgb(profeseObj?.color || o.stroke || '#4a8f3f');
+        const [r,g,b] = annotExportRgb(o);
         const firmaRaw = getFirmaDisplay(o.profese);
         const popRaw   = o.annotId || '';
 
@@ -10404,7 +10406,143 @@ function pdfTextWithLinks(pdf, text, x, y, fspt, defaultRgb) {
 
 // Pure-vector annotation list — draws directly into the PDF using jsPDF commands.
 // No canvas image; zero raster overhead → tiny file size, infinite zoom quality.
-function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
+// Barva anotace v exportu – stejné pravidlo jako v aplikaci (getAnnotColor):
+// odkaz na podlaží tyrkysově, Urgence červeně, jinak barva dodavatele.
+// `o` může být fabric objekt i záznam ze soupisu – stačí annotType, status, profese.
+function annotExportRgb(o) {
+  if (o && o.annotType === 'levellink') return hexToRgb('#06B6D4');
+  if (o && o.status === 'Urgence')      return hexToRgb('#EF4444');
+  const prof = (appState.profese || []).find(p => p.name === (o && o.profese));
+  return hexToRgb(prof?.color || (o && (o.stroke || o.fill)) || '#4a8f3f');
+}
+
+// ── Mini náhled tvaru anotace pro soupis v PDF ──────────────────────────────
+// V soupisu se vedle úkolu kreslí stejný tvar, jakým je anotace zobrazená na
+// výkrese, aby se dal úkol spárovat s anotací i bez čtení čísla. Symboly se
+// renderují Fabricem do malého PNG (stejný engine jako plátno), ostatní tvary
+// jako PDF vektory. Glyf se vždy vejde do čtverce `box` se středem v (cx, cy).
+const _glyphPngCache = new Map();
+function _symbolGlyphPNG(o, rgb, px) {
+  try {
+    if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
+    const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    const key = JSON.stringify(o.path) + '|' + (o.fillRule || '') + '|' + col + '|' + px;
+    if (_glyphPngCache.has(key)) return _glyphPngCache.get(key);
+    // Glyf je legenda, ne kopie umístěné instance – kreslí se bez rotace a měřítka
+    const shape = new fabric.Path(o.path, {
+      originX: 'center', originY: 'center',
+      fill: col, fillRule: o.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
+      stroke: null, strokeWidth: 0, objectCaching: false,
+    });
+    const w = Math.max(1, shape.width), h = Math.max(1, shape.height);
+    const pad = Math.max(w, h) * 0.04;                 // okraj na antialiasing
+    const cw = w + pad * 2, ch = h + pad * 2;
+    const sc = new fabric.StaticCanvas(null, { width: cw, height: ch, enableRetinaScaling: false });
+    shape.set({ left: cw / 2, top: ch / 2 });
+    sc.add(shape); sc.renderAll();
+    // Pevný počet pixelů na glyf (ne na jednotku plátna) – i dlouhá cesta dá malé PNG
+    const out = { data: sc.toDataURL({ format: 'png', multiplier: px / Math.max(cw, ch) }), w: cw, h: ch };
+    sc.dispose();
+    _glyphPngCache.set(key, out);
+    return out;
+  } catch (e) { return null; }
+}
+
+function drawAnnotGlyphToPDF(pdf, o, cx, cy, box, rgb) {
+  const [r, g, b] = rgb;
+  const half = box / 2;
+  const type = ((o && o.type) || '').toLowerCase();
+  const at   = o && o.annotType;
+  pdf.setDrawColor(r, g, b);
+  pdf.setFillColor(r, g, b);
+  pdf.setLineWidth(Math.max(0.12, box * 0.075));
+  const tint = [Math.round(r * 0.28 + 255 * 0.72),
+                Math.round(g * 0.28 + 255 * 0.72),
+                Math.round(b * 0.28 + 255 * 0.72)];
+
+  // Symbol – skutečná silueta ze SYMBOL_DEFS
+  if (type === 'path' && at === 'symbol') {
+    const png = _symbolGlyphPNG(o, rgb, 64);
+    if (png) {
+      const s = box / Math.max(png.w, png.h);
+      pdf.addImage(png.data, 'PNG', cx - png.w * s / 2, cy - png.h * s / 2, png.w * s, png.h * s);
+      return;
+    }
+  }
+
+  // Špendlík – kapka s bílým kolečkem
+  if (type === 'path' && at === 'pin') {
+    const hr = box * 0.30, hcy = cy - box * 0.12;
+    pdf.circle(cx, hcy, hr, 'F');
+    pdf.lines([[hr * 0.8, box * 0.34], [-hr * 1.6, 0]], cx - hr * 0.8, hcy + hr * 0.62, [1, 1], 'F', true);
+    pdf.setFillColor(255, 255, 255);
+    pdf.circle(cx, hcy, hr * 0.42, 'F');
+    return;
+  }
+
+  // Text – písmeno T
+  if (type === 'i-text' || type === 'text' || at === 'text') {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(box * 2.6);
+    pdf.setTextColor(r, g, b);
+    pdf.text('T', cx - box * 0.22, cy + box * 0.33);
+    return;
+  }
+
+  if (type === 'ellipse' || at === 'circle') {
+    pdf.setFillColor(...tint);
+    pdf.ellipse(cx, cy, half * 0.92, half * 0.72, 'FD');
+    return;
+  }
+
+  if (type === 'rect') {
+    pdf.setFillColor(...tint);
+    pdf.rect(cx - half * 0.92, cy - half * 0.70, box * 0.92, box * 0.70, 'FD');
+    return;
+  }
+
+  // Polygon / lomená čára / šipka / příčka – skutečné body, zmenšené na box
+  if ((type === 'polygon' || type === 'polyline') && Array.isArray(o.points) && o.points.length >= 2) {
+    const pts = o.points, sx = o.scaleX || 1, sy = o.scaleY || 1;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const w = (Math.max(...xs) - Math.min(...xs)) * sx;
+    const h = (Math.max(...ys) - Math.min(...ys)) * sy;
+    if (w > 1e-4 || h > 1e-4) {
+      const s  = Math.min(box * 0.92 / Math.max(w, 1e-4), box * 0.92 / Math.max(h, 1e-4));
+      const ox = cx - w * s / 2, oy = cy - h * s / 2;
+      const mnX = Math.min(...xs), mnY = Math.min(...ys);
+      const pp = pts.map(p => [ox + (p.x - mnX) * sx * s, oy + (p.y - mnY) * sy * s]);
+      const segs = [];
+      for (let i = 1; i < pp.length; i++) segs.push([pp[i][0] - pp[i-1][0], pp[i][1] - pp[i-1][1]]);
+      if (type === 'polygon') { pdf.setFillColor(...tint); pdf.lines(segs, pp[0][0], pp[0][1], [1,1], 'FD', true); }
+      else                    { pdf.lines(segs, pp[0][0], pp[0][1], [1,1], 'S', false); }
+      return;
+    }
+  }
+
+  // Volná čára a ostatní cesty – krátká vlnovka
+  if (type === 'path') {
+    pdf.lines([[box * 0.30, -box * 0.34], [box * 0.30, box * 0.34], [box * 0.30, -box * 0.34]],
+              cx - box * 0.45, cy + box * 0.17, [1, 1], 'S', false);
+    return;
+  }
+
+  pdf.circle(cx, cy, box * 0.22, 'F');   // neznámý typ – původní tečka
+}
+
+// Mapa annotId → fabric objekt podlaží; zdroj tvaru pro soupis v PDF
+function _annotShapeMap(levelIdx) {
+  const m = new Map();
+  const level = appState.levels[levelIdx];
+  if (!level) return m;
+  if (levelIdx === appState.activeLevel) saveCurrentLevel();  // ať je fabricJSON čerstvý
+  ((level.fabricJSON && level.fabricJSON.objects) || []).forEach(o => {
+    if (o.annotId && !o.annotLabelFor && !o.isBackground) m.set(o.annotId, o);
+  });
+  return m;
+}
+
+function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
   const PT_MM = 72 / 25.4;  // points per mm (2.835)
 
   // Text width in mm at given pt font size (helvetica normal metrics)
@@ -10433,8 +10571,10 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
   const DOT_R    = 0.7, ROW_MAX = 3.5;
   const BADGE_FS = 5;   // pt — badge / row text cap
 
+  const GLYPH_W = 3.6;                       // mm — sloupec s náhledem tvaru anotace
   const C_DOT  = lx + 0.012 * lw;
-  const C_ID   = lx + 0.045 * lw;
+  // ID musí začít až za glyfem; u širokého soupisu zůstává původní podíl
+  const C_ID   = Math.max(lx + 0.045 * lw, C_DOT + GLYPH_W + 0.8);
   const C_PROF = lx + 0.14  * lw;
   const C_POPIS= lx + 0.32  * lw;
   const C_TERM = lx + 0.68  * lw;
@@ -10544,11 +10684,27 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount) {
       pdf.rect(lx, curY, 0.8, rowH, 'F');
     }
 
-    // Profese dot — centred on first text line
+    // Náhled tvaru anotace — vystředěný na první řádek textu.
+    // Velikost je omezená výškou řádku i šířkou sloupce, aby glyf nepřesahoval řádek.
     const LH = rowFS / PT_MM * 1.55;
     const tY1 = curY + LH * 0.8; // first line baseline (same for ALL rows)
-    pdf.setFillColor(...pRgb);
-    pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
+    const gBox = Math.max(1.2, Math.min(GLYPH_W, LH, rowH - 0.3));
+    const shape = shapeById && shapeById.get(ann.annotId);
+    // Barva glyfu podle stejného pravidla jako na výkrese (Urgence červeně),
+    // aby se řádek soupisu dal spárovat s anotací i podle barvy
+    const gRgb = annotExportRgb({
+      annotType: (shape && shape.annotType) || ann.annotType,
+      status:  ann.status,
+      profese: ann.profese,
+      stroke: shape && shape.stroke,
+      fill:   shape && shape.fill,
+    });
+    if (shape) {
+      drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, gRgb);
+    } else {
+      pdf.setFillColor(...gRgb);
+      pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
+    }
 
     // All rows: normal weight — bold was causing different text metrics
     // and wrong word-wrap vs layout pass
@@ -11588,6 +11744,7 @@ async function doExportPDF() {
 
       let anns = [...(level.annotations || [])];
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
+      const shapeById = _annotShapeMap(idx);   // tvary anotací pro soupis
       // Urgence first, then alphabetically by firma within each group
       anns.sort((a, b) => {
         const au = a.status === 'Urgence' ? 0 : 1, bu = b.status === 'Urgence' ? 0 : 1;
@@ -11653,10 +11810,10 @@ async function doExportPDF() {
           pdf.setDrawColor(60, 70, 45);
           pdf.line(drawW, BY, drawW, BY + BH);
           // drawAnnotListToPDF draws the list as pure PDF vectors — no raster image
-          drawAnnotListToPDF(pdf, anns, drawW + 1, BY, listW - 2, BH, maxAnns);
+          drawAnnotListToPDF(pdf, anns, drawW + 1, BY, listW - 2, BH, maxAnns, shapeById);
         }
       } else if (includeList) {
-        drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns);
+        drawAnnotListToPDF(pdf, anns, 4, BY, PW - 8, BH, maxAnns, shapeById);
       }
     }
 
