@@ -5307,13 +5307,13 @@ function switchLevel(idx) {
         applyAnnotColorToCanvas(o);
         if (o.annotSymGen !== SYMBOL_SIZE_GEN) {
           // Jednorázová migrace na novou generaci velikosti (viz SYMBOL_SIZE_GEN) —
-          // zachová aktuální poměr velikosti symbolu, jen ho zvětší na dvojnásobek.
-          o.set({ scaleX: (o.scaleX || 1) * 2, scaleY: (o.scaleY || 1) * 2 });
+          // přepočet poměrem nový/starý limit zachová relativní velikost symbolu.
+          const f = SYMBOL_MAX_H / (SYMBOL_GEN_MAX_H[o.annotSymGen] || SYMBOL_GEN_MAX_H[1]);
+          if (f !== 1) o.set({ scaleX: (o.scaleX || 1) * f, scaleY: (o.scaleY || 1) * f });
           o.annotSymGen = SYMBOL_SIZE_GEN;
           o.setCoords();
-        } else {
-          symbolCapSize(o);
         }
+        symbolCapSize(o);
       });
       if (level.backgroundImage) {
         loadBackgroundImage(level.backgroundImage, false, () => { fitToWindow(); updateAllLabelScales(); applyHotovoVisibility(); });
@@ -7884,6 +7884,7 @@ const SYMBOL_DEFS = [
   { key: 'lowvoltage', label: 'Slaboproud', d: 'M10,2C8.89,2 8,2.89 8,4V7C8,8.11 8.89,9 10,9H11V11H2V13H6V15H5C3.89,15 3,15.89 3,17V20C3,21.11 3.89,22 5,22H9C10.11,22 11,21.11 11,20V17C11,15.89 10.11,15 9,15H8V13H16V15H15C13.89,15 13,15.89 13,17V20C13,21.11 13.89,22 15,22H19C20.11,22 21,21.11 21,20V17C21,15.89 20.11,15 19,15H18V13H22V11H13V9H14C15.11,9 16,8.11 16,7V4C16,2.89 15.11,2 14,2H10M10,4H14V7H10V4M5,17H9V20H5V17M15,17H19V20H15V17Z' },
   { key: 'camera', label: 'Kamera/CCTV', d: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z' },
   { key: 'plumbing', label: 'Potrubí', d: 'M22,14H20V16H14V13H16V11H14V6A2,2 0 0,0 12,4H4V2H2V10H4V8H10V11H8V13H10V18A2,2 0 0,0 12,20H20V22H22' },
+  { key: 'ventilation', label: 'Vzduchotechnika', d: 'M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z' },
   { key: 'waterdrop', label: 'Voda', d: 'M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z' },
   // ── Zemní práce & bourání ──────────────────────────────────────────────────────
   { key: 'pickaxe', label: 'Bourání', d: 'M14.79,10.62L3.5,21.9L2.1,20.5L13.38,9.21L14.79,10.62M19.27,7.73L19.86,7.14L19.07,6.35L19.71,5.71L18.29,4.29L17.65,4.93L16.86,4.14L16.27,4.73C14.53,3.31 12.57,2.17 10.47,1.37L9.64,3.16C11.39,4.08 13,5.19 14.5,6.5L14,7L17,10L17.5,9.5C18.81,11 19.92,12.61 20.84,14.36L22.63,13.53C21.83,11.43 20.69,9.47 19.27,7.73Z' },
@@ -7929,15 +7930,15 @@ function symbolDefFor(key) {
 }
 let _pendingSymbolKey = 'crane';
 
-// Standardní velikost symbolu (na přání uživatele zvětšeno na dvojnásobek
-// oproti původní výšce špendlíku 15×12 – viz placePinAt).
-// Měřítko se počítá z reálného rozměru glyfu, takže i nízké/široké ikony drží limit.
-const SYMBOL_MAX_H = 30;
-const SYMBOL_MAX_W = 36;
-// Verze "generace" velikosti symbolu — když se štítek zvedne (jako teď z 1 na 2),
-// staré uložené symboly se při načtení podlaží jednorázově zvětší, aby doběhly na
-// novou velikost, a označí se aktuální generací, takže se znovu nezdvojnásobí.
-const SYMBOL_SIZE_GEN = 2;
+// Standardní velikost symbolu. Měřítko se počítá z reálného rozměru glyfu,
+// takže i nízké/široké ikony drží limit.
+const SYMBOL_MAX_H = 15;
+const SYMBOL_MAX_W = 18;
+// Generace velikosti symbolu. Při změně limitu se zvedne a uložené symboly se při
+// načtení podlaží jednorázově přepočítají poměrem nový/starý limit, takže si zachovají
+// relativní velikost. Stamp v anotaci brání opakovanému přepočtu.
+const SYMBOL_SIZE_GEN = 3;
+const SYMBOL_GEN_MAX_H = { 1: 15, 2: 30, 3: 15 };
 function symbolFitScale(obj) {
   const w = obj.width || 1, h = obj.height || 1;
   return Math.min(SYMBOL_MAX_H / h, SYMBOL_MAX_W / w);
