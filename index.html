@@ -1842,6 +1842,21 @@ option { background: var(--card); color: var(--text); }
 }
 #kd-backup-banner button:hover { background: rgba(180,83,9,0.1); }
 
+/* Neuložené změny kontrolního dne – musí být vidět i na mobilu, kde stavový řádek
+   zakrývá stránka KD. Zůstává, dokud se uložení nepovede. */
+#kd-save-error-banner {
+  display: none; padding: 7px 14px; background: rgba(239,68,68,0.10);
+  border-bottom: 1px solid rgba(239,68,68,0.45);
+  font-size: 11px; color: #b91c1c; align-items: center; gap: 8px; flex-shrink: 0;
+}
+#kd-save-error-banner.visible { display: flex; }
+#kd-save-error-banner .kd-sv-msg { flex: 1; min-width: 0; }
+#kd-save-error-banner button {
+  padding: 2px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;
+  background: transparent; border: 1px solid #b91c1c; color: #b91c1c; flex-shrink: 0;
+}
+#kd-save-error-banner button:hover { background: rgba(185,28,28,0.1); }
+
 /* Task two-row layout */
 .kd-task {
   background: var(--card); border: 1px solid var(--border);
@@ -4692,6 +4707,10 @@ body.viewer-mode #kd-backup-next { display: none !important; }
     <div id="kd-backup-banner">
       <span id="kd-backup-banner-label">Náhled zálohy</span>
       <button onclick="kdLoadLive()">← Živá verze</button>
+    </div>
+    <div id="kd-save-error-banner">
+      <span class="kd-sv-msg" id="kd-save-error-label">Změny se neuložily na server</span>
+      <button onclick="kdRetrySave()">Zkusit znovu</button>
     </div>
     <div id="kd-meta-bar" style="display:none">
       <span class="kd-meta-label">Datum</span>
@@ -13269,14 +13288,42 @@ let _kdDirty         = false;  // true from first local edit until save complete
 let _kdPendingRender = false;  // deferred re-render while user types
 let _kdLastOwnSaveTs = 0;      // timestamp of last successful own save (ms)
 
-function _kdDirectSave() {
+let _kdSaveFailed   = false;  // poslední uložení KD selhalo – drží červený pruh
+let _kdSaveAuthRetries = 0;   // opakování po 401 (obnova session z remember-me)
+
+// Stav propsání KD na server. Dokud se neuloží, musí to být vidět – jinak uživatel
+// píše do prázdna a po obnovení stránky o změny přijde (merge pak vezme stav serveru).
+function _kdSetSaveState(ok, msg) {
+  const banner = document.getElementById('kd-save-error-banner');
+  const label  = document.getElementById('kd-save-error-label');
+  if (banner) banner.classList.toggle('visible', !ok);
+  if (!ok && label) label.textContent = msg;
+  if (!ok) {
+    if (!_kdSaveFailed) showToast(msg, 'error');   // hlášku jen při přechodu do chyby
+    _kdSaveFailed = true;
+  } else {
+    if (_kdSaveFailed) showToast('Kontrolní den uložen na server', 'success');
+    _kdSaveFailed = false;
+  }
+}
+
+// Ruční opakování z pruhu
+function kdRetrySave() {
+  _kdSaveAuthRetries = 0;
+  const label = document.getElementById('kd-save-error-label');
+  if (label) label.textContent = 'Ukládám…';
+  _kdDirectSave(0);
+}
+
+function _kdDirectSave(delay = 1000) {
   clearTimeout(_kdSaveTimer);
   _kdSavePending = true;
   _kdSaveTimer = setTimeout(async () => {
     if (!currentProject) { _kdSavePending = false; return; }
+    let retryIn = 0;
     try {
       const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
-      const { ok } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
+      const { ok, data, status } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formBody,
@@ -13284,10 +13331,30 @@ function _kdDirectSave() {
       // Don't merge response — client already has the correct post-deletion state.
       // Merging here would undo local deletions (server still has old data until this save).
       // Concurrent additions from other users are handled by _pollKDSync.
-      if (ok) { _kdLastKdTs = null; _kdDirty = false; _kdLastOwnSaveTs = Date.now(); } // force next poll to fetch fresh server state
-    } catch(e) { console.error('[kd] save error:', e); }
-    finally { _kdSavePending = false; }
-  }, 1000);
+      if (ok) {
+        _kdLastKdTs = null; _kdDirty = false; _kdLastOwnSaveTs = Date.now();  // force next poll to fetch fresh server state
+        _kdSaveAuthRetries = 0;
+        _kdSetSaveState(true);
+      } else if (status === 401 && _kdSaveAuthRetries < 2) {
+        // Session se právě obnovuje z remember-me cookie – zkusit znovu, data nezahazovat
+        _kdSaveAuthRetries++;
+        retryIn = 2500;
+      } else {
+        const kb  = Math.round(formBody.length / 1024);
+        const err = (data && data.error) || `HTTP ${status}`;
+        console.error('[kd] save failed:', err, '| payload', kb, 'kB');
+        _kdSetSaveState(false, `Kontrolní den se neuložil: ${err} (${kb} kB). Změny jsou zatím jen v tomto prohlížeči – neobnovuj stránku.`);
+      }
+    } catch(e) {
+      console.error('[kd] save error:', e);
+      _kdSetSaveState(false, 'Kontrolní den se neuložil: síťová chyba. Změny jsou zatím jen v tomto prohlížeči – neobnovuj stránku.');
+    }
+    finally {
+      // Při opakování nechat _kdSavePending nastavené – uložení stále běží
+      if (retryIn) _kdDirectSave(retryIn);
+      else _kdSavePending = false;
+    }
+  }, delay);
 }
 
 async function _kdServerLoad(projectId) {
@@ -13353,6 +13420,10 @@ function kdSaveLocations() {
 
 function kdLoad() {
   const pid = currentProject?.id;
+  // Stav ukládání patří k projektu – při přepnutí začít načisto
+  _kdSaveFailed = false; _kdSaveAuthRetries = 0;
+  const _b = document.getElementById('kd-save-error-banner');
+  if (_b) _b.classList.remove('visible');
   if (!pid) { kdRecords = []; return; }
   try { kdRecords = JSON.parse(localStorage.getItem(LS_KD_KEY(pid)) || '[]'); }
   catch { kdRecords = []; }
