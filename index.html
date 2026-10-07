@@ -11134,7 +11134,6 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     const recDateFmt=rec.date?rec.date.split('-').reverse().join('.'):'–';
     pdf.setTextColor(120,125,115);
     pdf.text(csText('Kontrolni den '+recDateFmt),PW-82,7.5);
-    pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
   };
 
   // Draw content box + title bar + column headers
@@ -11316,7 +11315,6 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
   pdf.text(cs(currentProject?.name||''),38,7.5);
   pdf.setTextColor(120,125,115);
   pdf.text(cs('Subdodavatele a kontakty'),PW-72,7.5);
-  pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
 
   const lx=4,ly=13,lw=PW-8,lh=PH-ly-4;
   pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
@@ -11410,7 +11408,6 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
   pdf.text(csT(currentProject?.name||''),38,7.5);
   pdf.setTextColor(120,125,115);
   pdf.text(csT('KD – Filtr subdodavatelu'),PW-68,7.5);
-  pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
 
   const lx=4, ly=13, lw=PW-8, lh=PH-ly-4;
   pdf.setFillColor(255,255,255); pdf.rect(lx,ly,lw,lh,'F');
@@ -11565,7 +11562,6 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
     pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
     pdf.text(csT(currentProject?.name||''),38,7.5);
     pdf.setTextColor(120,125,115);
-    pdf.text(new Date().toLocaleDateString('cs-CZ'),PW-22,7.5);
   };
 
   const getLines = text => {
@@ -11816,7 +11812,6 @@ async function doExportPDF() {
       pdf.text(currentProject?.name || '', 38, 7.5);
       pdf.setTextColor(120, 125, 115);
       pdf.text(level.name || `Podlaží ${idx + 1}`, PW - 65, 7.5);
-      pdf.text(new Date().toLocaleDateString('cs-CZ'), PW - 22, 7.5);
 
       const BY = 13, BH = PH - BY - 4;
 
