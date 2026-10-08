@@ -10080,7 +10080,7 @@ function _symbolToPNG(o, rgb) {
 async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, includeHotovo = false) {
   const level = appState.levels[levelIdx];
   if (!level || !level.backgroundImage) return;
-  if (levelIdx === appState.activeLevel) saveCurrentLevel();
+  // fabricJSON aktivního podlaží obnovuje doExportPDF jednou před smyčkou
 
   return new Promise(resolve => {
     const htmlImg = new Image();
@@ -10429,11 +10429,10 @@ function pdfTextWithLinks(pdf, text, x, y, fspt, defaultRgb) {
 // Barva anotace v exportu – stejné pravidlo jako v aplikaci (getAnnotColor):
 // odkaz na podlaží tyrkysově, Urgence červeně, jinak barva dodavatele.
 // `o` může být fabric objekt i záznam ze soupisu – stačí annotType, status, profese.
+// Barva anotace v exportu – přímo pravidlo aplikace (odkaz na podlaží tyrkysově,
+// Urgence červeně, jinak barva dodavatele), aby se obě cesty nemohly rozejít.
 function annotExportRgb(o) {
-  if (o && o.annotType === 'levellink') return hexToRgb('#06B6D4');
-  if (o && o.status === 'Urgence')      return hexToRgb('#EF4444');
-  const prof = (appState.profese || []).find(p => p.name === (o && o.profese));
-  return hexToRgb(prof?.color || (o && (o.stroke || o.fill)) || '#4a8f3f');
+  return hexToRgb(getAnnotColor(o));
 }
 
 // ── Mini náhled tvaru anotace pro soupis v PDF ──────────────────────────────
@@ -10442,12 +10441,20 @@ function annotExportRgb(o) {
 // renderují Fabricem do malého PNG (stejný engine jako plátno), ostatní tvary
 // jako PDF vektory. Glyf se vždy vejde do čtverce `box` se středem v (cx, cy).
 const _glyphPngCache = new Map();
+const _GLYPH_CACHE_MAX = 240;          // strop, ať cache neroste přes celou session
+// Krátký klíč místo celé cesty – délka + hash drží klíče malé i u složitých symbolů
+function _glyphHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return s.length + ':' + (h >>> 0).toString(36);
+}
 function _symbolGlyphPNG(o, rgb, px) {
   try {
     if (!window.fabric || !Array.isArray(o.path) || !o.path.length) return null;
     const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-    const key = JSON.stringify(o.path) + '|' + (o.fillRule || '') + '|' + col + '|' + px;
-    if (_glyphPngCache.has(key)) return _glyphPngCache.get(key);
+    const key = _glyphHash(JSON.stringify(o.path)) + '|' + (o.fillRule || '') + '|' + col + '|' + px;
+    const cached = _glyphPngCache.get(key);
+    if (cached) { _glyphPngCache.delete(key); _glyphPngCache.set(key, cached); return cached; }  // LRU
     // Glyf je legenda, ne kopie umístěné instance – kreslí se bez rotace a měřítka
     const shape = new fabric.Path(o.path, {
       originX: 'center', originY: 'center',
@@ -10464,6 +10471,7 @@ function _symbolGlyphPNG(o, rgb, px) {
     const out = { data: sc.toDataURL({ format: 'png', multiplier: px / Math.max(cw, ch) }), w: cw, h: ch };
     sc.dispose();
     _glyphPngCache.set(key, out);
+    while (_glyphPngCache.size > _GLYPH_CACHE_MAX) _glyphPngCache.delete(_glyphPngCache.keys().next().value);
     return out;
   } catch (e) { return null; }
 }
@@ -10551,15 +10559,28 @@ function drawAnnotGlyphToPDF(pdf, o, cx, cy, box, rgb) {
 }
 
 // Mapa annotId → fabric objekt podlaží; zdroj tvaru pro soupis v PDF
+// Mapa annotId → fabric objekt podlaží; zdroj tvaru pro soupis v PDF.
+// Nic neukládá – čerstvost fabricJSON aktivního podlaží zajistí _refreshActiveLevelJSON()
+// jednou před exportem.
 function _annotShapeMap(levelIdx) {
   const m = new Map();
   const level = appState.levels[levelIdx];
   if (!level) return m;
-  if (levelIdx === appState.activeLevel) saveCurrentLevel();  // ať je fabricJSON čerstvý
   ((level.fabricJSON && level.fabricJSON.objects) || []).forEach(o => {
     if (o.annotId && !o.annotLabelFor && !o.isBackground) m.set(o.annotId, o);
   });
   return m;
+}
+
+// Export je čistě čtecí operace: obnoví jen fabricJSON aktivního podlaží z plátna.
+// Na rozdíl od saveCurrentLevel() neukládá pozadí do IndexedDB ani nespouští upload
+// na server – generování PDF nesmí nic zapisovat.
+function _refreshActiveLevelJSON() {
+  if (!fabricCanvas) return;
+  const lvl = appState.levels[appState.activeLevel];
+  if (!lvl) return;
+  lvl.fabricJSON  = _canvasJSON();
+  lvl.annotations = _annotMetaFromCanvas();
 }
 
 function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
@@ -10716,12 +10737,16 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
       annotType: (shape && shape.annotType) || ann.annotType,
       status:  ann.status,
       profese: ann.profese,
-      stroke: shape && shape.stroke,
-      fill:   shape && shape.fill,
     });
+    let glyphDrawn = false;
     if (shape) {
-      drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, gRgb);
-    } else {
+      // Poškozená geometrie jedné anotace nesmí shodit celý export – spadne se na tečku
+      try {
+        drawAnnotGlyphToPDF(pdf, shape, C_DOT + GLYPH_W / 2, tY1 - LH * 0.28, gBox, gRgb);
+        glyphDrawn = true;
+      } catch (e) { console.error('[pdf] glyf anotace selhal:', ann.annotId, e); }
+    }
+    if (!glyphDrawn) {
       pdf.setFillColor(...gRgb);
       pdf.circle(C_DOT + DOT_R, tY1 - LH * 0.28, DOT_R, 'F');
     }
@@ -11754,13 +11779,16 @@ async function doExportPDF() {
     }
 
     // ── Level drawing pages ───────────────────────────────────────────────────
+    // Jednou pro celý export: aktivní podlaží má na plátně novější stav než fabricJSON
+    _refreshActiveLevelJSON();
     for (const idx of levelIdxs) {
       const level = appState.levels[idx];
       if (!level) continue;
 
       let anns = [...(level.annotations || [])];
       if (!inclHotovo) anns = anns.filter(a => a.status !== 'Hotovo');
-      const shapeById = _annotShapeMap(idx);   // tvary anotací pro soupis
+      // Tvary pro soupis se sestavují jen když se soupis opravdu tiskne
+      const shapeById = includeList ? _annotShapeMap(idx) : null;
       // Urgence first, then alphabetically by firma within each group
       anns.sort((a, b) => {
         const au = a.status === 'Urgence' ? 0 : 1, bu = b.status === 'Urgence' ? 0 : 1;
@@ -12008,8 +12036,15 @@ function saveCurrentLevel() {
   }
 
   // Extract annotations for sidebar
-  const annotObjects = getAnnotObjects();
-  appState.levels[appState.activeLevel].annotations = annotObjects.map(o => ({
+  appState.levels[appState.activeLevel].annotations = _annotMetaFromCanvas();
+
+  saveState();
+}
+
+// Metadata anotací z plátna – zdroj pro boční seznam i pro soupis v PDF.
+// Sdílené, aby se obě cesty nemohly rozejít v tom, co o anotaci vědí.
+function _annotMetaFromCanvas() {
+  return getAnnotObjects().map(o => ({
     annotId: o.annotId, annotType: o.annotType || null, profese: o.profese, popisek: o.popisek,
     priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
     createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
@@ -12018,8 +12053,6 @@ function saveCurrentLevel() {
     annotSymbol: o.annotSymbol || null,
     linkToLevel: o.linkToLevel || null
   }));
-
-  saveState();
 }
 
 // ============================================================
@@ -14817,7 +14850,7 @@ async function doLogout() {
   currentProject = null;
   appState.levels = [];
   appState.activeLevel = 0;
-  if (fabricCanvas) { fabricCanvas.clear(); fabricCanvas.backgroundColor = '#f0f0ec'; fabricCanvas.renderAll(); }
+  if (fabricCanvas) { cancelPendingDeconflict(); fabricCanvas.clear(); fabricCanvas.backgroundColor = '#f0f0ec'; fabricCanvas.renderAll(); }
   document.getElementById('level-tabs').innerHTML = '';
   document.getElementById('project-screen').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
