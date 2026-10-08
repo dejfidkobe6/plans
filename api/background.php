@@ -45,12 +45,31 @@ $userId    = (int)$user['id'];
 $method    = $_SERVER['REQUEST_METHOD'];
 $projectId = (int)($_GET['project_id'] ?? 0);
 $levelId   = trim($_GET['level_id'] ?? '');
+// GET &all=1 vrací výkresy všech podlaží projektu najednou – level_id se pak nezadává
+$listAll   = ($method === 'GET') && !empty($_GET['all']);
 
-if (!$projectId || $levelId === '') jsonError('Chybí parametry');
-if (strlen($levelId) > 64) jsonError('Neplatné level_id');
+if (!$projectId) jsonError('Chybí parametry');
+if (!$listAll && $levelId === '') jsonError('Chybí parametry');
+if ($levelId !== '' && strlen($levelId) > 64) jsonError('Neplatné level_id');
 
 $membership = getProjectMembership($projectId, $userId);
 if (!$membership) jsonError('Nemáš přístup', 403);
+
+// ============================================================
+// GET &all=1 – seznam výkresů všech podlaží projektu.
+// Lehká odpověď (jen cesty), aby šlo po přihlášení naplnit mezipaměť
+// zařízení bez stahování celého stavu projektu.
+// ============================================================
+if ($listAll) {
+    $stmt = $db->prepare('SELECT level_id, image_url FROM plan_backgrounds WHERE project_id = ?');
+    $stmt->execute([$projectId]);
+    $out = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $u = _versionedUrl($row['image_url'] ?? null);
+        if ($u) $out[] = ['levelId' => $row['level_id'], 'url' => $u];
+    }
+    jsonOk(['backgrounds' => $out]);
+}
 
 // ============================================================
 // GET – vrátí URL obrázku z DB

@@ -12169,15 +12169,12 @@ function _bgUrlsForLevels(levels, skipIdx) {
   return urls;
 }
 
-// Rozpočet prefetche podle připojení: Data Saver / 2G = nic, 3G = jen nejbližší podlaží,
-// jinak bez limitu. Vrací max. počet URL, které se smí stáhnout na pozadí.
+// Rozpočet prefetche. Výkresy se stahují i na mobilu – právě tam jsou potřeba
+// nejvíc (stavba, slabý signál). Jediná brzda je Data Saver, tedy výslovné přání
+// uživatele šetřit data. Vrací max. počet URL, které se smí stáhnout na pozadí.
 function _bgPrefetchBudget() {
   const c = navigator.connection;
-  if (!c) return Infinity;
-  const t = c.effectiveType || '';
-  if (c.saveData || /2g$/.test(t)) return 0;
-  if (t === '3g') return 3;
-  return Infinity;
+  return (c && c.saveData) ? 0 : Infinity;
 }
 
 // Odstraní z Cache Storage staré verze výkresů projektu. Po ořezu dostane soubor novou ?v=,
@@ -12286,28 +12283,46 @@ function _bgForgetUser(uid) {
   } catch {}
 }
 
-// Při otevření stránky (ještě před kliknutím na projekt): tiše doplnit do mezipaměti
-// výkresy naposledy otevřených projektů. Zahřívají se jen projekty, jejichž členem je
-// přihlášený uživatel podle serveru. Jakmile uživatel otevře projekt, končí –
-// prefetch daného projektu má přednost.
+// Po přihlášení / otevření aplikace naplnit mezipaměť zařízení výkresy projektů,
+// jejichž je uživatel členem. Funguje i na čerstvém zařízení (typicky mobil), kde si
+// prohlížeč zatím nic nepamatuje: seznam výkresů si vyžádá ze serveru. Jakmile
+// uživatel otevře projekt, končí – prefetch otevřeného projektu má přednost.
 async function _bgPrefetchRecent() {
   if (!('caches' in window) || !navigator.serviceWorker) return;
   const uid = currentUser && currentUser.id;
   if (uid == null || _bgPrefetchBudget() === 0) return;
   try { await navigator.serviceWorker.ready; } catch { return; }
-  let recent = [];
-  try { recent = JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]'); } catch {}
-  if (!recent.length) return;
-  let allowed = null;
+
+  // Projekty uživatele podle serveru – bez potvrzení členství se nestahuje nic
+  let projects = null;
   try {
     const { ok, data } = await apiFetch('api/projects.php');
-    if (ok && Array.isArray(data.plan_projects)) allowed = new Set(data.plan_projects.map(p => String(p.id)));
+    if (ok && Array.isArray(data.plan_projects)) projects = data.plan_projects.map(p => String(p.id));
   } catch {}
-  if (!allowed) return; // bez potvrzení členství se nic nestahuje
-  for (const pid of recent) {
-    if (!allowed.has(String(pid))) { localStorage.removeItem(LS_BG_URLS(uid, pid)); continue; }
+  if (!projects || !projects.length) return;
+
+  // Pořadí: naposledy otevřené projekty první, zbytek za nimi
+  let recent = [];
+  try { recent = (JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]')).map(String); } catch {}
+  const allowed = new Set(projects);
+  recent.filter(p => !allowed.has(p)).forEach(p => { try { localStorage.removeItem(LS_BG_URLS(uid, p)); } catch {} });
+  const order = [...recent.filter(p => allowed.has(p)), ...projects.filter(p => !recent.includes(p))].slice(0, 3);
+
+  for (const pid of order) {
+    if (currentProject) return;
+    // Zapamatované URL (rychlé), jinak se seznam dotáhne ze serveru – to je případ
+    // čerstvého mobilu, kde dřív prefetch po přihlášení neudělal vůbec nic
     let urls = [];
     try { urls = JSON.parse(localStorage.getItem(LS_BG_URLS(uid, pid)) || '[]'); } catch {}
+    if (!urls.length) {
+      try {
+        const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&all=1`);
+        if (ok && Array.isArray(data.backgrounds)) {
+          urls = data.backgrounds.map(b => b.url).filter(_isRemoteBgUrl);
+          if (urls.length) localStorage.setItem(LS_BG_URLS(uid, pid), JSON.stringify(urls));
+        }
+      } catch {}
+    }
     for (const u of urls) {
       if (currentProject) return;
       if (!(await _bgIsCached(u))) { try { await fetch(u, { credentials: 'same-origin' }); } catch {} }
@@ -14799,6 +14814,7 @@ async function doLogin() {
   const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
+  setTimeout(_bgPrefetchRecent, 1500);   // po přihlášení natáhnout výkresy do mezipaměti
 }
 
 // --- Register ---
@@ -14832,6 +14848,7 @@ async function doRegister() {
   const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
+  setTimeout(_bgPrefetchRecent, 1500);   // po přihlášení natáhnout výkresy do mezipaměti
 }
 
 // --- Logout ---
