@@ -16,6 +16,11 @@ LimitRequestBody 0
   RewriteEngine On
   RewriteBase /
 
+  # API bez přípony .php (např. /api/annotations) → /api/annotations.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}/$1.php -f
+  RewriteRule ^(api/[A-Za-z0-9_-]+)$ $1.php [L,QSA]
+
   # api/ soubory servíruj přímo – nepřesměrovávat
   RewriteRule ^api/ - [L]
 
