@@ -70,63 +70,78 @@ if ($apiKey !== '') {
     $userId = (int)$user['id'];
 }
 
-$projectParam = trim($_GET['project'] ?? '');
-if ($projectParam === '') jsonError('Chybí parametr project', 400);
+// ── Nalezení projektu podle názvu nebo ID ───────────────────
+// Název se porovnává po slovech, ne jako souvislý řetězec: „etapa II“ se tak
+// nesmí trefit do „etapa III“. Římské číslice se převádějí na arabské, takže
+// „etapa II“ i „etapa 2“ najdou totéž. Jednopísmenné „i“ a „v“ se nepřevádějí,
+// v češtině to jsou běžná slova.
+const ANNOT_ROMAN = ['ii'=>'2','iii'=>'3','iv'=>'4','vi'=>'6','vii'=>'7','viii'=>'8','ix'=>'9','x'=>'10'];
 
-// ── Nalezení projektu podle slugu nebo ID ───────────────────
-/** Porovnávací tvar názvu: malá písmena, bez diakritiky, jen [a-z0-9]. */
-function _annotSlug(string $s): string {
+/** Název rozložený na porovnávací slova: malá písmena, bez diakritiky, čísla sjednocená. */
+function _annotTokens(string $s): array {
     $s = mb_strtolower($s, 'UTF-8');
     $s = strtr($s, [
         'á'=>'a','ä'=>'a','č'=>'c','ď'=>'d','é'=>'e','ě'=>'e','ë'=>'e','í'=>'i','ĺ'=>'l','ľ'=>'l',
         'ň'=>'n','ó'=>'o','ô'=>'o','ö'=>'o','ŕ'=>'r','ř'=>'r','š'=>'s','ť'=>'t','ú'=>'u','ů'=>'u',
         'ü'=>'u','ý'=>'y','ž'=>'z',
     ]);
-    return preg_replace('/[^a-z0-9]/', '', $s) ?? '';
+    $s = preg_replace('/[^a-z0-9]+/', ' ', $s) ?? '';
+    $out = [];
+    foreach (preg_split('/\s+/', trim($s)) as $t) {
+        if ($t === '') continue;
+        $out[] = ANNOT_ROMAN[$t] ?? $t;
+    }
+    return $out;
 }
-
-// Pevné aliasy veřejného názvu na ID projektu. Hodí se, když je samotný název
-// nejednoznačný – například víc etap se slovem „Lihovar“. Klíč je slug (malá
-// písmena bez diakritiky a mezer), hodnota ID projektu z plan_projects.
-const ANNOT_PROJECT_ALIASES = [
-    // 'lihovar' => 12,
-];
 
 $db    = getDB();
 $appId = getPlansAppId();
 if ($viaKey) {
-    $stmt = $db->prepare('SELECT id, name FROM plan_projects WHERE app_id = ? AND is_active = 1');
+    $stmt = $db->prepare('SELECT id, name FROM plan_projects WHERE app_id = ? AND is_active = 1 ORDER BY name');
     $stmt->execute([$appId]);
 } else {
     $stmt = $db->prepare('
         SELECT p.id, p.name FROM plan_projects p
         JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
-        WHERE p.app_id = ? AND p.is_active = 1');
+        WHERE p.app_id = ? AND p.is_active = 1 ORDER BY p.name');
     $stmt->execute([$userId, $appId]);
 }
 $projects = $stmt->fetchAll();
 
-$want    = _annotSlug($projectParam);
+// ?list=1 – přehled dostupných projektů, ať si volající název nemusí hádat
+if (!empty($_GET['list'])) {
+    echo json_encode(
+        array_map(fn($p) => ['id' => (int)$p['id'], 'name' => $p['name']], $projects),
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
+    exit;
+}
+
+$projectParam = trim($_GET['project'] ?? '');
+if ($projectParam === '') jsonError('Chybí parametr project (nebo použij ?list=1)', 400);
+
 $project = null;
-$wantId  = ctype_digit($projectParam) ? (int)$projectParam : (ANNOT_PROJECT_ALIASES[$want] ?? null);
-if ($wantId !== null) {
-    foreach ($projects as $p) if ((int)$p['id'] === (int)$wantId) { $project = $p; break; }
+if (ctype_digit($projectParam)) {
+    foreach ($projects as $p) if ((int)$p['id'] === (int)$projectParam) { $project = $p; break; }
 }
 if (!$project) {
-    $exact = [];
-    $part  = [];
+    $qTok  = _annotTokens($projectParam);
+    $qSlug = implode('', $qTok);
+    $exact = []; $byWords = []; $loose = [];
     foreach ($projects as $p) {
-        $slug = _annotSlug($p['name']);
-        if ($slug === $want)                   $exact[] = $p;
-        elseif ($want !== '' && str_contains($slug, $want)) $part[] = $p;
+        $pTok  = _annotTokens($p['name']);
+        $pSlug = implode('', $pTok);
+        if ($pSlug === $qSlug)                                      $exact[]   = $p;
+        elseif ($qTok && !array_diff($qTok, $pTok))                 $byWords[] = $p;   // všechna slova dotazu jsou v názvu
+        elseif ($qSlug !== '' && str_contains($pSlug, $qSlug))      $loose[]   = $p;   // až když nic jiného nesedí
     }
-    $hits = $exact ?: $part;
+    $hits = $exact ?: ($byWords ?: $loose);
     if (count($hits) === 1) $project = $hits[0];
     elseif (count($hits) > 1) {
-        jsonError('Název projektu není jednoznačný: ' . implode(', ', array_column($hits, 'name')), 400);
+        jsonError('Název projektu není jednoznačný, upřesni ho: ' . implode(' | ', array_column($hits, 'name')), 400);
     }
 }
-if (!$project) jsonError('Projekt nenalezen nebo k němu nemáš přístup', 404);
+if (!$project) jsonError('Projekt nenalezen nebo k němu nemáš přístup (seznam: ?list=1)', 404);
 $projectId = (int)$project['id'];
 
 // ── Stav projektu (podlaží, geometrie, metadata anotací) ────
