@@ -20,6 +20,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BESIX_API_KEY: ${{ secrets.BESIX_API_KEY }}
         run: |
           php -r "
           file_put_contents('api/secrets.php',
@@ -27,7 +28,8 @@ jobs:
             'define(\'DB_PASS\', ' . var_export(getenv('DB_PASS'), true) . ');' . PHP_EOL .
             'define(\'GOOGLE_CLIENT_ID\', ' . var_export(getenv('GOOGLE_CLIENT_ID'), true) . ');' . PHP_EOL .
             'define(\'GOOGLE_CLIENT_SECRET\', ' . var_export(getenv('GOOGLE_CLIENT_SECRET'), true) . ');' . PHP_EOL .
-            'define(\'BREVO_API_KEY\', ' . var_export(getenv('BREVO_API_KEY'), true) . ');' . PHP_EOL
+            'define(\'BREVO_API_KEY\', ' . var_export(getenv('BREVO_API_KEY'), true) . ');' . PHP_EOL .
+            'define(\'BESIX_API_KEY\', ' . var_export(getenv('BESIX_API_KEY'), true) . ');' . PHP_EOL
           );"
 
       - name: Deploy via FTP

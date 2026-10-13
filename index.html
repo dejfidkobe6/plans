@@ -12169,15 +12169,12 @@ function _bgUrlsForLevels(levels, skipIdx) {
   return urls;
 }
 
-// Rozpočet prefetche podle připojení: Data Saver / 2G = nic, 3G = jen nejbližší podlaží,
-// jinak bez limitu. Vrací max. počet URL, které se smí stáhnout na pozadí.
+// Rozpočet prefetche. Výkresy se stahují i na mobilu – právě tam jsou potřeba
+// nejvíc (stavba, slabý signál). Jediná brzda je Data Saver, tedy výslovné přání
+// uživatele šetřit data. Vrací max. počet URL, které se smí stáhnout na pozadí.
 function _bgPrefetchBudget() {
   const c = navigator.connection;
-  if (!c) return Infinity;
-  const t = c.effectiveType || '';
-  if (c.saveData || /2g$/.test(t)) return 0;
-  if (t === '3g') return 3;
-  return Infinity;
+  return (c && c.saveData) ? 0 : Infinity;
 }
 
 // Odstraní z Cache Storage staré verze výkresů projektu. Po ořezu dostane soubor novou ?v=,
@@ -12286,28 +12283,46 @@ function _bgForgetUser(uid) {
   } catch {}
 }
 
-// Při otevření stránky (ještě před kliknutím na projekt): tiše doplnit do mezipaměti
-// výkresy naposledy otevřených projektů. Zahřívají se jen projekty, jejichž členem je
-// přihlášený uživatel podle serveru. Jakmile uživatel otevře projekt, končí –
-// prefetch daného projektu má přednost.
+// Po přihlášení / otevření aplikace naplnit mezipaměť zařízení výkresy projektů,
+// jejichž je uživatel členem. Funguje i na čerstvém zařízení (typicky mobil), kde si
+// prohlížeč zatím nic nepamatuje: seznam výkresů si vyžádá ze serveru. Jakmile
+// uživatel otevře projekt, končí – prefetch otevřeného projektu má přednost.
 async function _bgPrefetchRecent() {
   if (!('caches' in window) || !navigator.serviceWorker) return;
   const uid = currentUser && currentUser.id;
   if (uid == null || _bgPrefetchBudget() === 0) return;
   try { await navigator.serviceWorker.ready; } catch { return; }
-  let recent = [];
-  try { recent = JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]'); } catch {}
-  if (!recent.length) return;
-  let allowed = null;
+
+  // Projekty uživatele podle serveru – bez potvrzení členství se nestahuje nic
+  let projects = null;
   try {
     const { ok, data } = await apiFetch('api/projects.php');
-    if (ok && Array.isArray(data.plan_projects)) allowed = new Set(data.plan_projects.map(p => String(p.id)));
+    if (ok && Array.isArray(data.plan_projects)) projects = data.plan_projects.map(p => String(p.id));
   } catch {}
-  if (!allowed) return; // bez potvrzení členství se nic nestahuje
-  for (const pid of recent) {
-    if (!allowed.has(String(pid))) { localStorage.removeItem(LS_BG_URLS(uid, pid)); continue; }
+  if (!projects || !projects.length) return;
+
+  // Pořadí: naposledy otevřené projekty první, zbytek za nimi
+  let recent = [];
+  try { recent = (JSON.parse(localStorage.getItem(LS_BG_RECENT(uid)) || '[]')).map(String); } catch {}
+  const allowed = new Set(projects);
+  recent.filter(p => !allowed.has(p)).forEach(p => { try { localStorage.removeItem(LS_BG_URLS(uid, p)); } catch {} });
+  const order = [...recent.filter(p => allowed.has(p)), ...projects.filter(p => !recent.includes(p))].slice(0, 3);
+
+  for (const pid of order) {
+    if (currentProject) return;
+    // Zapamatované URL (rychlé), jinak se seznam dotáhne ze serveru – to je případ
+    // čerstvého mobilu, kde dřív prefetch po přihlášení neudělal vůbec nic
     let urls = [];
     try { urls = JSON.parse(localStorage.getItem(LS_BG_URLS(uid, pid)) || '[]'); } catch {}
+    if (!urls.length) {
+      try {
+        const { ok, data } = await apiFetch(`api/background.php?project_id=${pid}&all=1`);
+        if (ok && Array.isArray(data.backgrounds)) {
+          urls = data.backgrounds.map(b => b.url).filter(_isRemoteBgUrl);
+          if (urls.length) localStorage.setItem(LS_BG_URLS(uid, pid), JSON.stringify(urls));
+        }
+      } catch {}
+    }
     for (const u of urls) {
       if (currentProject) return;
       if (!(await _bgIsCached(u))) { try { await fetch(u, { credentials: 'same-origin' }); } catch {} }
@@ -13304,10 +13319,12 @@ function openSearchPop(anchor, items, onSelect, placeholder) {
 function kdSave() {
   const pid = currentProject?.id; if (!pid) return;
   _kdDirty = true;
+  _kdEditSeq++;     // každá změna posune pořadí, ať se neoznačí za uloženou cizí verze
   localStorage.setItem(LS_KD_KEY(pid), JSON.stringify(kdRecords));
   _serverSave();    // keep canvas state in sync
   _kdDirectSave();  // dedicated KD endpoint – not blocked by _isProjectLoading
 }
+let _kdEditSeq = 0;   // počítadlo lokálních změn kontrolního dne
 
 let _kdSaveTimer     = null;
 let _kdLastKdTs      = null;   // KD-specific updated_at from server
@@ -13350,6 +13367,7 @@ function _kdDirectSave(delay = 1000) {
     if (!currentProject) { _kdSavePending = false; return; }
     let retryIn = 0;
     try {
+      const seq = _kdEditSeq;   // stav, který se právě odesílá
       const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
       const { ok, data, status } = await apiFetch(`api/kd.php?project_id=${currentProject.id}`, {
         method: 'POST',
@@ -13360,7 +13378,10 @@ function _kdDirectSave(delay = 1000) {
       // Merging here would undo local deletions (server still has old data until this save).
       // Concurrent additions from other users are handled by _pollKDSync.
       if (ok) {
-        _kdLastKdTs = null; _kdDirty = false; _kdLastOwnSaveTs = Date.now();  // force next poll to fetch fresh server state
+        _kdLastKdTs = null; _kdLastOwnSaveTs = Date.now();  // force next poll to fetch fresh server state
+        // Za čistý se stav označí jen tehdy, když mezitím nepřibyla další změna –
+        // jinak by poll vzal server jako pravdu a rozepsaný úkol by přepsal
+        if (_kdEditSeq === seq) _kdDirty = false;
         _kdSaveAuthRetries = 0;
         _kdSetSaveState(true);
       } else if (status === 401 && _kdSaveAuthRetries < 2) {
@@ -13395,6 +13416,35 @@ async function _kdServerLoad(projectId) {
 
 // Client-side merge: adds items from server missing locally (concurrent additions).
 // Returns true if anything was added (so caller can re-render).
+// Strom kontrolního dne pro slučování podle id
+const KD_TREE = [{ key: 'chapters', kids: [{ key: 'cards', kids: [{ key: 'tasks', kids: [] }] }] }];
+
+// Sloučí serverová data do existujících objektů podle id — MÍSTO toho, aby je nahradila.
+// Zachování identity objektů je podstatné: tlačítka a textarey na boardu si drží odkaz
+// na konkrétní záznam/úsek/úkol. Kdyby se pole vyměnilo, přidal by se nový úkol do
+// zahozeného objektu a vůbec by se neobjevil.
+function _kdSyncById(local, server, kids) {
+  let changed = false;
+  const byId = new Map((local || []).map(o => [o.id, o]));
+  const out  = [];
+  for (const sItem of (server || [])) {
+    const lItem = byId.get(sItem.id);
+    if (!lItem) { out.push(sItem); changed = true; continue; }
+    for (const k of Object.keys(sItem)) {
+      if (kids.some(c => c.key === k)) continue;          // podřízená pole řeší rekurze
+      if (JSON.stringify(lItem[k]) !== JSON.stringify(sItem[k])) { lItem[k] = sItem[k]; changed = true; }
+    }
+    for (const c of kids) {
+      const res = _kdSyncById(lItem[c.key] || [], sItem[c.key] || [], c.kids);
+      if (res.changed) changed = true;
+      lItem[c.key] = res.list;                            // stejné objekty, jen přeskládané
+    }
+    out.push(lItem);
+  }
+  if (!changed && (out.length !== (local || []).length || out.some((o, i) => local[i] !== o))) changed = true;
+  return { list: out, changed };
+}
+
 function _kdMergeFromServer(serverRecords) {
   if (!Array.isArray(serverRecords)) return false;
   // Skip merge while a save is in-flight — merging now would restore locally-deleted items
@@ -13403,14 +13453,16 @@ function _kdMergeFromServer(serverRecords) {
   serverRecords.forEach(rec => {
     if (!rec.chapters) { rec.chapters = [{ id: kdGenId(), title: '', cards: rec.cards||[] }]; delete rec.cards; }
   });
-  // Full replace when user has no unsaved local edits (pure viewer — sync everything)
+
+  // Bez neuložených změn je server zdrojem pravdy – sloučit vše, ale v místě
   if (!_kdDirty) {
-    const newJson = JSON.stringify(serverRecords);
-    if (newJson === JSON.stringify(kdRecords)) return false; // identical — no re-render needed
-    kdRecords = serverRecords;
-    return true;
+    const res = _kdSyncById(kdRecords, serverRecords, KD_TREE);
+    kdRecords.length = 0;
+    kdRecords.push(...res.list);     // pole si drží identitu, jen se naplní znovu
+    return res.changed;
   }
 
+  // S neuloženými změnami jen doplnit, co přibylo na serveru; lokální verze má přednost
   let changed = false;
   serverRecords.forEach(sRec => {
     let localRec = kdRecords.find(r => r.id === sRec.id);
@@ -14799,6 +14851,7 @@ async function doLogin() {
   const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
+  setTimeout(_bgPrefetchRecent, 1500);   // po přihlášení natáhnout výkresy do mezipaměti
 }
 
 // --- Register ---
@@ -14832,6 +14885,7 @@ async function doRegister() {
   const _inviteToken = _inviteTokenUrl || _inviteTokenSess;
   if (_inviteToken) { window.location.href = 'api/invite.php?token=' + encodeURIComponent(_inviteToken); return; }
   showProjectScreen();
+  setTimeout(_bgPrefetchRecent, 1500);   // po přihlášení natáhnout výkresy do mezipaměti
 }
 
 // --- Logout ---
