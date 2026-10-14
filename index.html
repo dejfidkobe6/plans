@@ -13432,7 +13432,12 @@ function _kdSyncById(local, server, kids) {
     if (!lItem) { out.push(sItem); changed = true; continue; }
     for (const k of Object.keys(sItem)) {
       if (kids.some(c => c.key === k)) continue;          // podřízená pole řeší rekurze
-      if (JSON.stringify(lItem[k]) !== JSON.stringify(sItem[k])) { lItem[k] = sItem[k]; changed = true; }
+      const a = lItem[k], b = sItem[k];
+      // Skaláry porovnat přímo; serializuje se jen to málo, co je pole nebo objekt
+      const equal = (a === b) ||
+        (a !== null && b !== null && typeof a === 'object' && typeof b === 'object'
+         && JSON.stringify(a) === JSON.stringify(b));
+      if (!equal) { lItem[k] = b; changed = true; }
     }
     for (const c of kids) {
       const res = _kdSyncById(lItem[c.key] || [], sItem[c.key] || [], c.kids);

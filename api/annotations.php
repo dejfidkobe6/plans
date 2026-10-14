@@ -35,17 +35,20 @@ error_reporting(E_ALL);
 register_shutdown_function(function() {
     $err = error_get_last();
     if ($err && in_array($err['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_USER_ERROR])) {
+        error_log('[annotations] fatal: ' . $err['message'] . ' @ ' . basename($err['file']) . ':' . $err['line']);
         ob_clean();
         header('Content-Type: application/json; charset=UTF-8');
         http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $err['message']]);
+        // Endpoint je dostupný z cizí domény – detail chyby patří do logu, ne ven
+        echo json_encode(['ok' => false, 'error' => 'Interní chyba serveru']);
     }
 });
 set_exception_handler(function($e) {
+    error_log('[annotations] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
     ob_clean();
     header('Content-Type: application/json; charset=UTF-8');
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Interní chyba serveru']);
     exit;
 });
 
@@ -151,18 +154,28 @@ $row   = $stmt->fetch();
 $state = $row ? json_decode($row['state_json'] ?? '', true) : null;
 $levels = (is_array($state) && isset($state['levels']) && is_array($state['levels'])) ? $state['levels'] : [];
 
-// Rozměry podkladových výkresů – potřeba pro přepočet pozice na procenta
-$bgSize = [];   // level_id => [w, h]
+// Cesty k podkladovým výkresům. Rozměry se zjišťují až u podlaží, která mají
+// anotace – getimagesize sahá na disk, u projektu s mnoha podlažími je to znát.
+$bgUrl = [];    // level_id => cesta
 $stmt = $db->prepare('SELECT level_id, image_url FROM plan_backgrounds WHERE project_id = ?');
 $stmt->execute([$projectId]);
 foreach ($stmt->fetchAll() as $b) {
-    $url = $b['image_url'] ?? '';
-    if (!$url) continue;
-    $path = __DIR__ . '/..' . $url;
-    if (!is_file($path)) continue;
-    $size = @getimagesize($path);
-    if ($size && $size[0] > 0 && $size[1] > 0) $bgSize[$b['level_id']] = [$size[0], $size[1]];
+    if (!empty($b['image_url'])) $bgUrl[$b['level_id']] = $b['image_url'];
 }
+$bgSizeMemo = [];
+/** Rozměry výkresu podlaží v pixelech, nebo null. Měří se nejvýš jednou za požadavek. */
+$bgSizeFor = function (?string $levelId) use (&$bgSizeMemo, $bgUrl): ?array {
+    if ($levelId === null || !isset($bgUrl[$levelId])) return null;
+    if (array_key_exists($levelId, $bgSizeMemo)) return $bgSizeMemo[$levelId];
+    $bgSizeMemo[$levelId] = null;
+    $url  = strtok($bgUrl[$levelId], '?');          // obrana, kdyby v cestě někdy byla verze
+    $path = __DIR__ . '/..' . $url;
+    if (is_file($path)) {
+        $size = @getimagesize($path);
+        if ($size && $size[0] > 0 && $size[1] > 0) $bgSizeMemo[$levelId] = [$size[0], $size[1]];
+    }
+    return $bgSizeMemo[$levelId];
+};
 
 // Štítky symbolů stavebních činností – zrcadlí SYMBOL_DEFS v index.html.
 // Neznámý klíč se vrátí tak, jak je, takže se nic nerozbije, když symbol přibude.
@@ -208,7 +221,7 @@ foreach ($levels as $lvl) {
     $bgT  = isset($lvl['bgTop'])    ? (float)$lvl['bgTop']    : null;
     $bgSX = isset($lvl['bgScaleX']) ? (float)$lvl['bgScaleX'] : null;
     $bgSY = isset($lvl['bgScaleY']) ? (float)$lvl['bgScaleY'] : null;
-    $dim  = ($levelId !== null && isset($bgSize[$levelId])) ? $bgSize[$levelId] : null;
+    $dim  = $objects ? $bgSizeFor($levelId) : null;   // bez anotací se na disk nesahá
     $canPlace = $dim && $bgL !== null && $bgT !== null && $bgSX > 0 && $bgSY > 0;
 
     foreach ($objects as $o) {
@@ -270,4 +283,7 @@ foreach ($levels as $lvl) {
     }
 }
 
+// Dashboard se ptá opakovaně; krátká soukromá cache ušetří práci a data zůstanou čerstvá.
+// private = odpověď je vázaná na volajícího (API klíč / session), sdílené cache ji držet nesmí.
+header('Cache-Control: private, max-age=30');
 echo json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
