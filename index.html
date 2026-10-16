@@ -15722,6 +15722,10 @@ async function _refreshProfeseNow() {
 async function _pollKDSync() {
   if (!currentProject) return;
   try {
+    // Stav našeho ukládání při startu dotazu – odpověď vyžádaná dřív, než jsme uložili,
+    // už nemusí obsahovat, co jsme právě přidali
+    const saveAtStart = _kdLastOwnSaveTs;
+    const editAtStart = _kdEditSeq;
     // Lightweight timestamp check first
     const { ok: tsOk, data: tsData } = await apiFetch(`api/kd.php?project_id=${currentProject.id}&ts_only=1`);
     if (!tsOk || !tsData.updated_at) return;
@@ -15730,6 +15734,11 @@ async function _pollKDSync() {
     // KD data changed — fetch and merge
     const kdResult = await _kdServerLoad(currentProject.id);
     if (!kdResult) return;
+
+    // Zahodit zastaralou odpověď: mezitím jsme uložili nebo uživatel něco změnil.
+    // Kdyby se použila, sloučení by právě přidaný úkol zase smazalo (na serveru v ní
+    // ještě není). _kdLastKdTs se schválně neposouvá, ať si to další kolo vyzvedne.
+    if (_kdSavePending || _kdLastOwnSaveTs !== saveAtStart || _kdEditSeq !== editAtStart) return;
 
     _kdLastKdTs = kdResult.updatedAt;
     // Skip re-render for 3s after our own save — the poll would otherwise see our own
