@@ -186,6 +186,45 @@ $row   = $stmt->fetch();
 $state = $row ? json_decode(_decompress((string)($row['state_json'] ?? '')), true) : null;
 $levels = (is_array($state) && isset($state['levels']) && is_array($state['levels'])) ? $state['levels'] : [];
 
+// Dodavatelé: firma k zobrazení a barva, stejně jako je bere aplikace.
+// Primárně plan_profese, u starších projektů záloha z profese_json ve stavu.
+$profById = [];
+try {
+    $stmt = $db->prepare('SELECT name, firma, color FROM plan_profese WHERE project_id = ?');
+    $stmt->execute([$projectId]);
+    foreach ($stmt->fetchAll() as $pr) $profById[$pr['name']] = $pr;
+} catch (\Throwable $e) { /* tabulka nemusí existovat */ }
+if (!$profById) {
+    try {
+        $stmt = $db->prepare('SELECT profese_json FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
+        $stmt->execute([$projectId]);
+        $pj = $stmt->fetch();
+        $arr = $pj && $pj['profese_json'] ? json_decode(_decompress((string)$pj['profese_json']), true) : null;
+        foreach ((is_array($arr) ? $arr : []) as $pr) {
+            if (!empty($pr['name'])) $profById[$pr['name']] = $pr;
+        }
+    } catch (\Throwable $e) {}
+}
+
+/** Barva anotace podle pravidla aplikace (getAnnotColor): Urgence červeně, jinak dodavatel. */
+function annotColorHex(?string $type, ?string $status, ?string $profese, array $profById): string {
+    if ($type === 'levellink') return '#06B6D4';
+    if ($status === 'Urgence') return '#EF4444';
+    $c = $profese !== null && isset($profById[$profese]) ? ($profById[$profese]['color'] ?? null) : null;
+    return $c ?: '#6B7280';
+}
+
+/** Cesta fabric objektu jako SVG "d" (pole segmentů → řetězec). */
+function annotPathD(array $o): ?string {
+    if (empty($o['path']) || !is_array($o['path'])) return null;
+    $parts = [];
+    foreach ($o['path'] as $seg) {
+        if (is_array($seg)) $parts[] = implode(' ', array_map(fn($v) => is_float($v) ? rtrim(rtrim(sprintf('%.3f', $v), '0'), '.') : (string)$v, $seg));
+    }
+    $d = trim(implode(' ', $parts));
+    return $d !== '' ? $d : null;
+}
+
 // Objekty anotací. Zdrojem pravdy je plan_annotations – canvas.php je do stavu
 // doplňuje až při čtení, takže uložený state_json má fabricJSON.objects většinou
 // prázdné. Starší projekty, které ještě nebyly přemigrované, se dočtou ze stavu.
@@ -299,6 +338,7 @@ const ANNOT_TYPE_LABELS = [
     'freehand' => 'Volná čára', 'pin' => 'Špendlík', 'text' => 'Text', 'symbol' => 'Symbol',
 ];
 
+$includeDone = !empty($_GET['includeDone']);   // výchozí stav: hotové skryté
 $items = [];
 foreach ($levels as $lvl) {
     $levelId = $lvl['id'] ?? null;
@@ -330,6 +370,9 @@ foreach ($levels as $lvl) {
         $m    = $meta[$annotId] ?? [];
         $type = $o['annotType'] ?? ($m['annotType'] ?? null);
         if ($type === 'levellink') continue;   // navigační odkaz, ne pracovní anotace
+        // Jako v aplikaci: dokončené se nezobrazují, pokud si je volající nevyžádá
+        $st = ($m['status'] ?? $o['status'] ?? null);
+        if (!$includeDone && $st === 'Hotovo') continue;
 
         // Střed anotace v souřadnicích plátna. U špendlíku a symbolu je bod
         // původu zároveň místo, kam ho uživatel umístil.
@@ -368,10 +411,52 @@ foreach ($levels as $lvl) {
         $label = trim((string)($m['popisek'] ?? $o['popisek'] ?? ''));
         if ($label === '') $label = (string)$annotId;
 
+        // Tvar pro věrné vykreslení: jak se to má kreslit + geometrie v procentech
+        $kind = match (true) {
+            $type === 'symbol' => 'glyph',
+            $type === 'pin'    => 'pin',
+            in_array($type, ['rect', 'circle', 'polygon'], true)                 => 'area',
+            in_array($type, ['polyline', 'arrow', 'partition', 'freehand'], true) => 'line',
+            $type === 'text'   => 'text',
+            default            => 'area',
+        };
+        $shape = ['kind' => $kind, 'angle' => round((float)($o['angle'] ?? 0), 2)];
+        if ($canPlace) {
+            $wq = (float)($o['width']  ?? 0) * (float)($o['scaleX'] ?? 1);
+            $hq = (float)($o['height'] ?? 0) * (float)($o['scaleY'] ?? 1);
+            $shape['w'] = round(($wq / $bgSX) / $dim[0] * 100, 3);
+            $shape['h'] = round(($hq / $bgSY) / $dim[1] * 100, 3);
+        }
+        if (in_array($kind, ['glyph', 'pin', 'line'], true)) {
+            $d = annotPathD($o);
+            if ($d !== null) {
+                $shape['path']     = $d;
+                $shape['viewBox']  = [round((float)($o['width'] ?? 0), 2), round((float)($o['height'] ?? 0), 2)];
+                $shape['fillRule'] = ($o['fillRule'] ?? 'nonzero') === 'evenodd' ? 'evenodd' : 'nonzero';
+            }
+        }
+        if (!empty($o['points']) && is_array($o['points'])) {
+            $pts = [];
+            foreach ($o['points'] as $pt) {
+                if (isset($pt['x'], $pt['y'])) $pts[] = [round((float)$pt['x'], 2), round((float)$pt['y'], 2)];
+            }
+            if ($pts) $shape['points'] = $pts;
+        }
+
+        $profKey = ($m['profese'] ?? $o['profese'] ?? null) ?: null;
+        $status  = ($m['status']  ?? $o['status']  ?? null) ?: null;
+        $firma   = ($profKey !== null && !empty($profById[$profKey]['firma']))
+            ? $profById[$profKey]['firma'] : ($profKey ?: '—');
+
         $items[] = [
             'id'       => (string)$annotId,
             'label'    => $label,
-            'cat'      => ($m['profese'] ?? $o['profese'] ?? null) ?: null,
+            'cat'      => $profKey,
+            'firma'    => $firma,
+            'color'    => annotColorHex($type, $status, $profKey, $profById),
+            'status'   => $status,
+            'type'     => $type,
+            'shape'    => $shape,
             'x'        => $x,
             'y'        => $y,
             'zone'     => $zone,
