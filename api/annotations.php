@@ -186,6 +186,18 @@ $row   = $stmt->fetch();
 $state = $row ? json_decode(_decompress((string)($row['state_json'] ?? '')), true) : null;
 $levels = (is_array($state) && isset($state['levels']) && is_array($state['levels'])) ? $state['levels'] : [];
 
+// Objekty anotací. Zdrojem pravdy je plan_annotations – canvas.php je do stavu
+// doplňuje až při čtení, takže uložený state_json má fabricJSON.objects většinou
+// prázdné. Starší projekty, které ještě nebyly přemigrované, se dočtou ze stavu.
+// Migraci schválně nespouštíme, ta zapisuje a tenhle endpoint jen čte.
+$objsByLevel = [];
+$stmt = $db->prepare('SELECT level_id, fabric_json FROM plan_annotations WHERE project_id = ? ORDER BY id');
+$stmt->execute([$projectId]);
+foreach ($stmt->fetchAll() as $r) {
+    $obj = json_decode((string)$r['fabric_json'], true);
+    if (is_array($obj) && !empty($obj['annotId'])) $objsByLevel[$r['level_id']][] = $obj;
+}
+
 // Cesty k podkladovým výkresům. Rozměry se zjišťují až u podlaží, která mají
 // anotace – getimagesize sahá na disk, u projektu s mnoha podlažími je to znát.
 $bgUrl = [];    // level_id => cesta
@@ -291,7 +303,9 @@ $items = [];
 foreach ($levels as $lvl) {
     $levelId = $lvl['id'] ?? null;
     $zone    = $lvl['name'] ?? null;
-    $objects = $lvl['fabricJSON']['objects'] ?? [];
+    $objects = ($levelId !== null && isset($objsByLevel[$levelId]))
+        ? $objsByLevel[$levelId]
+        : ($lvl['fabricJSON']['objects'] ?? []);
     if (!is_array($objects)) $objects = [];
 
     // Metadata anotací podle annotId (nesou mimo jiné annotSymbol, který ve fabric
