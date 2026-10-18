@@ -456,6 +456,9 @@ foreach ($levels as $lvl) {
             'color'    => annotColorHex($type, $status, $profKey, $profById),
             'status'   => $status,
             'type'     => $type,
+            // Datumy pro třetí řádek štítku, stejně jako je píše aplikace
+            'dateFrom' => ($m['dateFrom'] ?? $o['dateFrom'] ?? null) ?: null,
+            'deadline' => ($m['deadline'] ?? $o['deadline'] ?? null) ?: null,
             'shape'    => $shape,
             'x'        => $x,
             'y'        => $y,
