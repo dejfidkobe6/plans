@@ -65,25 +65,7 @@ if (!$projectId) jsonError('Chybí project_id');
 $membership = getProjectMembership($projectId, $userId);
 if (!$membership) jsonError('Nemáš přístup k tomuto projektu', 403);
 
-// ── Compress / decompress ─────────────────────────────────────
-function _compress(string $json): string {
-    if (function_exists('gzencode')) {
-        $gz = @gzencode($json, 6);
-        if ($gz !== false) return base64_encode($gz);
-    }
-    return $json;
-}
-
-function _decompress(string $val): string {
-    if (strlen($val) >= 4 && str_starts_with($val, 'H4s')) {
-        $decoded = base64_decode($val, true);
-        if ($decoded !== false) {
-            $inflated = @gzdecode($decoded);
-            if ($inflated !== false) return $inflated;
-        }
-    }
-    return $val;
-}
+// _compress/_decompress jsou v functions.php (sdílí je i annotations.php)
 
 // ── GET ───────────────────────────────────────────────────────
 if ($method === 'GET') {

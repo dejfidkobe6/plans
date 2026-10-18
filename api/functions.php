@@ -18,6 +18,30 @@ function getDB(): PDO {
 }
 
 // ============================================================
+// Komprese velkých JSON sloupců (state_json, profese_json, kd nikoli).
+// Uloženo jako base64 z gzipu, poznat podle prefixu "H4s". Sdílené, aby každý,
+// kdo ta data čte, použil stejný postup – jinak mu vyjde prázdno.
+// ============================================================
+function _compress(string $json): string {
+    if (function_exists('gzencode')) {
+        $gz = @gzencode($json, 6);
+        if ($gz !== false) return base64_encode($gz);
+    }
+    return $json;
+}
+
+function _decompress(string $val): string {
+    if (strlen($val) >= 4 && str_starts_with($val, 'H4s')) {
+        $decoded = base64_decode($val, true);
+        if ($decoded !== false) {
+            $inflated = @gzdecode($decoded);
+            if ($inflated !== false) return $inflated;
+        }
+    }
+    return $val;
+}
+
+// ============================================================
 // JSON responses
 // ============================================================
 function jsonOk(array $data = []): void {

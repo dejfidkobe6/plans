@@ -182,7 +182,8 @@ $projectId = (int)$project['id'];
 $stmt = $db->prepare('SELECT state_json FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
 $stmt->execute([$projectId]);
 $row   = $stmt->fetch();
-$state = $row ? json_decode($row['state_json'] ?? '', true) : null;
+// state_json je uložený komprimovaně (viz _compress v functions.php)
+$state = $row ? json_decode(_decompress((string)($row['state_json'] ?? '')), true) : null;
 $levels = (is_array($state) && isset($state['levels']) && is_array($state['levels'])) ? $state['levels'] : [];
 
 // Cesty k podkladovým výkresům. Rozměry se zjišťují až u podlaží, která mají
