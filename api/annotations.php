@@ -217,6 +217,22 @@ function annotColorHex(?string $type, ?string $status, ?string $profese, array $
     return $c ?: '#6B7280';
 }
 
+/**
+ * Datum úkolu jako ISO 8601. Aplikace ukládá YYYY-MM-DD (flatpickr dateFormat Y-m-d),
+ * hodnota s časem projde beze změny; starší český zápis DD.MM.YYYY se převede.
+ * Cokoli nerozpoznaného vrátí null, ať se ven nedostane nepoužitelný řetězec.
+ */
+function annotIsoDate($v): ?string {
+    if (!is_string($v)) return null;
+    $v = trim($v);
+    if ($v === '') return null;
+    if (preg_match('/^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/', $v)) return $v;
+    if (preg_match('/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/', $v, $m)) {
+        return sprintf('%04d-%02d-%02d', (int)$m[3], (int)$m[2], (int)$m[1]);
+    }
+    return null;
+}
+
 /** Cesta fabric objektu jako SVG "d" (pole segmentů → řetězec). */
 function annotPathD(array $o): ?string {
     if (empty($o['path']) || !is_array($o['path'])) return null;
@@ -517,6 +533,9 @@ foreach ($levels as $lvl) {
             // Datumy pro třetí řádek štítku, stejně jako je píše aplikace
             'dateFrom' => ($m['dateFrom'] ?? $o['dateFrom'] ?? null) ?: null,
             'deadline' => ($m['deadline'] ?? $o['deadline'] ?? null) ?: null,
+            // Rozsah provádění úkolu („od – do“ v aplikaci), ISO 8601 nebo null
+            'from'     => annotIsoDate($m['dateFrom'] ?? $o['dateFrom'] ?? null),
+            'to'       => annotIsoDate($m['deadline'] ?? $o['deadline'] ?? null),
             'shape'    => $shape,
             'x'        => $x,
             'y'        => $y,
