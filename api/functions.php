@@ -233,6 +233,34 @@ function logoutSession(): void {
 // ============================================================
 // Plans app ID
 // ============================================================
+/** Odvodí plans app_id z dat (jen SELECT). null = nenalezeno. */
+function _plansAppIdFromData(): ?int {
+    $db = getDB();
+    // Vyhni se záměně s projekty board.besix.cz, které sdílí tabulku projektů
+    foreach (['plan_canvas_data', 'plan_backgrounds'] as $tbl) {
+        try {
+            $r = $db->query("SELECT DISTINCT p.app_id FROM plan_projects p
+                             INNER JOIN `$tbl` t ON t.project_id = p.id
+                             WHERE p.app_id IS NOT NULL LIMIT 1")->fetch();
+            if ($r && $r['app_id']) return (int)$r['app_id'];
+        } catch (\Exception $e) {}
+    }
+    try {
+        $r = $db->query("SELECT DISTINCT app_id FROM plan_projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
+        if ($r && $r['app_id']) return (int)$r['app_id'];
+    } catch (\Exception $e) {}
+    return null;
+}
+
+/** plans app_id bez jakéhokoli zápisu – pro čtecí endpointy, které nesmí nic měnit. */
+function plansAppIdReadOnly(): ?int {
+    try {
+        $row = getDB()->query("SELECT id FROM apps WHERE app_key = '" . PLANS_APP_KEY . "' LIMIT 1")->fetch();
+        if ($row) return (int)$row['id'];
+    } catch (\Exception $e) { /* tabulka apps nemusí existovat – nevytvářet ji */ }
+    return _plansAppIdFromData();
+}
+
 function getPlansAppId(): int {
     static $id = null;
     if ($id) return $id;
@@ -252,26 +280,8 @@ function getPlansAppId(): int {
         if ($row) { $id = (int)$row['id']; return $id; }
     } catch (\Exception $e) { /* apps table still unavailable */ }
 
-    // 3) Find app_id by joining projects with a plans-specific table (avoids
-    //    confusing board.besix.cz projects which share the same projects table)
-    $plansAppId = null;
-    $plansTables = ['plan_canvas_data', 'plan_backgrounds'];
-    foreach ($plansTables as $tbl) {
-        try {
-            $r = $db->query("SELECT DISTINCT p.app_id FROM plan_projects p
-                             INNER JOIN `$tbl` t ON t.project_id = p.id
-                             WHERE p.app_id IS NOT NULL LIMIT 1")->fetch();
-            if ($r && $r['app_id']) { $plansAppId = (int)$r['app_id']; break; }
-        } catch (\Exception $e2) {}
-    }
-
-    // 4) Fall back to any app_id in projects if no plans-specific data exists yet
-    if (!$plansAppId) {
-        try {
-            $r = $db->query("SELECT DISTINCT app_id FROM plan_projects WHERE app_id IS NOT NULL LIMIT 1")->fetch();
-            if ($r && $r['app_id']) $plansAppId = (int)$r['app_id'];
-        } catch (\Exception $e) {}
-    }
+    // 3) + 4) Odvodit z dat
+    $plansAppId = _plansAppIdFromData();
 
     // 5) Re-register in apps table with the found ID so future requests are fast
     if ($plansAppId) {
