@@ -182,7 +182,8 @@ $projectId = (int)$project['id'];
 $stmt = $db->prepare('SELECT state_json FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
 $stmt->execute([$projectId]);
 $row   = $stmt->fetch();
-$state = $row ? json_decode($row['state_json'] ?? '', true) : null;
+// state_json je uložený komprimovaně (viz _compress v functions.php)
+$state = $row ? json_decode(_decompress((string)($row['state_json'] ?? '')), true) : null;
 $levels = (is_array($state) && isset($state['levels']) && is_array($state['levels'])) ? $state['levels'] : [];
 
 // Cesty k podkladovým výkresům. Rozměry se zjišťují až u podlaží, která mají
@@ -207,6 +208,59 @@ $bgSizeFor = function (?string $levelId) use (&$bgSizeMemo, $bgUrl): ?array {
     }
     return $bgSizeMemo[$levelId];
 };
+
+/** Absolutní cesta k souboru výkresu podlaží, ověřená že leží v uploads/bg. null = není. */
+$bgPathFor = function (?string $levelId) use ($bgUrl): ?string {
+    if ($levelId === null || !isset($bgUrl[$levelId])) return null;
+    $path = realpath(__DIR__ . '/..' . strtok($bgUrl[$levelId], '?'));
+    $base = realpath(__DIR__ . '/../uploads/bg');
+    if (!$path || !$base || !is_file($path) || !str_starts_with($path, $base . DIRECTORY_SEPARATOR)) return null;
+    return $path;
+};
+
+// ── ?drawing=<levelId> – vydá samotný soubor výkresu ────────────────────────
+// Bez toho má volající jen procentuální pozice a nemá co podložit. Soubor se čte
+// podle cesty z databáze, parametr slouží jen k vyhledání řádku.
+if (isset($_GET['drawing']) && $_GET['drawing'] !== '') {
+    $path = $bgPathFor((string)$_GET['drawing']);
+    if (!$path) jsonError('Výkres pro toto podlaží neexistuje', 404);
+    $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+             'webp' => 'image/webp', 'gif' => 'image/gif'][$ext] ?? 'application/octet-stream';
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($path));
+    // Soubor se po ořezu přepisuje pod stejným názvem, proto krátká cache + ETag
+    header('Cache-Control: private, max-age=300');
+    header('ETag: "' . md5((string)filemtime($path) . '-' . filesize($path)) . '"');
+    readfile($path);
+    exit;
+}
+
+// ── ?drawings=1 – seznam podkladů projektu ──────────────────────────────────
+if (!empty($_GET['drawings'])) {
+    $zoneOf = [];
+    foreach ($levels as $lvl) {
+        if (!empty($lvl['id'])) $zoneOf[$lvl['id']] = $lvl['name'] ?? null;
+    }
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'plans.besix.cz';
+    $self   = $scheme . '://' . $host . strtok($_SERVER['REQUEST_URI'] ?? '/api/annotations', '?');
+    $out = [];
+    foreach ($bgUrl as $levelId => $rel) {
+        if (!$bgPathFor($levelId)) continue;
+        $dim = $bgSizeFor($levelId);
+        $out[] = [
+            'levelId' => (string)$levelId,
+            'zone'    => $zoneOf[$levelId] ?? null,
+            'url'     => $self . '?project=' . rawurlencode((string)$projectId) . '&drawing=' . rawurlencode((string)$levelId),
+            'width'   => $dim ? $dim[0] : null,
+            'height'  => $dim ? $dim[1] : null,
+        ];
+    }
+    header('Cache-Control: private, max-age=30');
+    echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 // Štítky symbolů stavebních činností – zrcadlí SYMBOL_DEFS v index.html.
 // Neznámý klíč se vrátí tak, jak je, takže se nic nerozbije, když symbol přibude.
