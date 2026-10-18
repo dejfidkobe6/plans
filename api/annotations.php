@@ -69,8 +69,38 @@ if ($apiKey !== '') {
     if (!hash_equals((string)BESIX_API_KEY, $apiKey)) jsonError('Neplatný API klíč', 401);
     $viaKey = true;
 } else {
-    $user   = requireAuth();
+    $user = _annotSessionUser();
+    if (!$user) jsonError('Nepřihlášen (pro volání ze serveru použij hlavičku x-besix-api-key)', 401);
     $userId = (int)$user['id'];
+}
+
+/**
+ * Přihlášený uživatel bez jakéhokoli zápisu.
+ * Úmyslně nevolá requireAuth(): ta při vypršelé session obnovuje remember-me token,
+ * což znamená DDL a zápis do remember_tokens. Tenhle endpoint nesmí nic měnit, takže
+ * cookie jen ověří čistým SELECTem a token nerotuje.
+ */
+function _annotSessionUser(): ?array {
+    $u = $_SESSION['user'] ?? null;
+    if ($u && !empty($u['id'])) return $u;
+
+    $raw = $_COOKIE[REMEMBER_COOKIE] ?? '';
+    if (!$raw) return null;
+    $parts = explode(':', $raw, 2);
+    if (count($parts) !== 2 || !ctype_digit($parts[0]) || strlen($parts[1]) !== 64) return null;
+    try {
+        $stmt = getDB()->prepare(
+            'SELECT rt.user_id AS id, u.name, u.email
+               FROM remember_tokens rt
+               JOIN users u ON u.id = rt.user_id
+              WHERE rt.user_id = ? AND rt.token_hash = ? AND rt.expires_at > NOW()
+              LIMIT 1'
+        );
+        $stmt->execute([(int)$parts[0], hash('sha256', $parts[1])]);
+        return $stmt->fetch() ?: null;
+    } catch (\Throwable $e) {
+        return null;   // tabulka nemusí existovat – rozhodně ji nezakládat
+    }
 }
 
 // ── Nalezení projektu podle názvu nebo ID ───────────────────
@@ -98,7 +128,8 @@ function _annotTokens(string $s): array {
 }
 
 $db    = getDB();
-$appId = getPlansAppId();
+$appId = plansAppIdReadOnly();   // varianta bez CREATE/INSERT – endpoint jen čte
+if ($appId === null) jsonError('Nelze zjistit plans app_id z DB.', 500);
 if ($viaKey) {
     $stmt = $db->prepare('SELECT id, name FROM plan_projects WHERE app_id = ? AND is_active = 1 ORDER BY name');
     $stmt->execute([$appId]);
