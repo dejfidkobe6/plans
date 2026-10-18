@@ -190,7 +190,10 @@ $levels = (is_array($state) && isset($state['levels']) && is_array($state['level
 // Primárně plan_profese, u starších projektů záloha z profese_json ve stavu.
 $profById = [];
 try {
-    $stmt = $db->prepare('SELECT name, firma, color FROM plan_profese WHERE project_id = ?');
+    $stmt = $db->prepare(
+        'SELECT name, firma, color, kontakt, telefon, emails_json, contacts_json, export_pinned, sort_order
+           FROM plan_profese WHERE project_id = ? ORDER BY sort_order, firma, name'
+    );
     $stmt->execute([$projectId]);
     foreach ($stmt->fetchAll() as $pr) $profById[$pr['name']] = $pr;
 } catch (\Throwable $e) { /* tabulka nemusí existovat */ }
@@ -339,6 +342,61 @@ const ANNOT_TYPE_LABELS = [
 ];
 
 $includeDone = !empty($_GET['includeDone']);   // výchozí stav: hotové skryté
+
+// ── ?subs=1 – subdodavatelé projektu ────────────────────────────────────────
+// Stejný tvar, jaký používá aplikace (viz _rowsToProfese v profese.php), plus
+// počet živých anotací daného dodavatele, ať jde seznam rovnou vypsat.
+if (!empty($_GET['subs'])) {
+    $liveCount = [];
+    foreach ($levels as $lvl) {
+        $lid  = $lvl['id'] ?? null;
+        $objs = ($lid !== null && isset($objsByLevel[$lid]))
+            ? $objsByLevel[$lid]
+            : ($lvl['fabricJSON']['objects'] ?? []);
+        $metaL = [];
+        foreach (($lvl['annotations'] ?? []) as $a) {
+            if (!empty($a['annotId'])) $metaL[$a['annotId']] = $a;
+        }
+        foreach ((is_array($objs) ? $objs : []) as $o) {
+            if (empty($o['annotId'])) continue;
+            if (!empty($o['annotLabelFor']) || !empty($o['isBackground']) || !empty($o['isPolyHelper'])) continue;
+            $mm = $metaL[$o['annotId']] ?? [];
+            if (($o['annotType'] ?? ($mm['annotType'] ?? null)) === 'levellink') continue;
+            if (!$includeDone && ($mm['status'] ?? $o['status'] ?? null) === 'Hotovo') continue;
+            $key = ($mm['profese'] ?? $o['profese'] ?? null);
+            if ($key !== null && $key !== '') $liveCount[$key] = ($liveCount[$key] ?? 0) + 1;
+        }
+    }
+
+    $out = [];
+    foreach ($profById as $name => $r) {
+        $p = ['name' => (string)$name];
+        if (!empty($r['firma'])) $p['firma'] = $r['firma'];
+        $p['color'] = $r['color'] ?: '#6B7280';
+        if (!empty($r['export_pinned'])) $p['exportPinned'] = true;
+        if (!empty($r['contacts_json'])) {
+            $c = json_decode((string)$r['contacts_json'], true);
+            if (is_array($c) && $c) $p['contacts'] = $c;
+        } elseif (!empty($r['kontakt']) || !empty($r['telefon'])) {
+            $c = [];
+            if (!empty($r['kontakt'])) $c['name']    = $r['kontakt'];
+            if (!empty($r['telefon'])) $c['telefon'] = $r['telefon'];
+            $p['contacts'] = [$c];
+        }
+        if (!empty($r['kontakt'])) $p['kontakt'] = $r['kontakt'];
+        if (!empty($r['telefon'])) $p['telefon'] = $r['telefon'];
+        if (!empty($r['emails_json'])) {
+            $e = json_decode((string)$r['emails_json'], true);
+            if (is_array($e) && $e) $p['emails'] = $e;
+        }
+        $p['count'] = $liveCount[$name] ?? 0;
+        $out[] = $p;
+    }
+    header('Cache-Control: private, max-age=30');
+    echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $items = [];
 foreach ($levels as $lvl) {
     $levelId = $lvl['id'] ?? null;
