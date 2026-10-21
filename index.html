@@ -6261,25 +6261,6 @@ function getFirmaDisplay(profeseName) {
 function labelLineTop(obj) {
   return getLabelFirma(obj);
 }
-function labelLineBot(obj) {
-  // Allow multi-line but cap each line at 40 chars, max 4 lines
-  const raw = (obj.popisek || obj.annotId || '');
-  const lines = raw.split('\n').slice(0, 4).map(l => l.substring(0, 40));
-  return lines.join('\n');
-}
-function labelLineDates(obj) {
-  const fmt = d => {
-    if (!d) return null;
-    const parts = d.split('-');
-    return `${parts[2]}.${parts[1]}.${parts[0]}`;
-  };
-  const from = fmt(obj.dateFrom);
-  const to   = fmt(obj.deadline);
-  if (from && to)  return `${from} – ${to}`;
-  if (from)        return `od ${from}`;
-  if (to)          return `do ${to}`;
-  return null;
-}
 
 // O(1) label lookup cache — stale entries auto-expire when canvas removes the object
 const _labelCache = new Map();
@@ -6294,8 +6275,6 @@ function findLabel(annotId) {
 }
 function _invalidateLabelCache() { _labelCache.clear(); }
 
-const LABEL_COMPACT_ZOOM = 2.0; // below this threshold show only contractor name
-let _labelsCompact = null;       // tracks current label mode to detect threshold crossing
 
 // Returns canvas-space midpoint along the arc of a Fabric Polyline/Polygon.
 function _polylineMidpoint(obj) {
@@ -6478,12 +6457,14 @@ function deconflictLabels() {
 
 function createAnnotLabel(obj) {
   if (obj.annotType === 'levellink') return createLevelLinkLabel(obj);
-  const zoom    = fabricCanvas.getZoom();
-  const compact = zoom < LABEL_COMPACT_ZOOM;
-  const color   = getAnnotColor(obj);
+  const zoom  = fabricCanvas.getZoom();
+  const color = getAnnotColor(obj);
 
-  const FONT1 = 14, FONT2 = 13, FONT3 = 11;
-  const STRIPE = 5, PAD_L = 10, PAD_T = 8, GAP = 4, RX = 10;
+  // Štítek nese jen název dodavatele, a to při jakémkoli zoomu. Popis, termín
+  // a další detaily ukazuje bublina po najetí myší (viz mouse:over níž) –
+  // dřív se při přiblížení rozbalovaly do štítku a výkres se tím zahltil.
+  const FONT1 = 14;
+  const STRIPE = 5, PAD_L = 10, PAD_T = 8, RX = 10;
   const fontOpts = 'IBM Plex Mono, monospace';
 
   // Glow shadow color (hex → rgba)
@@ -6496,38 +6477,13 @@ function createAnnotLabel(obj) {
     left: 0, top: 0
   });
 
-  let items, W, H;
-
-  if (compact) {
-    // ── Compact: only contractor name ──
-    W = txtTop.width + PAD_L * 2 + STRIPE;
-    txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
-    H = PAD_T + txtTop.height + PAD_T;
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(250,250,252,0.94)', stroke: 'rgba(0,0,0,0.08)', strokeWidth: 1 });
-    const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
-    items = [bg, stripe, txtTop];
-  } else {
-    // ── Full: contractor + popis + dates ──
-    const txtBot = new fabric.Text(labelLineBot(obj), {
-      fontFamily: fontOpts, fontSize: FONT2, fill: '#444444', left: 0, top: 0
-    });
-    const line3 = labelLineDates(obj);
-    const txtDates = line3 ? new fabric.Text(line3, {
-      fontFamily: fontOpts, fontSize: FONT3, fill: '#777777', left: 0, top: 0
-    }) : null;
-
-    W = Math.max(txtTop.width, txtBot.width, txtDates ? txtDates.width : 0) + PAD_L * 2 + STRIPE;
-    let curY = PAD_T;
-    txtTop.set({ left: STRIPE + PAD_L, top: curY }); curY += txtTop.height + GAP;
-    txtBot.set({ left: STRIPE + PAD_L, top: curY }); curY += txtBot.height + GAP;
-    if (txtDates) { txtDates.set({ left: STRIPE + PAD_L, top: curY }); curY += txtDates.height + GAP; }
-    H = curY - GAP + PAD_T;
-
-    const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(250,250,252,0.94)', stroke: 'rgba(0,0,0,0.08)', strokeWidth: 1 });
-    const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
-    items = [bg, stripe, txtTop, txtBot];
-    if (txtDates) items.push(txtDates);
-  }
+  // ── Štítek: barevný proužek + název dodavatele ──
+  const W = txtTop.width + PAD_L * 2 + STRIPE;
+  txtTop.set({ left: STRIPE + PAD_L, top: PAD_T });
+  const H = PAD_T + txtTop.height + PAD_T;
+  const bg     = new fabric.Rect({ left: 0, top: 0, width: W, height: H, fill: 'rgba(250,250,252,0.94)', stroke: 'rgba(0,0,0,0.08)', strokeWidth: 1 });
+  const stripe = new fabric.Rect({ left: 0, top: 0, width: STRIPE, height: H, fill: color });
+  const items  = [bg, stripe, txtTop];
 
   const s = 1 / zoom;
   const group = new fabric.Group(items, {
@@ -6620,27 +6576,8 @@ function cancelPendingDeconflict() {
 
 function updateAllLabelScales(deconflict = true) {
   if (!fabricCanvas) return;
-  const zoom    = fabricCanvas.getZoom();
-  const compact = zoom < LABEL_COMPACT_ZOOM;
-
-  // Rebuild labels when crossing compact/full threshold.
-  // Během plynulého zoomu (deconflict=false) i tady jen naplánovat odložený průchod –
-  // zoom oscilující kolem prahu by jinak drahý O(n²) deconflict spouštěl při každém přechodu.
-  if (compact !== _labelsCompact) {
-    _labelsCompact = compact;
-    const existing = fabricCanvas.getObjects().filter(o => o.annotLabelFor);
-    existing.forEach(l => fabricCanvas.remove(l));
-    getAnnotObjects().forEach(obj => createAnnotLabel(obj));
-    if (deconflict) {
-      cancelPendingDeconflict();
-      deconflictLabels();
-    } else {
-      _scheduleDeconflictSettle();
-    }
-    fabricCanvas.renderAll();
-    return;
-  }
-
+  // Obsah štítku na zoomu nezávisí, takže se při zoomu nic nepřestavuje –
+  // jen se štítky přepočítají na novou pozici a měřítko.
   const _allObjs = fabricCanvas.getObjects();
   const _annotById = new Map(_allObjs.filter(o => o.annotId).map(o => [o.annotId, o]));
   _allObjs.forEach(o => {
