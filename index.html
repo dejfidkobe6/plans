@@ -7,7 +7,7 @@
 
 <!-- PWA manifest -->
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#4A5340">
+<meta name="theme-color" content="#000000">
 
 <!-- iOS / Safari -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3823,19 +3823,21 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 <div id="pwa-gate" style="display:none;position:fixed;inset:0;z-index:99999;
   background:#fff;flex-direction:column;align-items:center;justify-content:center;
   gap:20px;font-family:'Barlow Condensed',sans-serif;padding:36px;text-align:center;">
-  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;box-shadow:0 4px 20px rgba(0,0,0,.12)">
+  <!-- ikona má bílou horní část, proti bílému pozadí ji odděluje obrys -->
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;
+    border:1px solid #e3e3e3;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
   <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
     Aplikace je nainstalovaná na tvém telefonu.<br>Otevři ji z plochy pro nejlepší zážitek.
   </div>
   <!-- iOS install hint (hidden by default, shown on iOS) -->
-  <div id="pwa-ios-hint" style="display:none;font-size:14px;color:#4A5340;background:#f0f2ee;
+  <div id="pwa-ios-hint" style="display:none;font-size:14px;color:#111;background:#f2f2f2;
     border-radius:10px;padding:12px 16px;max-width:300px;line-height:1.6;text-align:left;">
     1. Klepni na <strong>Sdílet</strong> (☐↑) v Safari<br>
     2. Zvol <strong>Přidat na plochu</strong><br>
     3. Spusť aplikaci z plochy
   </div>
-  <button id="pwa-open-btn" style="background:#4A5340;color:#fff;border:none;
+  <button id="pwa-open-btn" style="background:#000;color:#fff;border:none;
     padding:15px 0;border-radius:12px;font-size:17px;font-weight:600;
     cursor:pointer;width:100%;max-width:300px;letter-spacing:.3px">
     Otevřít aplikaci
