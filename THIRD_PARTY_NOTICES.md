@@ -20,6 +20,14 @@ Symboly `platform` (Plošina), `silo` (Stavební silo), `tiles` (Obklady a dlaž
 `tree` (Sázení zeleně), `irrigation` (Závlaha), `concrete` (Autodomíchávač),
 `scaffolding` (Lešení) a `drywall` (Sádrokarton) jsou vlastní kresby projektu.
 
+## Písmo (`assets/fonts/`)
+
+### Montserrat Bold
+- Zdroj: https://github.com/JulietaUla/Montserrat, balíček `@fontsource/montserrat` 5.0.18
+- Licence: SIL Open Font License 1.1 — text v `assets/fonts/Montserrat-OFL.txt`
+- Použití: nápis v pásu ikon aplikace, viz `generate_icons.py`. Font se nenačítá
+  v prohlížeči, slouží jen k vygenerování PNG ikon.
+
 ## Knihovny načítané z CDN (`index.html`)
 
 | Knihovna | Verze | Licence |

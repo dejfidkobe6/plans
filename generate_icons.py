@@ -1,118 +1,144 @@
 #!/usr/bin/env python3
 """
-Icon generator for BeSix Plans app.
+Generátor ikon aplikace BeSix Plans.
 
-Usage:
-  python3 generate_icons.py
+Spuštění:
+  python3 generate_icons.py           # zapíše do icons/
+  python3 generate_icons.py BOARD     # jiný nápis v pásu
 
-Parameters to customize:
-  BG_COLOR    — background color (RGB hex)
-  FG_COLOR    — foreground color for logo + text (RGB hex)
-  PLANS_TEXT  — text to show below the logo (uppercase)
+Skládá ikonu z loga besix_logo_bila.png a fontu Montserrat Bold,
+takže ji lze kdykoli přegenerovat beze ztráty kvality – na rozdíl
+od dřívější verze, která jen přebarvovala hotové icon-512.png.
 
-Current icon parameters (measured from icon-512.png):
-  Canvas: 512x512 px (other sizes generated proportionally)
-  Background: #FFFFFF
-  Foreground (logo + text): #262422
-  Logo+BeSix block: x=96–418, y=88–347  (322x259 px in 512px canvas)
-  Gap logo→text: ~11 px
-  PLANS text: x=133–306, y=358–425  (173x67 px in 512px canvas)
-  PLANS text center-x: ~220 / 512 (left of center — aligns with logo group)
-  Padding: ~88 px top, ~87 px bottom
+Rozvržení (hodnoty platí pro 512 px, menší velikosti se odvozují poměrem):
+  spodní pás      26 % výšky           → od y = 378
+  logo            56 % šířky (287 px), horní okraj 12 % (y = 61)
+  text            52 pt, prostrkání 6 px, svislý střed pásu (y = 445)
+
+Barevnost je černobílá:
+  horní pozadí  bílá   #FFFFFF
+  logo          černá  #000000
+  spodní pás    černá  #000000
+  text          bílá   #FFFFFF
 """
 
-from PIL import Image, ImageDraw, ImageFont
 import os
+import sys
+from PIL import Image, ImageDraw, ImageFont
 
-# ── Customize here ─────────────────────────────────────────────
-BG_COLOR   = (74, 83, 64)    # #4A5340  dark green (manifest theme_color)
-FG_COLOR   = (255, 255, 255) # #FFFFFF  white
-PLANS_TEXT = "PLANS"         # text below the logo
+# ── Nastavení ──────────────────────────────────────────────────
+BAND_COLOR = (0, 0, 0)         # #000000  spodní pás
+LOGO_COLOR = (0, 0, 0)         # #000000  logo
+TOP_COLOR  = (255, 255, 255)   # #FFFFFF  horní pozadí
+TEXT_COLOR = (255, 255, 255)   # #FFFFFF  text v pásu
+PLANS_TEXT = "PLANS"           # nápis v pásu
 # ───────────────────────────────────────────────────────────────
 
-SOURCE_512 = "/home/user/plans/icons/icon-512.png"
-OUT_DIR    = "/home/user/plans/icons"
+BASE     = os.path.dirname(os.path.abspath(__file__))
+LOGO_SRC = os.path.join(BASE, "besix_logo_bila.png")
+FONT_TTF = os.path.join(BASE, "assets", "fonts", "Montserrat-Bold.ttf")
+OUT_DIR  = os.path.join(BASE, "icons")
 
+REF = 512          # referenční plátno, ke kterému se vztahují rozměry níže
+
+# běžná ikona
+BAND_TOP, LOGO_W, LOGO_TOP, FONT_PT, TEXT_Y = 378, 287, 61, 52, 445
+KERNING = 6
+
+# maskable: launcher ořízne ~13 %, viditelná zůstane oblast 33–479 px,
+# takže celá skladba je stažena dovnitř této zóny
+M_BAND_TOP, M_LOGO_W, M_LOGO_TOP, M_FONT_PT, M_TEXT_Y = 359, 232, 93, 50, 419
+
+# ikony, které se skládají celé; favicony viz FAVICONS
 SIZES = [48, 72, 96, 128, 192, 512]
 
+# na 16 a 32 px by byl pás i text jen šmouha, proto samotné logo na bílé
+FAVICONS = [(16, "favicon-16.png"), (32, "favicon-32.png")]
 
-def recolor_icon(src_path, bg_rgb, fg_rgb, size):
-    """
-    Load existing icon, threshold it (2-color), recolor with new bg/fg.
-    Returns PIL Image at the requested size.
-    """
-    src = Image.open(src_path).convert("RGBA")
-    src = src.resize((512, 512), Image.LANCZOS)
 
-    # Build new image
-    out = Image.new("RGBA", (512, 512), bg_rgb + (255,))
+def load_logo():
+    """Logo oříznuté o průhledný okraj a přebarvené na LOGO_COLOR."""
+    src = Image.open(LOGO_SRC).convert("RGBA")
+    src = src.crop(src.split()[3].getbbox())
+    logo = Image.new("RGBA", src.size, LOGO_COLOR + (0,))
+    logo.putalpha(src.split()[3])
+    return logo
 
-    src_pixels = src.load()
-    out_pixels = out.load()
 
-    for y in range(512):
-        for x in range(512):
-            r, g, b, a = src_pixels[x, y]
-            if a < 30:
-                continue  # transparent — keep background
-            # Threshold: dark pixel → foreground, light → background
-            brightness = (r + g + b) / 3
-            if brightness < 160:
-                out_pixels[x, y] = fg_rgb + (255,)
-            # else: already background color
+def draw_text(draw, text, font, center_x, center_y, tracking):
+    """Prostrkaný text vycentrovaný vodorovně i svisle podle skutečných glyfů."""
+    widths = [draw.textlength(ch, font=font) for ch in text]
+    total = sum(widths) + tracking * (len(text) - 1)
+    top, bottom = font.getbbox(text)[1], font.getbbox(text)[3]
+    x, y = center_x - total / 2, center_y - (top + bottom) / 2
+    for ch, w in zip(text, widths):
+        draw.text((x, y), ch, font=font, fill=TEXT_COLOR)
+        x += w + tracking
 
-    if size != 512:
-        out = out.resize((size, size), Image.LANCZOS)
-    return out
+
+def build(size, text, maskable=False):
+    k = size / REF
+    band_top = round((M_BAND_TOP if maskable else BAND_TOP) * k)
+    logo_w   = round((M_LOGO_W   if maskable else LOGO_W)   * k)
+    logo_top = round((M_LOGO_TOP if maskable else LOGO_TOP) * k)
+    font_pt  = max(1, round((M_FONT_PT if maskable else FONT_PT) * k))
+    text_y   = round((M_TEXT_Y   if maskable else TEXT_Y)   * k)
+
+    img = Image.new("RGB", (size, size), TOP_COLOR)
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, band_top, size, size], fill=BAND_COLOR)
+
+    logo = load_logo()
+    logo = logo.resize((logo_w, round(logo.height * logo_w / logo.width)), Image.LANCZOS)
+    img.paste(logo, ((size - logo_w) // 2, logo_top), logo)
+
+    draw_text(d, text, ImageFont.truetype(FONT_TTF, font_pt), size / 2, text_y, KERNING * k)
+    return img
+
+
+def build_logo_only(size):
+    """Favicon: logo na bílé, s okrajem 12 % jako u velké ikony."""
+    img = Image.new("RGB", (size, size), TOP_COLOR)
+    logo = load_logo()
+    w = round(size * 0.76)
+    logo = logo.resize((w, round(logo.height * w / logo.width)), Image.LANCZOS)
+    img.paste(logo, ((size - w) // 2, (size - logo.height) // 2), logo)
+    return img
 
 
 def main():
-    if not os.path.exists(SOURCE_512):
-        print(f"ERROR: Source icon not found: {SOURCE_512}")
-        return
+    text = sys.argv[1] if len(sys.argv) > 1 else PLANS_TEXT
+    for src in (LOGO_SRC, FONT_TTF):
+        if not os.path.exists(src):
+            print("CHYBA: chybí %s" % src)
+            return 1
+    os.makedirs(OUT_DIR, exist_ok=True)
+    print("Generuji ikony s nápisem %s" % text)
 
-    print(f"Generating icons:")
-    print(f"  Background: #{BG_COLOR[0]:02X}{BG_COLOR[1]:02X}{BG_COLOR[2]:02X}")
-    print(f"  Foreground: #{FG_COLOR[0]:02X}{FG_COLOR[1]:02X}{FG_COLOR[2]:02X}")
-    print(f"  Text: {PLANS_TEXT}")
-    print()
-
+    # 512 se vykreslí v plné velikosti, menší se z něj zmenšují, aby byly ostré
+    master = build(512, text)
     for size in SIZES:
-        img = recolor_icon(SOURCE_512, BG_COLOR, FG_COLOR, size)
+        img = master if size == 512 else master.resize((size, size), Image.LANCZOS)
+        path = os.path.join(OUT_DIR, "icon-%d.png" % size)
+        img.save(path, "PNG")
+        print("  %3dx%-3d → %s" % (size, size, path))
 
-        # Determine output filename
-        if size == 512:
-            fname = "icon-512.png"
-        elif size == 192:
-            fname = "icon-192.png"
-        elif size == 128:
-            fname = "icon-128.png"
-        elif size == 96:
-            fname = "icon-96.png"
-        elif size == 72:
-            fname = "icon-72.png"
-        elif size == 48:
-            fname = "icon-48.png"
+    for name, size, img in [
+        ("apple-touch-icon.png", 180, master.resize((180, 180), Image.LANCZOS)),
+        ("icon-512-maskable.png", 512, build(512, text, maskable=True)),
+    ]:
+        path = os.path.join(OUT_DIR, name)
+        img.save(path, "PNG")
+        print("  %3dx%-3d → %s" % (size, size, path))
 
-        out_path = os.path.join(OUT_DIR, fname)
-        img.save(out_path, "PNG")
-        print(f"  Saved {size}x{size} → {out_path}")
+    for size, name in FAVICONS:
+        path = os.path.join(OUT_DIR, name)
+        build_logo_only(size).save(path, "PNG")
+        print("  %3dx%-3d → %s" % (size, size, path))
 
-    # Also generate apple-touch-icon (180x180)
-    img_touch = recolor_icon(SOURCE_512, BG_COLOR, FG_COLOR, 180)
-    touch_path = os.path.join(OUT_DIR, "apple-touch-icon.png")
-    img_touch.save(touch_path, "PNG")
-    print(f"  Saved 180x180 → {touch_path}")
-
-    # Generate favicon sizes
-    for fav_size, fav_name in [(16, "favicon-16.png"), (32, "favicon-32.png")]:
-        img_fav = recolor_icon(SOURCE_512, BG_COLOR, FG_COLOR, fav_size)
-        fav_path = os.path.join(OUT_DIR, fav_name)
-        img_fav.save(fav_path, "PNG")
-        print(f"  Saved {fav_size}x{fav_size} → {fav_path}")
-
-    print("\nDone. Refresh the page (hard reload Ctrl+Shift+R) to see the new icons.")
+    print("\nHotovo. Pro zobrazení tvrdě obnov stránku (Ctrl+Shift+R).")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
