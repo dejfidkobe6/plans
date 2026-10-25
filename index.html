@@ -156,10 +156,11 @@ body {
   text-decoration: none;
 }
 #logo img {
-  height: 32px;
-  width: auto;
+  height: 36px;
+  width: 36px;
   flex-shrink: 0;
-  filter: brightness(0);
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 #logo .logo-plans {
   font-family: var(--font-mono);
@@ -2883,16 +2884,15 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   margin-bottom: 28px;
 }
 .auth-logo-img {
-  width: 100%; max-width: 200px;
+  width: 100%; max-width: 150px;
   display: flex; align-items: center; justify-content: center;
 }
+/* Oficiální logo aplikace = ikona. Má bílou horní část, proti bílému panelu
+   ji odděluje obrys. */
 .auth-logo-img img {
   width: 100%; height: auto;
-  filter: brightness(0);
-}
-.auth-logo-name {
-  font-family: var(--font-mono); font-size: 18px; font-weight: 600;
-  color: var(--text-bright); letter-spacing: 0.15em; text-transform: uppercase;
+  border-radius: 20px;
+  border: 1px solid var(--border);
 }
 .auth-tabs {
   display: flex; margin-bottom: 24px;
@@ -2956,10 +2956,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 }
 #project-screen-header .ps-logo { display: flex; align-items: center; gap: 12px; }
 #project-screen-header .ps-logo-icon {
-  height: 32px; width: auto; display: block;
-  filter: brightness(0);
+  height: 36px; width: 36px; display: block;
+  border-radius: 8px; border: 1px solid var(--border);
 }
-#project-screen-header .ps-logo-text { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--olive-light); letter-spacing: 0.03em; }
 #project-screen-header .ps-user-info {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
@@ -3916,9 +3915,8 @@ body.viewer-mode #kd-backup-next { display: none !important; }
   <div class="auth-box">
     <div class="auth-logo">
       <div class="auth-logo-img">
-        <img src="besix_logo_bila.png" alt="BeSix">
+        <img src="/icons/icon-192.png" alt="BeSix Plans">
       </div>
-      <div class="auth-logo-name">PLANS</div>
     </div>
     <div class="auth-tabs">
       <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Přihlásit se</div>
@@ -3972,8 +3970,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 <div id="project-screen" class="hidden">
   <div id="project-screen-header">
     <div class="ps-logo">
-      <img class="ps-logo-icon" src="besix_logo_bila.png" alt="BeSix">
-      <div class="ps-logo-text">BeSix Plans</div>
+      <img class="ps-logo-icon" src="/icons/icon-192.png" alt="BeSix Plans">
     </div>
     <div class="ps-user-info">
       <span id="ps-user-label"></span>
@@ -4006,7 +4003,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 <!-- TOP BAR -->
 <div id="top-bar">
   <a id="logo" href="https://besix.cz/" target="_blank" rel="noopener noreferrer">
-    <img src="besix_logo_bila.png" alt="BeSix">
+    <img src="/icons/icon-192.png" alt="BeSix Plans">
     <div class="logo-plans" id="logo-project-name">PLANS</div>
   </a>
   <div id="topbar-actions">
@@ -11639,7 +11636,7 @@ async function doExportPDF() {
     const PW = 297, PH = 210;
     let first = true;
 
-    // Pre-load BESIX logo (white-on-transparent PNG → dark-green for PDF)
+    // Pre-load BESIX logo (white-on-transparent PNG → black, jako na ikoně aplikace)
     const _pdfLogo = await new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
@@ -11647,7 +11644,7 @@ async function doExportPDF() {
           const canvas = document.createElement('canvas');
           canvas.width = img.width; canvas.height = img.height;
           const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#3d6b1a';
+          ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.globalCompositeOperation = 'destination-in';
           ctx.drawImage(img, 0, 0);
