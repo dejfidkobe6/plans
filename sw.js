@@ -11,6 +11,8 @@ const PRECACHE = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
+  './assets/fonts/montserrat-latin-700.woff2',
+  './assets/fonts/montserrat-latin-ext-700.woff2',
   // CDN knihovny – fabric, three.js, pdf.js, jspdf
   'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
