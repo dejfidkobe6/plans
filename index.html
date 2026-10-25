@@ -22,7 +22,6 @@
 <!-- Android / Chrome tile -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="application-name" content="Plans">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -34,8 +33,38 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
-/* Montserrat Bold – stejné písmo jako na ikoně aplikace. Dva řezy kvůli
-   české diakritice: ý je v latin, č/š/ž/ř/ě/ů až v latin-ext. */
+/* Montserrat – firemní písmo BeSix. Každý řez ve dvou sadách znaků:
+   ý je v latin, ale č/š/ž/ř/ě/ů až v latin-ext. */
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-ext-400.woff2') format('woff2');
+  unicode-range: U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-ext-500.woff2') format('woff2');
+  unicode-range: U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Montserrat'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/assets/fonts/montserrat-latin-ext-600.woff2') format('woff2');
+  unicode-range: U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
 @font-face {
   font-family: 'Montserrat'; font-style: normal; font-weight: 700; font-display: swap;
   src: url('/assets/fonts/montserrat-latin-700.woff2') format('woff2');
@@ -67,8 +96,12 @@
   --interier: #8B5CF6;
   --koordinace: #10B981;
   --vlastni: #6B7280;
-  --font-mono: 'IBM Plex Mono', monospace;
-  --font-main: 'Barlow Condensed', sans-serif;
+  /* Firemní písmo BeSix je Montserrat, fallback Arial/Calibri.
+     Obě proměnné si nechávají jména, aby se nemuselo přepisovat 150 míst.
+     --font-mono zůstává pro údaje, které se mají zarovnávat pod sebe;
+     číslice drží v zákrytu přes font-variant-numeric níže. */
+  --font-mono: 'Montserrat', Arial, Calibri, sans-serif;
+  --font-main: 'Montserrat', Arial, Calibri, sans-serif;
   /* KD board: fixed chrome above cards (topbar 48 + bottom-pad 26 + meta-bar ~40 + filter-bar ~42 + inner-pad 28 + buffer 11) */
   --kd-cards-chrome: 195px;
 }
@@ -85,7 +118,7 @@
   max-width: 320px;
   pointer-events: none;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: var(--font-main);
 }
 #annot-tooltip .tt-prof {
   font-size: 12px;
@@ -141,6 +174,9 @@
 html, body { height: 100%; overflow: hidden; }
 body {
   font-family: var(--font-main);
+  /* Montserrat není neproporcionální, tabulkové číslice drží sloupce
+     s čísly v zákrytu tam, kde dřív pomáhalo mono písmo. */
+  font-variant-numeric: tabular-nums;
   background: var(--bg);
   color: var(--text);
   display: flex;
@@ -173,7 +209,6 @@ body {
   height: 36px;
   width: 36px;
   flex-shrink: 0;
-  border-radius: 8px;
   border: 1px solid var(--border);
 }
 /* Název projektu ve stejném štítku jako nápis na ikoně aplikace */
@@ -2912,7 +2947,6 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
    ji odděluje obrys. */
 .auth-logo-img img {
   width: 100%; height: auto;
-  border-radius: 20px;
   border: 1px solid var(--border);
 }
 .auth-tabs {
@@ -2978,7 +3012,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 #project-screen-header .ps-logo { display: flex; align-items: center; gap: 12px; }
 #project-screen-header .ps-logo-icon {
   height: 36px; width: 36px; display: block;
-  border-radius: 8px; border: 1px solid var(--border);
+  border: 1px solid var(--border);
 }
 #project-screen-header .ps-user-info {
   display: flex; align-items: center; gap: 10px;
@@ -3842,9 +3876,9 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 <!-- PWA redirect overlay – shown when opening in a mobile browser instead of the installed app -->
 <div id="pwa-gate" style="display:none;position:fixed;inset:0;z-index:99999;
   background:#fff;flex-direction:column;align-items:center;justify-content:center;
-  gap:20px;font-family:'Barlow Condensed',sans-serif;padding:36px;text-align:center;">
+  gap:20px;font-family:var(--font-main);padding:36px;text-align:center;">
   <!-- ikona má bílou horní část, proti bílému pozadí ji odděluje obrys -->
-  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;
     border:1px solid #e3e3e3;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
   <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
@@ -6485,7 +6519,7 @@ function createAnnotLabel(obj) {
   // dřív se při přiblížení rozbalovaly do štítku a výkres se tím zahltil.
   const FONT1 = 14;
   const STRIPE = 5, PAD_L = 10, PAD_T = 8, RX = 10;
-  const fontOpts = 'IBM Plex Mono, monospace';
+  const fontOpts = 'Montserrat, Arial, sans-serif';
 
   // Glow shadow color (hex → rgba)
   const hr = parseInt(color.slice(1,3),16), hg = parseInt(color.slice(3,5),16), hb = parseInt(color.slice(5,7),16);
@@ -6535,7 +6569,7 @@ function createLevelLinkLabel(obj) {
   const targetLvl = appState.levels.find(l => l.id === obj.linkToLevel);
   const targetName = targetLvl ? targetLvl.name : (obj.linkToLevel ? '?' : '— nevybráno —');
   const txt = new fabric.Text('⤵ ' + targetName, {
-    fontFamily: 'IBM Plex Mono, monospace', fontSize: FONT, fill: LINK_COLOR,
+    fontFamily: 'Montserrat, Arial, sans-serif', fontSize: FONT, fill: LINK_COLOR,
     left: 0, top: 0
   });
   const W = txt.width + PAD_L * 2, H = txt.height + PAD_T * 2;
@@ -7787,7 +7821,7 @@ function placeTextAt(x, y) {
   const color = getActiveProfeseColor();
   const txt = new fabric.IText('Popis', {
     left: x, top: y,
-    fontFamily: 'IBM Plex Mono',
+    fontFamily: 'Montserrat, Arial, sans-serif',
     fontSize: 14,
     fill: color,
     stroke: '#111',
@@ -8512,7 +8546,7 @@ function showToast(message, type = 'info') {
   }
   const colors = { info: '#3B82F6', success: '#10B981', warn: '#F59E0B', error: '#EF4444' };
   const toast = document.createElement('div');
-  toast.style.cssText = `background:#ffffff;border:1px solid ${colors[type] || colors.info};border-left:3px solid ${colors[type] || colors.info};color:#222222;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transition:opacity 0.2s;max-width:280px;`;
+  toast.style.cssText = `background:#ffffff;border:1px solid ${colors[type] || colors.info};border-left:3px solid ${colors[type] || colors.info};color:#222222;padding:8px 14px;border-radius:4px;font-family:var(--font-main);font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transition:opacity 0.2s;max-width:280px;`;
   toast.textContent = message;
   toastContainer.appendChild(toast);
   requestAnimationFrame(() => { toast.style.opacity = '1'; });
@@ -10285,13 +10319,13 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
 
         // Measure and clamp text to max 38mm label width
         const MAX_TW = 38;
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
+        pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(LBL_FS1);
         const firmaText = fitPDF(firmaRaw, LBL_FS1, MAX_TW);
         const wFirma = pdf.getStringUnitWidth(firmaText) * LBL_FS1 / PT_MM;
 
         let popText = '', wPop = 0;
         if (popRaw) {
-          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(LBL_FS2);
           popText = fitPDF(popRaw, LBL_FS2, MAX_TW);
           wPop = pdf.getStringUnitWidth(popText) * LBL_FS2 / PT_MM;
         }
@@ -10332,13 +10366,13 @@ async function drawLevelToPDF(pdf, levelIdx, availX, availY, availW, availH, inc
         const tx = px + LBL_STR + PAD_H;
         // Line 1: firma — bold, profese color
         const ty1 = py + PAD_V + LINE_H1 * 0.82;
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(LBL_FS1);
+        pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(LBL_FS1);
         pdf.setTextColor(r, g, b);
         pdf.text(firmaText, tx, ty1);
         // Line 2: annotation ID — normal, dark grey
         if (popText) {
           const ty2 = ty1 + GAP_LN + LINE_H2;
-          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(LBL_FS2);
+          pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(LBL_FS2);
           pdf.setTextColor(85, 90, 80);
           pdf.text(popText, tx, ty2);
         }
@@ -10470,7 +10504,7 @@ function drawAnnotGlyphToPDF(pdf, o, cx, cy, box, rgb) {
 
   // Text – písmeno T
   if (type === 'i-text' || type === 'text' || at === 'text') {
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont(PDF_FONT, 'bold');
     pdf.setFontSize(box * 2.6);
     pdf.setTextColor(r, g, b);
     pdf.text('T', cx - box * 0.22, cy + box * 0.33);
@@ -10590,7 +10624,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
   // ── Title bar ──
   pdf.setFillColor(242, 244, 240);
   pdf.rect(lx, ly, lw, TITLE_H, 'F');
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont(PDF_FONT, 'bold');
   pdf.setFontSize(7);
   pdf.setTextColor(55, 80, 30);
   pdf.text('ANOTACE', lx + lw * 0.02, ly + TITLE_H * 0.70);
@@ -10600,7 +10634,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
   anns.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
   let bx = lx + lw * 0.22;
   const BPAD = 1, BH = 4.5, bby = ly + (TITLE_H - BH) / 2;
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont(PDF_FONT, 'bold');
   pdf.setFontSize(BADGE_FS);
   for (const [st, rgb] of Object.entries(STATUS_RGB)) {
     if (!counts[st]) continue;
@@ -10617,7 +10651,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
 
   // ── Column headers ──
   const colBaseY = ly + TITLE_H + COLH_H - 0.8;
-  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(4); pdf.setTextColor(100, 115, 80);
+  pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(4); pdf.setTextColor(100, 115, 80);
   pdf.text('ID',           C_ID,    colBaseY);
   pdf.text('Subdodavatel', C_PROF,  colBaseY);
   pdf.text('Popis',        C_POPIS, colBaseY);
@@ -10632,7 +10666,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
   const popisMaxW  = C_TERM - C_POPIS - 1;
   const refCount   = Math.max(targetCount || 0, anns.length);
 
-  pdf.setFont('helvetica', 'normal');  // ensure consistent metrics for layout
+  pdf.setFont(PDF_FONT, 'normal');  // ensure consistent metrics for layout
 
   // Split popisek into display lines: respect \n, then word-wrap each segment
   const getPopisLines = (popisek, fspt) => {
@@ -10713,7 +10747,7 @@ function drawAnnotListToPDF(pdf, anns, lx, ly, lw, lh, targetCount, shapeById) {
 
     // All rows: normal weight — bold was causing different text metrics
     // and wrong word-wrap vs layout pass
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFont(PDF_FONT, 'normal');
     pdf.setFontSize(rowFS);
 
     // ID
@@ -10848,22 +10882,22 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.2); pdf.line(0, 11, PW, 11);
     const _lH = 7.5, _lW = _lH * (943 / 840), _lX = 1.5, _lY = (11 - _lH) / 2;
     if (pdfLogo) pdf.addImage(pdfLogo, 'PNG', _lX, _lY, _lW, _lH);
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
     pdf.text('BeSix Plans', _lX + _lW + 1.5, 7.5);
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 45);
+    pdf.setFont(PDF_FONT, 'normal'); pdf.setTextColor(50, 55, 45);
     pdf.text(cs(currentProject?.name || ''), 38, 7.5);
 
     pdf.setFillColor(255, 255, 255); pdf.rect(lx, ly, lw, lh, 'F');
     pdf.setDrawColor(210, 212, 208); pdf.setLineWidth(0.15); pdf.rect(lx, ly, lw, lh, 'S');
 
     pdf.setFillColor(242, 244, 240); pdf.rect(lx, ly, lw, TITLE_H, 'F');
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(8); pdf.setTextColor(55, 80, 30);
     pdf.text(cs('DOCHÁZKOVÝ LIST'), lx + 3, ly + TITLE_H * 0.65);
 
     if (isFirstPage) {
       // "Datum konání KD:" label + editable text field
       const dateLabel = 'Datum konani KD:';
-      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 85, 75);
+      pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 85, 75);
       const dateLabelW = pdf.getStringUnitWidth(dateLabel) * 7 / PT_MM;
       const dateLabelX = lx + lw * 0.42;
       const dateFieldX = dateLabelX + dateLabelW + 2;
@@ -10893,12 +10927,12 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
         const btnW = pdf.getStringUnitWidth(btnLabel) * 6 / PT_MM + 6;
         const btnX = lx + lw - btnW - 2, btnY = ly + (TITLE_H - 5.5) / 2;
         pdf.setFillColor(60, 90, 25); pdf.roundedRect(btnX, btnY, btnW, 5.5, 0.8, 0.8, 'F');
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(255, 255, 255);
+        pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(255, 255, 255);
         pdf.text(btnLabel, btnX + 3, btnY + 5.5 * 0.72);
         pdf.link(btnX, btnY, btnW, 5.5, { url: 'mailto:' + allEmails.join(';') });
       }
     } else {
-      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6); pdf.setTextColor(120, 125, 115);
+      pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(6); pdf.setTextColor(120, 125, 115);
       const _contLabel = totalPages > 1 ? 'pokracovani - strana ' + pageIndex + '/' + totalPages : 'pokracovani...';
       pdf.text(cs(_contLabel), lx + lw * 0.42, ly + TITLE_H * 0.65);
     }
@@ -10906,7 +10940,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     // Column header row
     const COLH_Y = ly + TITLE_H;
     pdf.setFillColor(228, 232, 220); pdf.rect(lx, COLH_Y, lw, COLH_H, 'F');
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55, 70, 30);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55, 70, 30);
     const colHdrY = COLH_Y + COLH_H * 0.68;
     pdf.text('#',                   COL_NR.x,    colHdrY);
     pdf.text('Firma / Dodavatel',   COL_FIRMA.x, colHdrY);
@@ -10923,7 +10957,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     });
 
     // Footer note
-    pdf.setFont('helvetica', 'italic'); pdf.setFontSize(4.5); pdf.setTextColor(150, 155, 140);
+    pdf.setFont(PDF_FONT, 'italic'); pdf.setFontSize(4.5); pdf.setTextColor(150, 155, 140);
     pdf.text('* Datum konani KD a pritomnost ucastniku lze upravit primo v PDF readeru.', lx + 2, ly + lh - 1.5);
 
     return COLH_Y + COLH_H;
@@ -10955,13 +10989,13 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     pdf.setFillColor(r, g, b);
     pdf.rect(lx, rowY, COL_FIRMA.x - lx, ROW_H, 'F');
 
-    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40, 45, 35);
+    pdf.setFont(PDF_FONT, 'normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40, 45, 35);
     const midY = rowY + ROW_H * 0.62;
 
     // Nr – white text on colored cell
-    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setTextColor(255, 255, 255);
     pdf.text(String(i + 1), COL_NR.x, midY);
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(40, 45, 35);
+    pdf.setFont(PDF_FONT, 'normal'); pdf.setTextColor(40, 45, 35);
 
     // Firma (no dot)
     pdf.text(fitT(p.firma || p.name, ROW_FS, COL_FIRMA.w - 2), COL_FIRMA.x + 1, midY);
@@ -11005,7 +11039,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const _vBtnY = rowY + (ROW_H - _vBtnH) / 2;
     pdf.setFillColor(Math.round(r * 0.65 + 255 * 0.35), Math.round(g * 0.65 + 255 * 0.35), Math.round(b * 0.65 + 255 * 0.35));
     pdf.roundedRect(_vBtnX, _vBtnY, _vBtnW, _vBtnH, 0.6, 0.6, 'F');
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(Math.max(3.5, ROW_FS * 0.82)); pdf.setTextColor(255, 255, 255);
     pdf.text('Vizitka', _vBtnX + _vBtnW / 2, _vBtnY + _vBtnH * 0.72, { align: 'center' });
     if (_profeseVcfToken && currentProject) {
       // Encode all params as single URL-encoded JSON — no & in URL, works with Unicode names
@@ -11043,7 +11077,7 @@ function drawDochazkaPDF(pdf, rec, pdfLogo, PW, PH) {
     const rowY = curY;
     if (i % 2 === 0) { pdf.setFillColor(249, 251, 246); pdf.rect(lx, rowY, lw, BASE_ROW_H, 'F'); }
     const tY = rowY + BASE_ROW_H * 0.62;
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160, 165, 150);
+    pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160, 165, 150);
     pdf.text(String(i + 1), COL_NR.x, tY);
 
     const cbSize = Math.min(5, BASE_ROW_H * 0.65);
@@ -11112,9 +11146,9 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
     const _logoH=7.5,_logoW=_logoH*(943/840),_logoX=1.5,_logoY=(11-_logoH)/2;
     if (pdfLogo) pdf.addImage(pdfLogo,'PNG',_logoX,_logoY,_logoW,_logoH);
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
     pdf.text('BeSix Plans',_logoX+_logoW+1.5,7.5);
-    pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setTextColor(50,55,45);
     pdf.text(csText(currentProject?.name||''),38,7.5);
     const recDateFmt=rec.date?rec.date.split('-').reverse().join('.'):'–';
     pdf.setTextColor(120,125,115);
@@ -11127,12 +11161,12 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.15); pdf.rect(lx,ly,lw,lh,'S');
     // Title bar
     pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TITLE_H,'F');
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(7); pdf.setTextColor(55,80,30);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(7); pdf.setTextColor(55,80,30);
     pdf.text('KONTROLNI DEN',lx+lw*0.015,ly+TITLE_H*0.70);
     if (isFirst) {
       // Badges
       const BPAD=1,BH=4.5; let bx=lx+lw*0.22; const bby=ly+(TITLE_H-BH)/2;
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(5);
+      pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(5);
       const drawBadge=(label,fillRgb,strokeRgb)=>{
         const lb=csText(label),bw=textW(lb,5)+BPAD*2;
         pdf.setFillColor(...fillRgb); pdf.roundedRect(bx,bby,bw,BH,0.8,0.8,'F');
@@ -11147,16 +11181,16 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
         drawBadge(filterLabel,[230,240,255],[60,100,200]);
       }
       if (rec.note&&rec.note.trim()) {
-        pdf.setFont('helvetica','normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
+        pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
         const nw=lw*0.3; pdf.text(fitT(rec.note,5,nw),lx+lw-nw-1,ly+TITLE_H*0.70);
       }
     } else {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
+      pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(5); pdf.setTextColor(120,125,115);
       pdf.text(csText('pokracovani...'),lx+lw*0.22,ly+TITLE_H*0.70);
     }
     // Column headers
     const colBaseY=ly+TITLE_H+COLH_H-0.8;
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
     pdf.text('Sekce',C_SEC,colBaseY); pdf.text('Dodavatel',C_SUB,colBaseY);
     pdf.text(csText('Úkol'),C_TASK,colBaseY); pdf.text(csText('Termín'),C_DATE,colBaseY); pdf.text('Lokace',C_LOC,colBaseY);
     pdf.setDrawColor(195,200,188); pdf.setLineWidth(0.2); pdf.line(lx,ly+TITLE_H+COLH_H,lx+lw,ly+TITLE_H+COLH_H);
@@ -11224,7 +11258,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     if (item.type==='chapter-header') {
       pdf.setFillColor(220,228,208); pdf.rect(lx,curY,lw,rowH,'F');
       pdf.setFillColor(74,83,64); pdf.rect(lx,curY,3,rowH,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(6.5); pdf.setTextColor(25,45,10);
+      pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(6.5); pdf.setTextColor(25,45,10);
       pdf.text(fitT(csText(item.title||'–'),6.5,lw*0.75),lx+5,curY+rowH*0.68);
       pdf.setDrawColor(130,150,100); pdf.setLineWidth(0.25); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
       curY+=rowH; continue;
@@ -11232,7 +11266,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     if (item.type==='urgent-header') {
       pdf.setFillColor(255,232,232); pdf.rect(lx,curY,lw,rowH,'F');
       pdf.setFillColor(239,68,68); pdf.rect(lx,curY,1.5,rowH,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(4.5); pdf.setTextColor(180,40,40);
+      pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(4.5); pdf.setTextColor(180,40,40);
       pdf.text(csText('URGENTNÍ'),C_SEC,curY+rowH*0.72);
       pdf.setDrawColor(239,120,120); pdf.setLineWidth(0.15); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
       curY+=rowH; continue;
@@ -11240,7 +11274,7 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     if (item.type==='section-header') {
       pdf.setFillColor(240,243,235); pdf.rect(lx,curY,lw,rowH,'F');
       pdf.setFillColor(107,124,58); pdf.rect(lx,curY,1.5,rowH,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(4.5); pdf.setTextColor(55,80,30);
+      pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(4.5); pdf.setTextColor(55,80,30);
       pdf.text(fitT(csText(item.title||'–'),4.5,lw*0.5),C_SEC,curY+rowH*0.72);
       pdf.setDrawColor(185,195,160); pdf.setLineWidth(0.15); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
       curY+=rowH; continue;
@@ -11256,11 +11290,11 @@ function drawKDRecordToPDF(pdf, rec, pdfLogo, PW, PH, inclDone, kdSubFilter = []
     pdf.setFillColor(...pRgb); pdf.circle(DOT_X+DOT_R,tY1-LH*0.28,DOT_R,'F');
 
     if (isUrgent) {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(Math.max(3,ROW_FS-1)); pdf.setTextColor(160,60,60);
+      pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(Math.max(3,ROW_FS-1)); pdf.setTextColor(160,60,60);
       pdf.text(fitT(csText(task.sectionTitle||''),Math.max(3,ROW_FS-1),C_SUB-C_SEC-0.5),C_SEC,tY1);
     }
 
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(...pRgb);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(ROW_FS); pdf.setTextColor(...pRgb);
     pdf.text(fitT(csText(profObj?.firma||profObj?.name||task.sub||'–'),ROW_FS,C_TASK-C_SUB-0.5),C_SUB,tY1);
 
     const taskFg=[isUrgent?160:50,isUrgent?40:55,isUrgent?40:45];
@@ -11294,9 +11328,9 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
   pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
   const lH=7.5,lW=lH*(943/840),lX=1.5,lY=(11-lH)/2;
   if (pdfLogo) pdf.addImage(pdfLogo,'PNG',lX,lY,lW,lH);
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+  pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
   pdf.text('BeSix Plans',lX+lW+1.5,7.5);
-  pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+  pdf.setFont(PDF_FONT,'normal'); pdf.setTextColor(50,55,45);
   pdf.text(cs(currentProject?.name||''),38,7.5);
   pdf.setTextColor(120,125,115);
   pdf.text(cs('Subdodavatele a kontakty'),PW-72,7.5);
@@ -11307,7 +11341,7 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
 
   const TITLE_H=10, COLH_H=6;
   pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TITLE_H,'F');
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(55,80,30);
+  pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(8); pdf.setTextColor(55,80,30);
   pdf.text(cs('SUBDODAVATELE A KONTAKTY'),lx+3,ly+TITLE_H*0.65);
 
   const COL_NR   = { x: lx+1,   w: 7  };
@@ -11319,7 +11353,7 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
 
   const COLH_Y = ly+TITLE_H;
   pdf.setFillColor(228,232,220); pdf.rect(lx,COLH_Y,lw,COLH_H,'F');
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(5.5); pdf.setTextColor(55,70,30);
+  pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(5.5); pdf.setTextColor(55,70,30);
   const chy = COLH_Y+COLH_H*0.68;
   pdf.text('#',COL_NR.x,chy); pdf.text('Firma / Dodavatel',COL_FIRM.x,chy);
   pdf.text(cs('Profese / Role'),COL_PROF.x,chy); pdf.text(cs('Kontaktní osoba'),COL_KONT.x,chy);
@@ -11341,12 +11375,12 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
     pdf.rect(lx,curY,lw,ROW_H,'F');
     pdf.setFillColor(r,g,b); pdf.rect(lx,curY,1.8,ROW_H,'F');
     const tY=curY+ROW_H*.62;
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40,45,35);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(40,45,35);
     pdf.text(String(i+1),COL_NR.x,tY);
     pdf.setFillColor(r,g,b);
     const dotR=Math.min(1.3,ROW_H*.16);
     pdf.circle(COL_FIRM.x+dotR+0.5,curY+ROW_H/2,dotR,'F');
-    pdf.setFont('helvetica','normal'); pdf.setTextColor(40,45,35);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setTextColor(40,45,35);
     pdf.text(fitT(p.firma||p.name,ROW_FS,COL_FIRM.w-6),COL_FIRM.x+4,tY);
     pdf.setTextColor(100,105,90);
     pdf.text(fitT(p.name,ROW_FS,COL_PROF.w-2),COL_PROF.x,tY);
@@ -11368,7 +11402,7 @@ function drawSupplierContactsToPDF(pdf, pdfLogo, PW, PH) {
   for(let i=suppliers.length;i<minRows&&curY+ROW_H<=ly+lh;i++){
     if(i%2===0){pdf.setFillColor(249,251,246);pdf.rect(lx,curY,lw,ROW_H,'F');}
     const tY=curY+ROW_H*.62;
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160,165,150);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(ROW_FS); pdf.setTextColor(160,165,150);
     pdf.text(String(i+1),COL_NR.x,tY);
     pdf.setDrawColor(218,222,212); pdf.setLineWidth(0.1);
     pdf.line(lx,curY+ROW_H,lx+lw,curY+ROW_H);
@@ -11387,9 +11421,9 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
   pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
   const lH=7.5,lW=lH*(943/840),lX=1.5,lY=(11-lH)/2;
   if (pdfLogo) pdf.addImage(pdfLogo,'PNG',lX,lY,lW,lH);
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+  pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
   pdf.text('BeSix Plans',lX+lW+1.5,7.5);
-  pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+  pdf.setFont(PDF_FONT,'normal'); pdf.setTextColor(50,55,45);
   pdf.text(csT(currentProject?.name||''),38,7.5);
   pdf.setTextColor(120,125,115);
   pdf.text(csT('KD – Filtr subdodavatelu'),PW-68,7.5);
@@ -11402,9 +11436,9 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
   const TH=10;
   pdf.setFillColor(242,244,240); pdf.rect(lx,ly,lw,TH,'F');
   pdf.setFillColor(107,124,58); pdf.rect(lx,ly,4,TH,'F');
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(45,70,20);
+  pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(8); pdf.setTextColor(45,70,20);
   pdf.text(csT('KONTROLNÍ DNY — VÝBĚR SUBDODAVATELE'),lx+7,ly+TH*0.68);
-  pdf.setFont('helvetica','italic'); pdf.setFontSize(5.5); pdf.setTextColor(120,130,100);
+  pdf.setFont(PDF_FONT,'italic'); pdf.setFontSize(5.5); pdf.setTextColor(120,130,100);
   pdf.text(csT('Klikněte na řádek pro přechod na stranu daného subdodavatele'),lx+lw*0.52,ly+TH*0.68);
 
   let curY = ly + TH + 5;
@@ -11429,12 +11463,12 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
     pdf.setFillColor(238,243,228); pdf.roundedRect(rowX,curY,rowW,OVW_H,1.2,1.2,'F');
     pdf.setDrawColor(107,124,58); pdf.setLineWidth(0.35); pdf.roundedRect(rowX,curY,rowW,OVW_H,1.2,1.2,'S');
     pdf.setFillColor(107,124,58); pdf.rect(rowX,curY,4,OVW_H,'F');
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(FS); pdf.setTextColor(40,65,20);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(FS); pdf.setTextColor(40,65,20);
     pdf.text(csT('Celkový přehled — všichni subdodavatelé'),rowX+7,curY+OVW_H*0.42);
-    pdf.setFont('helvetica','italic'); pdf.setFontSize(4.5); pdf.setTextColor(90,110,60);
+    pdf.setFont(PDF_FONT,'italic'); pdf.setFontSize(4.5); pdf.setTextColor(90,110,60);
     pdf.text(csT('Pro filtrování úkolů klikni na okno subdodavatele níže'),rowX+7,curY+OVW_H*0.72);
     const cntStr=csT(cnt+' úkolů');
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(80,100,55);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(80,100,55);
     pdf.text(cntStr,rowX+rowW-tw(cntStr,FS_SM)-8,curY+OVW_H*0.42);
     pdf.setTextColor(107,124,58);
     pdf.text('›',rowX+rowW-4,curY+OVW_H*0.46);
@@ -11463,20 +11497,20 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
 
     // Firm name bold
     const firma=csT(prof.firma||prof.name);
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(FS); pdf.setTextColor(Math.round(r*.5),Math.round(g*.5),Math.round(b*.5));
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(FS); pdf.setTextColor(Math.round(r*.5),Math.round(g*.5),Math.round(b*.5));
     const fW=tw(firma,FS);
     pdf.text(firma,rx+7,curY+ROW_H*0.64);
     // Profese name if different (only when firm label differs)
     if (prof.firma&&prof.firma!==prof.name) {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM-0.5); pdf.setTextColor(130,135,120);
+      pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(FS_SM-0.5); pdf.setTextColor(130,135,120);
       const availW=rw-7-fW-tw(csT(cnt+' úkolů'),FS_SM)-10;
       if(availW>4) pdf.text(csT(' '+prof.name),rx+7+fW,curY+ROW_H*0.64);
     }
     // Count
     const cntStr=csT(cnt+' úkolů');
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(r,g,b);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(FS_SM); pdf.setTextColor(r,g,b);
     pdf.text(cntStr,rx+rw-tw(cntStr,FS_SM)-6,curY+ROW_H*0.64);
-    pdf.setFont('helvetica','bold'); pdf.text('›',rx+rw-3,curY+ROW_H*0.68);
+    pdf.setFont(PDF_FONT,'bold'); pdf.text('›',rx+rw-3,curY+ROW_H*0.68);
     pdf.link(rx,curY,rw,ROW_H,{pageNumber:subPageNums[prof.name]});
 
     col=(col+1)%NCOLS;
@@ -11485,7 +11519,7 @@ function drawKDNavPage(pdf, profList, kdRecords, allAnnots, pdfLogo, PW, PH, ove
   if (col!==0) curY+=ROW_H+2;
 
   // Footer
-  pdf.setFont('helvetica','italic'); pdf.setFontSize(4.5); pdf.setTextColor(160,165,150);
+  pdf.setFont(PDF_FONT,'italic'); pdf.setFontSize(4.5); pdf.setTextColor(160,165,150);
   pdf.text(csT('* Navigace kliknutím funguje v Adobe Acrobat/Reader, prohlížeči Chrome, Firefox a kompatibilních PDF čtečkách.'),lx+3,ly+lh-1.5);
 }
 
@@ -11542,9 +11576,9 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
     pdf.setDrawColor(210,212,208); pdf.setLineWidth(0.2); pdf.line(0,11,PW,11);
     const _lH=7.5,_lW=_lH*(943/840),_lX=1.5,_lY=(11-_lH)/2;
     if (pdfLogo) pdf.addImage(pdfLogo,'PNG',_lX,_lY,_lW,_lH);
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(9); pdf.setTextColor(60,90,25);
     pdf.text('BeSix Plans',_lX+_lW+1.5,7.5);
-    pdf.setFont('helvetica','normal'); pdf.setTextColor(50,55,45);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setTextColor(50,55,45);
     pdf.text(csT(currentProject?.name||''),38,7.5);
     pdf.setTextColor(120,125,115);
   };
@@ -11562,7 +11596,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
     pdf.setFillColor(Math.round(r*.10+255*.90),Math.round(g*.10+255*.90),Math.round(b*.10+255*.90));
     pdf.rect(lx,ly,lw,TITLE_H,'F');
     pdf.setFillColor(r,g,b); pdf.rect(lx,ly,5,TITLE_H,'F');
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.setTextColor(Math.round(r*.55),Math.round(g*.55),Math.round(b*.55));
+    pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(7.5); pdf.setTextColor(Math.round(r*.55),Math.round(g*.55),Math.round(b*.55));
     const subTitle = csT((prof.firma||prof.name)+(prof.firma&&prof.firma!==prof.name?' ('+prof.name+')':''));
     pdf.text(subTitle,lx+8,ly+TITLE_H*0.65);
     if (isFirst) {
@@ -11571,7 +11605,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
       const bw=tw(badge,5)+2.5;
       const bx=lx+lw*0.38,by=ly+(TITLE_H-5)/2;
       pdf.setFillColor(r,g,b); pdf.roundedRect(bx,by,bw,5,0.8,0.8,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(5); pdf.setTextColor(255,255,255);
+      pdf.setFont(PDF_FONT,'bold'); pdf.setFontSize(5); pdf.setTextColor(255,255,255);
       pdf.text(badge,bx+1.2,by+5*0.72);
       // Back link
       const back=csT('← Návrat k filtru');
@@ -11580,16 +11614,16 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
       const backX=lx+lw-backW-2.5,backY=ly+(TITLE_H-backBH)/2;
       pdf.setFillColor(245,247,240); pdf.roundedRect(backX,backY,backW,backBH,1.2,1.2,'F');
       pdf.setDrawColor(160,175,130); pdf.setLineWidth(0.25); pdf.roundedRect(backX,backY,backW,backBH,1.2,1.2,'S');
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(backBFS); pdf.setTextColor(60,80,40);
+      pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(backBFS); pdf.setTextColor(60,80,40);
       pdf.text(back,backX+2.5,backY+backBH*0.67);
       pdf.link(backX,backY,backW,backBH,{pageNumber:navPageNum});
     } else {
-      pdf.setFont('helvetica','italic'); pdf.setFontSize(5); pdf.setTextColor(130,135,120);
+      pdf.setFont(PDF_FONT,'italic'); pdf.setFontSize(5); pdf.setTextColor(130,135,120);
       pdf.text(csT('pokračování...'),lx+8,ly+TITLE_H*0.65);
     }
     // Column headers
     const chy=ly+TITLE_H+COLH_H-0.8;
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(4); pdf.setTextColor(100,115,80);
     pdf.text(csT('Zapsáno/změněno'),C_KD,chy); pdf.text(csT('Kapitola'),C_CHAP,chy); pdf.text('Sekce',C_SEC,chy);
     pdf.text(csT('Úkol'),C_TASK,chy); pdf.text(csT('Termín'),C_TERM,chy); pdf.text('Lokace',C_LOC,chy);
     pdf.setDrawColor(195,200,188); pdf.setLineWidth(0.2); pdf.line(lx,ly+TITLE_H+COLH_H,lx+lw,ly+TITLE_H+COLH_H);
@@ -11610,7 +11644,7 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
     } else if (task.urgent) {
       pdf.setFillColor(255,246,246); pdf.rect(lx,curY,lw,rowH,'F');
     }
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(ROW_FS);
+    pdf.setFont(PDF_FONT,'normal'); pdf.setFontSize(ROW_FS);
     pdf.setTextColor(80,90,70); pdf.text(fitT(writtenFmt(task.writtenAt,recDate),ROW_FS,C_CHAP-C_KD-0.5),C_KD,tY);
     pdf.setTextColor(55,65,45); pdf.text(fitT(csT(chapterTitle),ROW_FS,C_SEC-C_CHAP-0.5),C_CHAP,tY);
     if(isAnnot){pdf.setTextColor(90,110,150);}else{pdf.setTextColor(80,90,70);}
@@ -11630,6 +11664,40 @@ function drawKDSubPageToPDF(pdf, prof, kdRecords, annotEntries, pdfLogo, PW, PH,
     }
     pdf.setDrawColor(210,215,205); pdf.setLineWidth(0.1); pdf.line(lx,curY+rowH,lx+lw,curY+rowH);
     curY+=rowH;
+  }
+}
+
+// Písmo exportů. Montserrat je firemní písmo, helvetica je nouzová varianta –
+// kdyby se soubory nepodařilo načíst, export proběhne, jen v jiném písmu.
+let PDF_FONT = 'helvetica';
+let _pdfFontCache = null;
+
+async function registerPdfFont(pdf) {
+  const FACES = [
+    ['normal', '/assets/fonts/Montserrat-Regular.ttf'],
+    ['bold',   '/assets/fonts/Montserrat-Bold.ttf'],
+    ['italic', '/assets/fonts/Montserrat-Italic.ttf'],
+  ];
+  try {
+    if (!_pdfFontCache) {
+      _pdfFontCache = await Promise.all(FACES.map(async ([style, url]) => {
+        const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < buf.length; i += 0x8000)       // po částech, ať nepřeteče zásobník
+          bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+        return [style, url.split('/').pop(), btoa(bin)];
+      }));
+    }
+    for (const [style, file, b64] of _pdfFontCache) {
+      pdf.addFileToVFS(file, b64);
+      pdf.addFont(file, 'Montserrat', style);
+    }
+    pdf.setFont('Montserrat', 'normal');                   // ověř, že se font opravdu zaregistroval
+    PDF_FONT = 'Montserrat';
+  } catch (e) {
+    console.error('Montserrat se do PDF nepodařilo vložit, použije se helvetica', e);
+    _pdfFontCache = null;
+    PDF_FONT = 'helvetica';
   }
 }
 
@@ -11654,6 +11722,7 @@ async function doExportPDF() {
   try {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    await registerPdfFont(pdf);
     const PW = 297, PH = 210;
     let first = true;
 
@@ -11786,16 +11855,16 @@ async function doExportPDF() {
           hexSegs.push([hexPts[i][0] - hexPts[i-1][0], hexPts[i][1] - hexPts[i-1][1]]);
         pdf.setFillColor(61, 107, 26);
         pdf.lines(hexSegs, hexPts[0][0], hexPts[0][1], [1,1], 'F', true);
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8);
+        pdf.setFont(PDF_FONT, 'bold'); pdf.setFontSize(8);
         pdf.setTextColor(255, 255, 255);
         pdf.text('B', HCX - 1.3, HCY + 1.5);
       }
 
       // "BeSix Plans" label
-      pdf.setFont('helvetica', 'bold');
+      pdf.setFont(PDF_FONT, 'bold');
       pdf.setFontSize(9); pdf.setTextColor(60, 90, 25);
       pdf.text('BeSix Plans', _logoX + _logoW + 1.5, 7.5);
-      pdf.setFont('helvetica', 'normal');
+      pdf.setFont(PDF_FONT, 'normal');
       pdf.setTextColor(50, 55, 45);
       pdf.text(currentProject?.name || '', 38, 7.5);
       pdf.setTextColor(120, 125, 115);

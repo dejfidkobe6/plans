@@ -22,11 +22,16 @@ a `drywall` (Sádrokarton) jsou vlastní kresby projektu.
 
 ## Písmo (`assets/fonts/`)
 
-### Montserrat Bold
-- Zdroj: https://github.com/JulietaUla/Montserrat, balíček `@fontsource/montserrat` 5.0.18
+### Montserrat
+- Zdroj: https://github.com/JulietaUla/Montserrat; webové řezy z balíčku
+  `@fontsource/montserrat` 5.0.18, TTF z `@expo-google-fonts/montserrat` 0.4.2
 - Licence: SIL Open Font License 1.1 — text v `assets/fonts/Montserrat-OFL.txt`
-- Použití: nápis v pásu ikon aplikace, viz `generate_icons.py`. Font se nenačítá
-  v prohlížeči, slouží jen k vygenerování PNG ikon.
+- Použití: firemní písmo celého rozhraní. Soubory:
+  - `montserrat-{latin,latin-ext}-{400,500,600,700}.woff2` — písmo rozhraní.
+    Dvě sady znaků, protože `ý` je v latin, ale `č/š/ž/ř/ě/ů` až v latin-ext.
+  - `Montserrat-{Regular,Bold,Italic}.ttf` — vkládá se do PDF exportů přes jsPDF
+    a používá je `generate_icons.py`. Ořezáno na latinku a latin-ext
+    (fontTools subset, bez GSUB/GPOS), ~37 kB na řez místo 330 kB.
 
 ## Knihovny načítané z CDN (`index.html`)
 
