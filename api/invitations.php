@@ -120,10 +120,8 @@ if ($method === 'POST') {
 
       <!-- Logo hlavička -->
       <tr><td align="center" style="padding:40px 32px 28px;">
-        <img src="https://plans.besix.cz/besix_logo_bila.png" alt="BeSix" width="72" height="72"
-             style="display:block;margin:0 auto 14px;">
-        <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:1px;line-height:1;">BeSix</div>
-        <div style="font-size:10px;font-weight:700;color:#ffffff;letter-spacing:10px;margin-top:4px;opacity:.7;">PLANS</div>
+        <img src="https://plans.besix.cz/icons/icon-192.png" alt="BeSix Plans" width="96" height="96"
+             style="display:block;margin:0 auto;border-radius:20px;">
       </td></tr>
 
       <!-- Oddělovač -->
@@ -135,7 +133,7 @@ if ($method === 'POST') {
         <h2 style="margin:0 0 28px;color:#ffffff;font-size:22px;font-weight:700;">{$projName}</h2>
 
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-          <tr><td style="padding:14px 16px;background:#222222;border-radius:8px;border-left:3px solid #6b7c3a;">
+          <tr><td style="padding:14px 16px;background:#222222;border-radius:8px;border-left:3px solid #ffffff;">
             <div style="font-size:10px;color:#666666;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px;">Vaše role</div>
             <div style="font-size:16px;color:#ffffff;font-weight:600;">{$roleLabel}</div>
           </td></tr>
@@ -147,7 +145,7 @@ if ($method === 'POST') {
 
         <!-- Tlačítko -->
         <a href="{$appUrlEsc}"
-           style="display:block;text-align:center;background-color:#6b7c3a;color:#ffffff;text-decoration:none;
+           style="display:block;text-align:center;background-color:#ffffff;color:#000000;text-decoration:none;
                   padding:15px 24px;border-radius:7px;font-size:15px;font-weight:700;letter-spacing:.4px;">
           Přejít do BeSix Plans
         </a>

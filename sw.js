@@ -11,6 +11,18 @@ const PRECACHE = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
+  './assets/fonts/montserrat-latin-400.woff2',
+  './assets/fonts/montserrat-latin-ext-400.woff2',
+  './assets/fonts/montserrat-latin-500.woff2',
+  './assets/fonts/montserrat-latin-ext-500.woff2',
+  './assets/fonts/montserrat-latin-600.woff2',
+  './assets/fonts/montserrat-latin-ext-600.woff2',
+  './assets/fonts/montserrat-latin-700.woff2',
+  './assets/fonts/montserrat-latin-ext-700.woff2',
+  // TTF se vkládají do PDF exportu – bez nich by export offline spadl na náhradní písmo
+  './assets/fonts/Montserrat-Regular.ttf',
+  './assets/fonts/Montserrat-Bold.ttf',
+  './assets/fonts/Montserrat-Italic.ttf',
   // CDN knihovny – fabric, three.js, pdf.js, jspdf
   'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
@@ -19,8 +31,6 @@ const PRECACHE = [
   'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',
   'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  // Google Fonts CSS (font soubory se cachují automaticky při prvním načtení)
-  'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap',
 ];
 
 // ── Install: předcachovat klíčové zdroje ──────────────────────
