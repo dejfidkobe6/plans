@@ -7,7 +7,7 @@
 
 <!-- PWA manifest -->
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#4A5340">
+<meta name="theme-color" content="#000000">
 
 <!-- iOS / Safari -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3823,19 +3823,21 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 <div id="pwa-gate" style="display:none;position:fixed;inset:0;z-index:99999;
   background:#fff;flex-direction:column;align-items:center;justify-content:center;
   gap:20px;font-family:'Barlow Condensed',sans-serif;padding:36px;text-align:center;">
-  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;box-shadow:0 4px 20px rgba(0,0,0,.12)">
+  <!-- ikona má bílou horní část, proti bílému pozadí ji odděluje obrys -->
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22px;
+    border:1px solid #e3e3e3;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
   <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
     Aplikace je nainstalovaná na tvém telefonu.<br>Otevři ji z plochy pro nejlepší zážitek.
   </div>
   <!-- iOS install hint (hidden by default, shown on iOS) -->
-  <div id="pwa-ios-hint" style="display:none;font-size:14px;color:#4A5340;background:#f0f2ee;
+  <div id="pwa-ios-hint" style="display:none;font-size:14px;color:#111;background:#f2f2f2;
     border-radius:10px;padding:12px 16px;max-width:300px;line-height:1.6;text-align:left;">
     1. Klepni na <strong>Sdílet</strong> (☐↑) v Safari<br>
     2. Zvol <strong>Přidat na plochu</strong><br>
     3. Spusť aplikaci z plochy
   </div>
-  <button id="pwa-open-btn" style="background:#4A5340;color:#fff;border:none;
+  <button id="pwa-open-btn" style="background:#000;color:#fff;border:none;
     padding:15px 0;border-radius:12px;font-size:17px;font-weight:600;
     cursor:pointer;width:100%;max-width:300px;letter-spacing:.3px">
     Otevřít aplikaci
@@ -7841,6 +7843,7 @@ const SYMBOL_DEFS = [
   { key: 'camera', label: 'Kamera/CCTV', d: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z' },
   { key: 'plumbing', label: 'Potrubí', d: 'M22,14H20V16H14V13H16V11H14V6A2,2 0 0,0 12,4H4V2H2V10H4V8H10V11H8V13H10V18A2,2 0 0,0 12,20H20V22H22' },
   { key: 'ventilation', label: 'Vzduchotechnika', d: 'M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z' },
+  { key: 'aircon', label: 'Klimatizace', d: 'M20.79,13.95L18.46,14.57L16.46,13.44V10.56L18.46,9.43L20.79,10.05L21.31,8.12L19.54,7.65L20,5.88L18.07,5.36L17.45,7.69L15.45,8.82L13,7.38V5.12L14.71,3.41L13.29,2L12,3.29L10.71,2L9.29,3.41L11,5.12V7.38L8.5,8.82L6.5,7.69L5.92,5.36L4,5.88L4.47,7.65L2.7,8.12L3.22,10.05L5.55,9.43L7.55,10.56V13.45L5.55,14.58L3.22,13.96L2.7,15.89L4.47,16.36L4,18.12L5.93,18.64L6.55,16.31L8.55,15.18L11,16.62V18.88L9.29,20.59L10.71,22L12,20.71L13.29,22L14.7,20.59L13,18.88V16.62L15.5,15.17L17.5,16.3L18.12,18.63L20,18.12L19.53,16.35L21.3,15.88L20.79,13.95M9.5,10.56L12,9.11L14.5,10.56V13.44L12,14.89L9.5,13.44V10.56Z' },
   { key: 'waterdrop', label: 'Voda', d: 'M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z' },
   // ── Zemní práce & bourání ──────────────────────────────────────────────────────
   { key: 'pickaxe', label: 'Bourání', d: 'M14.79,10.62L3.5,21.9L2.1,20.5L13.38,9.21L14.79,10.62M19.27,7.73L19.86,7.14L19.07,6.35L19.71,5.71L18.29,4.29L17.65,4.93L16.86,4.14L16.27,4.73C14.53,3.31 12.57,2.17 10.47,1.37L9.64,3.16C11.39,4.08 13,5.19 14.5,6.5L14,7L17,10L17.5,9.5C18.81,11 19.92,12.61 20.84,14.36L22.63,13.53C21.83,11.43 20.69,9.47 19.27,7.73Z' },
@@ -7855,6 +7858,7 @@ const SYMBOL_DEFS = [
   { key: 'hoist', label: 'Stav. výtah', d: 'M7,2L11,6H8V10H6V6H3L7,2M17,10L13,6H16V2H18V6H21L17,10M7,12H17A2,2 0 0,1 19,14V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V14A2,2 0 0,1 7,12M7,14V20H17V14H7Z' },
   { key: 'stairs', label: 'Schody', d: 'M15,5V9H11V13H7V17H3V20H10V16H14V12H18V8H22V5H15Z' },
   { key: 'steel', label: 'Ocel. konstrukce', d: 'M1.85 0.89 L15.16 12.8 h6.98 L8.84 0.89 zM1.17 1.41 v1.21 L14.58 14.62 v-1.21 zm3 5.03 v1.62 L17.58 20.06 v-3.98 l-3 -0.61 zM3.64 8.71 l-2.01 0.5 l13.49 12.07 l2.01 -0.5 zM1.17 9.94 v1.12 L14.58 23.06 v-1.12 zM15.42 13.64 v1.03 l3 0.75 v5.91 l-3 0.75 V23.11 h7.41 v-1.03 l-3 -0.75 V15.42 l3 -0.75 V13.64 zm5.25 6.37 v0.66 l1.03 0.26 z' }, // Game Icons "i-beam" (CC BY 3.0), rescaled 512→24
+  { key: 'metalwork', label: 'Zámečnické prvky', d: 'M9,5V10C13.03,12.47 8.44,14.97 6,16V19H21V16C14.59,13.27 17.47,9 22,8V5H9M2,6C2.81,8.13 4.42,9.5 7,10V6H2Z' },
   // ── Nářadí ─────────────────────────────────────────────────────────────────────
   { key: 'works', label: 'Prováděné práce', d: 'M13.78 15.3L19.78 21.3L21.89 19.14L15.89 13.14L13.78 15.3M17.5 10.1C17.11 10.1 16.69 10.05 16.36 9.91L4.97 21.25L2.86 19.14L10.27 11.74L8.5 9.96L7.78 10.66L6.33 9.25V12.11L5.63 12.81L2.11 9.25L2.81 8.55H5.62L4.22 7.14L7.78 3.58C8.95 2.41 10.83 2.41 12 3.58L9.89 5.74L11.3 7.14L10.59 7.85L12.38 9.63L14.2 7.75C14.06 7.42 14 7 14 6.63C14 4.66 15.56 3.11 17.5 3.11C18.09 3.11 18.61 3.25 19.08 3.53L16.41 6.2L17.91 7.7L20.58 5.03C20.86 5.5 21 6 21 6.63C21 8.55 19.45 10.1 17.5 10.1Z' },
   { key: 'saw', label: 'Pila', d: 'M9.8,17L5.9,11.6L20,2L22,5V8H19V11H16V14H13V17M9.7,18.7L9.2,21.5L7.6,22.7C6.7,23.3 5.5,23.1 4.8,22.2L1.3,17.3C0.7,16.4 0.9,15.2 1.8,14.5L5.1,12.2L9.7,18.7M4.6,15L3,16.1L6.5,21L8.1,19.8L4.6,15Z' },
@@ -7866,11 +7870,12 @@ const SYMBOL_DEFS = [
   { key: 'insulation', label: 'Izolace', d: 'M20,12H22V14H20C18.62,14 17.26,13.65 16,13C13.5,14.3 10.5,14.3 8,13C6.74,13.65 5.37,14 4,14H2V12H4C5.39,12 6.78,11.53 8,10.67C10.44,12.38 13.56,12.38 16,10.67C17.22,11.53 18.61,12 20,12M20,6H22V8H20C18.62,8 17.26,7.65 16,7C13.5,8.3 10.5,8.3 8,7C6.74,7.65 5.37,8 4,8H2V6H4C5.39,6 6.78,5.53 8,4.67C10.44,6.38 13.56,6.38 16,4.67C17.22,5.53 18.61,6 20,6M20,18H22V20H20C18.62,20 17.26,19.65 16,19C13.5,20.3 10.5,20.3 8,19C6.74,19.65 5.37,20 4,20H2V18H4C5.39,18 6.78,17.53 8,16.67C10.44,18.38 13.56,18.38 16,16.67C17.22,17.53 18.61,18 20,18Z' },
   { key: 'paint', label: 'Malování', d: 'M18,4V3A1,1 0 0,0 17,2H5A1,1 0 0,0 4,3V7A1,1 0 0,0 5,8H17A1,1 0 0,0 18,7V6H19V10H9V21A1,1 0 0,0 10,22H12A1,1 0 0,0 13,21V12H21V4H18Z' },
   { key: 'tiles', label: 'Obklady a dlažba', d: 'M1,1H11V11H1ZM13,1H23V11H13ZM1,13H11V23H1ZM13,13H23V23H13Z' },
+  { key: 'cleaning', label: 'Úklid', d: 'M19.36,2.72L20.78,4.14L15.06,9.85C16.13,11.39 16.28,13.24 15.38,14.44L9.06,8.12C10.26,7.22 12.11,7.37 13.65,8.44L19.36,2.72M5.93,17.57C3.92,15.56 2.69,13.16 2.35,10.92L7.23,8.83L14.67,16.27L12.58,21.15C10.34,20.81 7.94,19.58 5.93,17.57Z' },
   // ── Měření & kontrola ──────────────────────────────────────────────────────────
   { key: 'tape', label: 'Metr/Pásmo', d: 'M9,5A7,7 0 0,1 16,12H17V15H16V19H9A7,7 0 0,1 2,12A7,7 0 0,1 9,5M9,8A4,4 0 0,0 5,12A4,4 0 0,0 9,16A4,4 0 0,0 13,12A4,4 0 0,0 9,8M17,17H22V19L22,21H20V19H17V17Z' },
   { key: 'level', label: 'Vodováha', d: 'M22 8H2V16H22V8M18 14V10H20V14H18M11 12H13C14.1 12 15 11.11 15 10H17V14H7V10H9C9 11.11 9.9 12 11 12M4 14V10H6V14H4Z' },
   // ── Terénní úpravy & zeleň ─────────────────────────────────────────────────────
-  { key: 'tree', label: 'Sázení zeleně', d: 'M5,9A7,7 0 1,0 19,9A7,7 0 1,0 5,9ZM10.5,16H13.5V21H10.5Z' },
+  { key: 'tree', label: 'Sázení zeleně', d: 'M11,21V16.74C10.53,16.91 10.03,17 9.5,17C7,17 5,15 5,12.5C5,11.23 5.5,10.09 6.36,9.27C6.13,8.73 6,8.13 6,7.5C6,5 8,3 10.5,3C12.06,3 13.44,3.8 14.25,5C14.33,5 14.41,5 14.5,5A5.5,5.5 0 0,1 20,10.5A5.5,5.5 0 0,1 14.5,16C14,16 13.5,15.93 13,15.79V21H11Z' },
   { key: 'irrigation', label: 'Závlaha', d: 'M2,3H22V5H2ZM4.8,7A1.2,1.2 0 1,1 7.2,7L6,13ZM10.8,7A1.2,1.2 0 1,1 13.2,7L12,13ZM16.8,7A1.2,1.2 0 1,1 19.2,7L18,13Z' },
 ];
 // Keys that existed in earlier versions of SYMBOL_DEFS but were removed or renamed.

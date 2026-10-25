@@ -6,7 +6,7 @@
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#4A5340",
+  "theme_color": "#000000",
   "lang": "cs",
   "categories": ["productivity", "business"],
   "icons": [

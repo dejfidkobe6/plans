@@ -17,8 +17,8 @@ dostupné na odkazovaných adresách.
 - Attribution: game-icons.net (https://game-icons.net)
 
 Symboly `platform` (Plošina), `silo` (Stavební silo), `tiles` (Obklady a dlažba),
-`tree` (Sázení zeleně), `irrigation` (Závlaha), `concrete` (Autodomíchávač),
-`scaffolding` (Lešení) a `drywall` (Sádrokarton) jsou vlastní kresby projektu.
+`irrigation` (Závlaha), `concrete` (Autodomíchávač), `scaffolding` (Lešení)
+a `drywall` (Sádrokarton) jsou vlastní kresby projektu.
 
 ## Písmo (`assets/fonts/`)
 
