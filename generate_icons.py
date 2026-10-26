@@ -60,6 +60,11 @@ FAVICONS = [(16, "favicon-16.png"), (32, "favicon-32.png")]
 # kde si ji systém nemaskuje (lišta Windows, záložka prohlížeče).
 CORNER = 0.22
 
+# Launcher na mobilu z maskable ikony ukáže jen bezpečnou oblast 33–479 px.
+# Běžné ikony se proto kreslí ze stejné předlohy a stejně oříznuté, aby ikona
+# na ploše počítače vypadala identicky jako ta na telefonu.
+SAFE = (33, 33, 479, 479)
+
 
 def load_logo():
     """Logo oříznuté o průhledný okraj a přebarvené na LOGO_COLOR."""
@@ -133,7 +138,7 @@ def main():
 
     # 512 se vykreslí v plné velikosti, menší se z něj zmenšují, aby byly ostré.
     # Zaoblit se musí až po zmenšení, jinak se oblouk rozmaže.
-    master = build(512, text)
+    master = build(512, text, maskable=True).crop(SAFE).resize((512, 512), Image.LANCZOS)
     for size in SIZES:
         img = master if size == 512 else master.resize((size, size), Image.LANCZOS)
         path = os.path.join(OUT_DIR, "icon-%d.png" % size)

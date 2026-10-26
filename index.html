@@ -3134,24 +3134,49 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .npd-btn-create { background: var(--olive); color: #fff; }
 .npd-btn-create:hover { background: var(--olive-hover); }
 
-/* TOP BAR user info */
+/* TOP BAR – účet. Jméno uživatele i projektu se přesunulo do nabídky pod
+   ikonkou, aby lišta nerostla s délkou názvu projektu. */
 #topbar-user-info {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 12px; border-left: 1px solid var(--border);
-  font-family: var(--font-mono); font-size: 11px;
+  display: flex; align-items: center;
+  padding: 0 10px; border-left: 1px solid var(--border);
   margin-left: auto;
   flex-shrink: 0;
 }
-#topbar-user-name { color: var(--text-dim); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-#topbar-project-name { color: var(--olive-light); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
-.topbar-sep-dot { color: var(--border); }
-#topbar-switch-project-btn, #topbar-logout-btn {
-  padding: 3px 8px; background: transparent; border: 1px solid var(--border);
-  color: var(--text-dim); border-radius: 3px; cursor: pointer;
-  font-family: var(--font-main); font-size: 10px; transition: all 0.15s;
+#topbar-user-btn {
+  width: 34px; height: 34px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border); border-radius: 50%;
+  color: var(--text-dim); cursor: pointer; transition: all 0.15s;
 }
-#topbar-switch-project-btn:hover { border-color: var(--olive); color: var(--olive-light); }
-#topbar-logout-btn:hover { border-color: #EF4444; color: #EF4444; }
+#topbar-user-btn:hover,
+#topbar-user-btn.open { border-color: var(--olive); color: var(--olive-light); background: var(--card); }
+#topbar-user-btn svg { width: 18px; height: 18px; fill: currentColor; }
+/* Nabídka je fixed, protože #top-bar má overflow:hidden a uvnitř by se ořízla. */
+#topbar-user-menu {
+  display: none; position: fixed; z-index: 9500;
+  min-width: 215px; max-width: 280px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  padding: 6px;
+}
+#topbar-user-menu.open { display: block; }
+.tum-head {
+  padding: 8px 10px 10px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.tum-name { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.tum-proj {
+  font-size: 11px; color: var(--text-dim); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tum-item {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 10px; background: transparent; border: none;
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--font-main); font-size: 13px; color: var(--text);
+}
+.tum-item:hover { background: var(--card); color: var(--text-bright); }
+.tum-danger:hover { background: rgba(239,68,68,0.1); color: #EF4444; }
 
 /* ============================================================
    RESPONSIVE – narrow desktop (769px – 1450px)
@@ -3167,17 +3192,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   }
 }
 
-/* ≤1100px: hide project name + separator dot; tighten user-info */
-@media (max-width: 1100px) and (min-width: 769px) {
-  #topbar-project-name, .topbar-sep-dot { display: none; }
-  #topbar-user-name { max-width: 90px; }
-  #topbar-user-info { gap: 5px; padding: 0 8px; }
-}
-
-/* ≤920px: hide user name; shrink tool buttons */
+/* ≤920px: shrink tool buttons */
 @media (max-width: 920px) and (min-width: 769px) {
-  #topbar-user-name { display: none; }
-  #topbar-user-info { gap: 4px; padding: 0 6px; }
+  #topbar-user-info { padding: 0 6px; }
   .tb-btn { width: 28px; height: 28px; }
   #toolbar-right { gap: 1px; padding: 0 4px; }
 }
@@ -3378,11 +3395,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Hide status bar (replaced by bottom bar on mobile) */
   #status-bar { display: none; }
 
-  /* Compact user info – hide name/project text, keep buttons */
-  #topbar-user-name,
-  #topbar-project-name,
-  .topbar-sep-dot { display: none; }
-  #topbar-user-info { gap: 4px; padding: 0 6px; }
+  #topbar-user-info { padding: 0 6px; }
 
   /* Logo – hide text label, keep icon */
   #logo .logo-plans { display: none; }
@@ -4216,11 +4229,19 @@ body.viewer-mode #kd-backup-next { display: none !important; }
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div id="topbar-user-info">
-    <span id="topbar-user-name"></span>
-    <span class="topbar-sep-dot">·</span>
-    <span id="topbar-project-name"></span>
-    <button id="topbar-switch-project-btn" onclick="showProjectScreen()" title="Přepnout projekt">Projekt</button>
-    <button id="topbar-logout-btn" onclick="doLogout()" title="Odhlásit se">Odhlásit</button>
+    <button id="topbar-user-btn" type="button" title="Účet"
+            aria-haspopup="true" aria-expanded="false" onclick="toggleUserMenu(event)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/></svg>
+    </button>
+  </div>
+  <div id="topbar-user-menu" role="menu">
+    <div class="tum-head">
+      <div class="tum-name" id="tum-user-name"></div>
+      <div class="tum-proj" id="tum-project-name"></div>
+    </div>
+    <button class="tum-item" role="menuitem" onclick="userMenuAction('switch')">Přepnout projekt</button>
+    <button class="tum-item" role="menuitem" onclick="userMenuAction('newwin')">Otevřít v novém okně</button>
+    <button class="tum-item tum-danger" role="menuitem" onclick="userMenuAction('logout')">Odhlásit</button>
   </div>
 </div>
 
@@ -15304,9 +15325,60 @@ async function deleteProject(e, projId) {
 
 // --- Update Top Bar ---
 function updateTopbarUserInfo() {
-  document.getElementById('topbar-user-name').textContent = currentUser ? currentUser.name : '';
-  document.getElementById('topbar-project-name').textContent = currentProject ? currentProject.name : '';
+  document.getElementById('tum-user-name').textContent = currentUser ? currentUser.name : '';
+  document.getElementById('tum-project-name').textContent = currentProject ? currentProject.name : 'Žádný projekt';
   document.getElementById('logo-project-name').textContent = currentProject ? currentProject.name : 'PLANS';
+}
+
+// --- Nabídka účtu v liště ---
+let _userMenuCleanup = null;
+
+function closeUserMenu() {
+  document.getElementById('topbar-user-menu').classList.remove('open');
+  const btn = document.getElementById('topbar-user-btn');
+  btn.classList.remove('open');
+  btn.setAttribute('aria-expanded', 'false');
+  if (_userMenuCleanup) { _userMenuCleanup(); _userMenuCleanup = null; }
+}
+
+function toggleUserMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('topbar-user-menu');
+  if (menu.classList.contains('open')) { closeUserMenu(); return; }
+
+  const btn = document.getElementById('topbar-user-btn');
+  const r = btn.getBoundingClientRect();
+  menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.right = Math.max(6, window.innerWidth - r.right) + 'px';
+  menu.classList.add('open');
+  btn.classList.add('open');
+  btn.setAttribute('aria-expanded', 'true');
+
+  const onDown = ev => { if (!menu.contains(ev.target) && ev.target !== btn) closeUserMenu(); };
+  const onKey = ev => { if (ev.key === 'Escape') closeUserMenu(); };
+  document.addEventListener('mousedown', onDown);
+  document.addEventListener('keydown', onKey);
+  _userMenuCleanup = () => {
+    document.removeEventListener('mousedown', onDown);
+    document.removeEventListener('keydown', onKey);
+  };
+}
+
+function userMenuAction(action) {
+  closeUserMenu();
+  if (action === 'switch') showProjectScreen();
+  else if (action === 'newwin') openProjectInNewWindow();
+  else if (action === 'logout') doLogout();
+}
+
+// Otevře další okno aplikace. Projekt jde v adrese, aby se v novém okně
+// rovnou načetl; data v localStorage jsou klíčovaná projektem, takže se
+// dvě okna s různými projekty nepřepisují.
+function openProjectInNewWindow() {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  url.search = currentProject ? '?project=' + currentProject.id : '';
+  window.open(url.toString(), '_blank', 'noopener');
 }
 
 // ============================================================
@@ -15340,6 +15412,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       showToast('Byl(a) jsi přidán(a) do projektu!', 'success');
     } else {
+      // ?project=<id> – odkaz na konkrétní projekt, používá ho i „Otevřít v novém okně"
+      const _wantProject = parseInt(_params.get('project') || '', 10);
+      if (_wantProject) {
+        const { ok: pok, data: pd } = await apiFetch('api/projects.php');
+        const proj = pok && pd.plan_projects
+          ? pd.plan_projects.find(p => p.id === _wantProject) : null;
+        if (proj) { openProject(proj); return; }
+        showToast('Projekt se nepodařilo otevřít', 'error');
+      }
       showProjectScreen();
     }
   }

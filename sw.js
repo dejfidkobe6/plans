@@ -1,6 +1,6 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v7';
+const CACHE = 'besix-plans-v8';
 
 const PRECACHE = [
   './',
