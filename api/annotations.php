@@ -4,9 +4,18 @@
 //
 // Čtecí endpoint pro externí dashboard (stavba.besix.cz). Vrací JSON pole
 // anotací daného projektu:
-//   {id, label, cat, x, y, zone, activity, time, count}
+//   {id, label, cat, firma, color, status, type, dateFrom, deadline, from, to,
+//    shape{kind,path,viewBox,fillRule,w,h,angle,points}, x, y, zone, activity,
+//    time, count}
 // x, y = pozice na výkrese v procentech (0–100), počítáno ze středu anotace
 // vůči podkladovému výkresu daného podlaží.
+//
+// Výchozí výstup obsahuje jen živé úkoly – anotace se stavem „Hotovo“ se
+// vynechávají, protože dashboard ukazuje rozpracovanou stavbu. Hotové se
+// přidají parametrem ?includeDone=1; to platí i pro ?subs=1.
+//
+// Další režimy: ?list=1 (projekty), ?drawings=1 (podklady), ?drawing=<levelId>
+// (jeden obrázek podkladu), ?subs=1 (dodavatelé včetně kontaktů).
 //
 // Autentizace (jedno z):
 //   1) hlavička  x-besix-api-key: <klíč>   – service-to-service, čte libovolný
@@ -196,7 +205,11 @@ try {
     );
     $stmt->execute([$projectId]);
     foreach ($stmt->fetchAll() as $pr) $profById[$pr['name']] = $pr;
-} catch (\Throwable $e) { /* tabulka nemusí existovat */ }
+} catch (\Throwable $e) {
+    // Tabulka nemusí existovat u starších instalací; cokoli jiného ale znamená,
+    // že by dodavatelé tiše vypadli jako „—“ v šedé, proto to patří do logu.
+    error_log('[annotations] plan_profese: ' . $e->getMessage());
+}
 if (!$profById) {
     try {
         $stmt = $db->prepare('SELECT profese_json FROM plan_canvas_data WHERE project_id = ? LIMIT 1');
@@ -206,7 +219,9 @@ if (!$profById) {
         foreach ((is_array($arr) ? $arr : []) as $pr) {
             if (!empty($pr['name'])) $profById[$pr['name']] = $pr;
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        error_log('[annotations] profese_json: ' . $e->getMessage());
+    }
 }
 
 /** Barva anotace podle pravidla aplikace (getAnnotColor): Urgence červeně, jinak dodavatel. */
@@ -297,11 +312,21 @@ if (isset($_GET['drawing']) && $_GET['drawing'] !== '') {
     $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
     $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
              'webp' => 'image/webp', 'gif' => 'image/gif'][$ext] ?? 'application/octet-stream';
-    header('Content-Type: ' . $mime);
-    header('Content-Length: ' . filesize($path));
+    $etag = '"' . md5((string)filemtime($path) . '-' . filesize($path)) . '"';
     // Soubor se po ořezu přepisuje pod stejným názvem, proto krátká cache + ETag
     header('Cache-Control: private, max-age=300');
-    header('ETag: "' . md5((string)filemtime($path) . '-' . filesize($path)) . '"');
+    header('ETag: ' . $etag);
+    header('X-Content-Type-Options: nosniff');
+    if (trim((string)($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
+        while (ob_get_level()) ob_end_clean();
+        http_response_code(304);
+        exit;
+    }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($path));
+    // Výkres se posílá mimo výstupní buffer z začátku souboru – jinak by se
+    // celý načetl do paměti PHP a u velkých podkladů narazil na memory_limit.
+    while (ob_get_level()) ob_end_clean();
     readfile($path);
     exit;
 }
@@ -312,9 +337,9 @@ if (!empty($_GET['drawings'])) {
     foreach ($levels as $lvl) {
         if (!empty($lvl['id'])) $zoneOf[$lvl['id']] = $lvl['name'] ?? null;
     }
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'plans.besix.cz';
-    $self   = $scheme . '://' . $host . strtok($_SERVER['REQUEST_URI'] ?? '/api/annotations', '?');
+    // Hostitele bere z konfigurace, ne z hlavičky Host – tu si určuje klient
+    // a vrácené URL by pak mohly ukazovat kamkoli.
+    $self = rtrim(APP_URL, '/') . strtok($_SERVER['REQUEST_URI'] ?? '/api/annotations', '?');
     $out = [];
     foreach ($bgUrl as $levelId => $rel) {
         if (!$bgPathFor($levelId)) continue;
