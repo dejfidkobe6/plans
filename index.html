@@ -6719,7 +6719,9 @@ function updateAllLabelScales(deconflict = true) {
   } else {
     _scheduleDeconflictSettle();
   }
-  fabricCanvas.renderAll();
+  // requestRenderAll, ne renderAll: při zoomu už jedno překreslení čeká ve
+  // frontě na snímek, synchronní render by ho zdvojil.
+  fabricCanvas.requestRenderAll();
 }
 
 function updateLabelFor(annotId) {
@@ -7099,10 +7101,11 @@ function setupEventListeners() {
       const pos = (e.touches && e.touches[0]) ? e.touches[0] : e;
       const dx = (pos.clientX || 0) - panStartX;
       const dy = (pos.clientY || 0) - panStartY;
-      const vpt = cw.viewportTransform.slice();
-      vpt[4] = lastViewportX + dx;
-      vpt[5] = lastViewportY + dy;
-      cw.setViewportTransform(vpt);
+      // Přímý zápis do výřezu: setViewportTransform volá setCoords() na všech
+      // objektech, což při stovkách anotací stojí milisekundy na každý pohyb
+      // myši. Posun souřadnice objektů nemění, stačí je srovnat na konci tažení.
+      cw.viewportTransform[4] = lastViewportX + dx;
+      cw.viewportTransform[5] = lastViewportY + dy;
       cw.requestRenderAll();
       return;
     }
@@ -7158,7 +7161,8 @@ function setupEventListeners() {
       isPanning = false;
       if (appState.tool === 'pan') cw.defaultCursor = 'grab';
       else cw.defaultCursor = 'default';
-      cw.renderAll();
+      // Srovnej souřadnice objektů po tažení, aby zase sedělo trefování myší.
+      cw.setViewportTransform(cw.viewportTransform);
       saveCurrentLevel();
       return;
     }
@@ -7350,9 +7354,13 @@ function setupEventListeners() {
   // deconflict:false — the expensive O(n²) overlap pass is debounced separately
   // (see updateAllLabelScales) so it doesn't run on every frame of the gesture.
   let _labelRaf = null;
+  // Štítky se přepočítají hned, jen nejvýš jednou za snímek. Dřív se počítaly
+  // až ve vlastním requestAnimationFrame, které doběhlo _po_ vykreslení plátna,
+  // takže si vyžádaly další render – plátno se při zoomu kreslilo dvakrát.
   function _scheduleLabels() {
     if (_labelRaf) return;
-    _labelRaf = requestAnimationFrame(() => { _labelRaf = null; updateAllLabelScales(false); });
+    _labelRaf = requestAnimationFrame(() => { _labelRaf = null; });
+    updateAllLabelScales(false);
   }
 
   // Wheel zoom
