@@ -358,6 +358,8 @@ body {
 #topbar-actions {
   display: flex;
   align-items: stretch;
+  gap: 4px;
+  padding: 5px 6px;
 }
 
 /* MOBILE MENU BUTTON – hidden on desktop */
@@ -1565,6 +1567,15 @@ option { background: var(--card); color: var(--text); }
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0; white-space: nowrap;
 }
+/* Přepínače pohledů jsou zaoblené dlaždice, ne slepené celovýškové buňky.
+   Pravidlo stojí za jejich vlastními, aby přebilo výšku i postranní linky. */
+#vykres-btn, #subddodavatele-btn, #anotace-btn,
+#users-mgmt-btn, #pdf-export-btn, #kd-btn {
+  height: auto;
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
 #kd-btn:hover { background: rgba(0,0,0,0.5); color: var(--text-bright); }
 #kd-btn.active { background: rgba(0,0,0,0.6); color: var(--text-bright); }
 #kd-btn svg { width: 16px; height: 16px; }
