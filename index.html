@@ -228,7 +228,8 @@ body {
   width: 40px;
   flex-shrink: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  /* v procentech, aby rámeček seděl na oblouk zaoblený v samotném PNG */
+  border-radius: 22%;
 }
 /* Název projektu ve stejném štítku jako nápis na ikoně aplikace */
 #logo .logo-plans {
@@ -2982,7 +2983,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .auth-logo-img img {
   width: 100%; height: auto;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 22%;
 }
 .auth-tabs {
   display: flex; margin-bottom: 24px;
@@ -3049,7 +3050,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 #project-screen-header .ps-logo-icon {
   height: 36px; width: 36px; display: block;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 22%;
 }
 #project-screen-header .ps-user-info {
   display: flex; align-items: center; gap: 10px;
@@ -3919,7 +3920,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
   background:#fff;flex-direction:column;align-items:center;justify-content:center;
   gap:20px;font-family:var(--font-main);padding:36px;text-align:center;">
   <!-- ikona má bílou horní část, proti bílému pozadí ji odděluje obrys -->
-  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:20px;
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22%;
     border:1px solid #e3e3e3;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
   <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">

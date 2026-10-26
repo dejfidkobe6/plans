@@ -55,6 +55,11 @@ SIZES = [48, 72, 96, 128, 192, 512]
 # na 16 a 32 px by byl pás i text jen šmouha, proto samotné logo na bílé
 FAVICONS = [(16, "favicon-16.png"), (32, "favicon-32.png")]
 
+# Zaoblení rohů ikony, podíl ze strany. Odpovídá masce, kterou si na ikonu
+# kreslí systémy samy, takže ikona nevypadá jako ostrý bílý čtverec ani tam,
+# kde si ji systém nemaskuje (lišta Windows, záložka prohlížeče).
+CORNER = 0.22
+
 
 def load_logo():
     """Logo oříznuté o průhledný okraj a přebarvené na LOGO_COLOR."""
@@ -96,6 +101,17 @@ def build(size, text, maskable=False):
     return img
 
 
+def rounded(img):
+    """Ořízne rohy do oblouku. Výsledek je RGBA – rohy jsou průhledné."""
+    size = img.size[0]
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, size - 1, size - 1],
+                                           round(size * CORNER), fill=255)
+    out = img.convert("RGBA")
+    out.putalpha(mask)
+    return out
+
+
 def build_logo_only(size):
     """Favicon: logo na bílé, s okrajem 12 % jako u velké ikony."""
     img = Image.new("RGB", (size, size), TOP_COLOR)
@@ -115,25 +131,29 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     print("Generuji ikony s nápisem %s" % text)
 
-    # 512 se vykreslí v plné velikosti, menší se z něj zmenšují, aby byly ostré
+    # 512 se vykreslí v plné velikosti, menší se z něj zmenšují, aby byly ostré.
+    # Zaoblit se musí až po zmenšení, jinak se oblouk rozmaže.
     master = build(512, text)
     for size in SIZES:
         img = master if size == 512 else master.resize((size, size), Image.LANCZOS)
         path = os.path.join(OUT_DIR, "icon-%d.png" % size)
-        img.save(path, "PNG")
+        rounded(img).save(path, "PNG")
         print("  %3dx%-3d → %s" % (size, size, path))
 
+    # apple-touch-icon a maskable zůstávají ostré čtverce: oba si systém maskuje
+    # sám a průhledné rohy by u nich vyšly černě, respektive by se oblouk ořízl
+    # podruhé.
     for name, size, img in [
         ("apple-touch-icon.png", 180, master.resize((180, 180), Image.LANCZOS)),
         ("icon-512-maskable.png", 512, build(512, text, maskable=True)),
     ]:
         path = os.path.join(OUT_DIR, name)
         img.save(path, "PNG")
-        print("  %3dx%-3d → %s" % (size, size, path))
+        print("  %3dx%-3d → %s  (čtverec, maskuje si systém)" % (size, size, path))
 
     for size, name in FAVICONS:
         path = os.path.join(OUT_DIR, name)
-        build_logo_only(size).save(path, "PNG")
+        rounded(build_logo_only(size)).save(path, "PNG")
         print("  %3dx%-3d → %s" % (size, size, path))
 
     print("\nHotovo. Pro zobrazení tvrdě obnov stránku (Ctrl+Shift+R).")
