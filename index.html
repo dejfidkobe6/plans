@@ -102,8 +102,22 @@
      číslice drží v zákrytu přes font-variant-numeric níže. */
   --font-mono: 'Montserrat', Arial, Calibri, sans-serif;
   --font-main: 'Montserrat', Arial, Calibri, sans-serif;
-  /* KD board: fixed chrome above cards (topbar 48 + bottom-pad 26 + meta-bar ~40 + filter-bar ~42 + inner-pad 28 + buffer 11) */
-  --kd-cards-chrome: 195px;
+  /* Rozměry rámu aplikace. Panely a lišty jsou zaoblené karty oddělené mezerou,
+     proto se odsazení počítá z proměnných – jinak by se posunuly překryvné
+     stránky, které se umisťují pod topbar. */
+  --topbar-h: 58px;
+  --levelbar-h: 40px;
+  --statusbar-h: 26px;
+  --chrome-gap: 6px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  /* kde začíná a končí obsah mezi topbarem a stavovou lištou */
+  --chrome-top: calc(var(--chrome-gap) * 2 + var(--topbar-h));
+  --chrome-top-tabs: calc(var(--chrome-top) + var(--levelbar-h) + var(--chrome-gap));
+  --chrome-bottom: calc(var(--chrome-gap) * 2 + var(--statusbar-h));
+  /* KD board: výška nad kartami = rám nad a pod stránkou KD
+     + meta-bar ~40 + filter-bar ~42 + inner-pad 28 + rezerva 11 */
+  --kd-cards-chrome: calc(var(--chrome-top) + var(--chrome-bottom) + 121px);
 }
 #annot-tooltip {
   display: none;
@@ -183,6 +197,9 @@ body {
   flex-direction: column;
   height: 100vh;
   user-select: none;
+  /* mezera kolem a mezi kartami rozhraní, aby bylo zaoblení vidět */
+  padding: var(--chrome-gap);
+  gap: var(--chrome-gap);
 }
 
 /* TOP BAR */
@@ -190,8 +207,9 @@ body {
   display: flex;
   align-items: stretch;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: var(--topbar-h);
   flex-shrink: 0;
   z-index: 100;
   overflow: hidden; /* prevent any child from pushing off-screen */
@@ -206,10 +224,12 @@ body {
   text-decoration: none;
 }
 #logo img {
-  height: 36px;
-  width: 36px;
+  height: 40px;
+  width: 40px;
   flex-shrink: 0;
   border: 1px solid var(--border);
+  /* v procentech, aby rámeček seděl na oblouk zaoblený v samotném PNG */
+  border-radius: 22%;
 }
 /* Název projektu ve stejném štítku jako nápis na ikoně aplikace */
 #logo .logo-plans {
@@ -304,8 +324,9 @@ body {
   display: flex;
   align-items: stretch;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: var(--levelbar-h);
   flex-shrink: 0;
   z-index: 99;
   overflow: hidden;
@@ -360,7 +381,8 @@ body {
   display: none;
   flex-direction: column;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   z-index: 200;
   flex-shrink: 0;
   overflow: hidden;
@@ -477,6 +499,7 @@ body {
 #main-layout {
   display: flex;
   flex: 1;
+  gap: var(--chrome-gap);
   overflow: hidden;
   position: relative;
 }
@@ -486,7 +509,8 @@ body {
   width: 240px;
   min-width: 240px;
   background: var(--panel);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   transition: width 0.2s, min-width 0.2s;
@@ -701,6 +725,8 @@ option { background: var(--card); }
   position: relative;
   overflow: hidden;
   background: #e8e8e4;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 #canvas-wrapper {
   position: absolute;
@@ -917,7 +943,8 @@ canvas#fabric-canvas { display: block; }
   width: 240px;
   min-width: 240px;
   background: var(--panel);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1055,9 +1082,10 @@ option { background: var(--card); color: var(--text); }
 
 /* STATUS BAR */
 #status-bar {
-  height: 26px;
+  height: var(--statusbar-h);
   background: var(--panel);
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -1544,16 +1572,19 @@ option { background: var(--card); color: var(--text); }
 /* KONTROLNÍ DEN PAGE */
 #kd-page {
   display: none; position: fixed;
-  top: 48px; left: 0; right: 0; bottom: 26px;
+  top: var(--chrome-top); bottom: var(--chrome-bottom);
+  left: var(--chrome-gap); right: var(--chrome-gap);
   z-index: 102;
   background: var(--bg); flex-direction: row; overflow: hidden;
+  gap: var(--chrome-gap);
 }
 #kd-page.visible { display: flex; }
 
 /* Sidebar */
 #kd-sidebar {
   width: 220px; min-width: 220px; flex-shrink: 0;
-  background: var(--panel); border-right: 1px solid var(--border);
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex; flex-direction: column; overflow: hidden;
 }
 #kd-sidebar-top {
@@ -1632,6 +1663,8 @@ option { background: var(--card); color: var(--text); }
 /* Main content area */
 #kd-main {
   flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 #kd-meta-bar {
   display: flex; align-items: center; gap: 10px;
@@ -2087,7 +2120,8 @@ option { background: var(--card); color: var(--text); }
 .kdf-active { border-color: var(--olive) !important; color: var(--olive) !important; }
 #anotace-page {
   display: none; position: fixed;
-  top: 88px; left: 0; right: 0; bottom: 26px;
+  top: var(--chrome-top-tabs); left: var(--chrome-gap); right: var(--chrome-gap);
+  bottom: var(--chrome-bottom);
   z-index: 50;
   background: var(--bg); flex-direction: column; overflow: hidden;
 }
@@ -2149,9 +2183,9 @@ option { background: var(--card); color: var(--text); }
 /* HOME PAGE OVERLAY */
 #home-page {
   position: fixed;
-  top: 88px;
-  left: 0; right: 0;
-  bottom: 26px;
+  top: var(--chrome-top-tabs);
+  left: var(--chrome-gap); right: var(--chrome-gap);
+  bottom: var(--chrome-bottom);
   background: var(--bg);
   z-index: 50;
   display: none;
@@ -2846,7 +2880,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 /* ---- Members panel ---- */
 #users-page {
   position: fixed;
-  top: 88px; left: 0; right: 0; bottom: 26px;
+  top: var(--chrome-top-tabs); left: var(--chrome-gap); right: var(--chrome-gap);
+  bottom: var(--chrome-bottom);
   background: var(--bg);
   z-index: 50;
   display: none;
@@ -2948,6 +2983,7 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 .auth-logo-img img {
   width: 100%; height: auto;
   border: 1px solid var(--border);
+  border-radius: 22%;
 }
 .auth-tabs {
   display: flex; margin-bottom: 24px;
@@ -3002,17 +3038,19 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   position: fixed; inset: 0; z-index: 9999;
   background: var(--bg);
   display: flex; flex-direction: column;
+  padding: var(--chrome-gap); gap: var(--chrome-gap);
 }
 #project-screen.hidden { display: none; }
 #project-screen-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 24px; background: var(--panel);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius); flex-shrink: 0;
 }
 #project-screen-header .ps-logo { display: flex; align-items: center; gap: 12px; }
 #project-screen-header .ps-logo-icon {
   height: 36px; width: 36px; display: block;
   border: 1px solid var(--border);
+  border-radius: 22%;
 }
 #project-screen-header .ps-user-info {
   display: flex; align-items: center; gap: 10px;
@@ -3162,8 +3200,8 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Hamburger dropdown floats above all overlay pages */
   #mobile-dropdown {
     position: fixed;
-    top: 48px;
-    left: 0; right: 0;
+    top: var(--chrome-top);
+    left: var(--chrome-gap); right: var(--chrome-gap);
     z-index: 9999;
   }
   #topbar-user-info { display: none !important; }
@@ -3175,21 +3213,23 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   /* Back bar: fixed above all overlay pages */
   #mob-back-bar {
     position: fixed;
-    top: 48px; left: 0; right: 0;
+    top: var(--chrome-top);
+    left: var(--chrome-gap); right: var(--chrome-gap);
     z-index: 9998;
     height: 42px;
+    border-radius: var(--radius);
   }
 
-  /* Overlay pages – start below topbar(48) + back bar(42) = 90px, fill to bottom */
+  /* Overlay pages – pod topbarem a zpětnou lištou (42 px), dolů až na konec */
   #home-page, #users-page, #anotace-page {
-    top: 90px !important;
-    bottom: 0 !important;
+    top: calc(var(--chrome-top) + 42px + var(--chrome-gap)) !important;
+    bottom: var(--chrome-gap) !important;
     z-index: 950;
   }
   /* KD page covers full height — has its own bottom bar */
   #kd-page {
-    top: 90px !important;
-    bottom: 0 !important;
+    top: calc(var(--chrome-top) + 42px + var(--chrome-gap)) !important;
+    bottom: var(--chrome-gap) !important;
     z-index: 950;
   }
 
@@ -3699,10 +3739,12 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
 #mobile-bottom-bar {
   display: none;
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: var(--chrome-gap); left: var(--chrome-gap); right: var(--chrome-gap);
   height: 54px;
   background: var(--panel);
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
   z-index: 900;
   align-items: stretch;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -3878,7 +3920,7 @@ body.viewer-mode #kd-backup-next { display: none !important; }
   background:#fff;flex-direction:column;align-items:center;justify-content:center;
   gap:20px;font-family:var(--font-main);padding:36px;text-align:center;">
   <!-- ikona má bílou horní část, proti bílému pozadí ji odděluje obrys -->
-  <img src="/icons/icon-192.png" style="width:96px;height:96px;
+  <img src="/icons/icon-192.png" style="width:96px;height:96px;border-radius:22%;
     border:1px solid #e3e3e3;box-shadow:0 4px 20px rgba(0,0,0,.12)">
   <div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:.5px">BeSix Plans</div>
   <div id="pwa-desc" style="font-size:16px;color:#555;max-width:300px;line-height:1.5">
