@@ -3454,7 +3454,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #level-dropdown {
     display: flex;
     position: fixed;
-    top: 56px;
+    /* Pod horní lištou, ne přes ni – odvozeno z výšky lišty a mezery kolem ní,
+       aby se to nerozešlo, až lišta zase změní výšku. */
+    top: calc(var(--chrome-top) + 4px);
     left: 50%;
     transform: translateX(-50%);
     width: 75%;
@@ -7145,6 +7147,7 @@ function setupEventListeners() {
       // myši. Posun souřadnice objektů nemění, stačí je srovnat na konci tažení.
       cw.viewportTransform[4] = lastViewportX + dx;
       cw.viewportTransform[5] = lastViewportY + dy;
+      _labelsDuringGesture();
       cw.requestRenderAll();
       return;
     }
@@ -7393,13 +7396,49 @@ function setupEventListeners() {
   // deconflict:false — the expensive O(n²) overlap pass is debounced separately
   // (see updateAllLabelScales) so it doesn't run on every frame of the gesture.
   let _labelRaf = null;
+  let _labelsHidden = false;
   // Štítky se přepočítají hned, jen nejvýš jednou za snímek. Dřív se počítaly
   // až ve vlastním requestAnimationFrame, které doběhlo _po_ vykreslení plátna,
   // takže si vyžádaly další render – plátno se při zoomu kreslilo dvakrát.
   function _scheduleLabels() {
+    if (_labelsHidden) return;   // schované štítky nemá smysl přepočítávat
     if (_labelRaf) return;
     _labelRaf = requestAnimationFrame(() => { _labelRaf = null; });
     updateAllLabelScales(false);
+  }
+
+  // Štítky jsou při pohybu nejdražší část kreslení: každá změna měřítka zahodí
+  // jejich cache a text se rasterizuje znovu. Při stovkách anotací to dělá přes
+  // 100 ms na snímek. Po dobu posunu a zoomu se proto schovají a vrátí se,
+  // jakmile se plátno zastaví. U malých výkresů se nic neschovává, tam je to
+  // zbytečné – zrychlení by nikdo nepoznal, jen by štítky blikaly.
+  const LABELS_HIDE_FROM = 120;
+  let _labelsShowTimer = null;
+
+  function _labelsSetHidden(hide) {
+    const labels = cw.getObjects().filter(o => o.annotLabelFor);
+    if (hide) {
+      if (_labelsHidden || labels.length < LABELS_HIDE_FROM) return;
+      // Zapamatuj si vlastní viditelnost – hotové úkoly bývají skryté a
+      // nesmí se při návratu objevit.
+      labels.forEach(l => { l._visibleBeforeMove = l.visible; l.visible = false; });
+      _labelsHidden = true;
+    } else {
+      if (!_labelsHidden) return;
+      labels.forEach(l => {
+        if (l._visibleBeforeMove !== undefined) { l.visible = l._visibleBeforeMove; delete l._visibleBeforeMove; }
+      });
+      _labelsHidden = false;
+    }
+  }
+
+  function _labelsDuringGesture() {
+    _labelsSetHidden(true);
+    clearTimeout(_labelsShowTimer);
+    _labelsShowTimer = setTimeout(() => {
+      _labelsSetHidden(false);
+      updateAllLabelScales(true);   // po zastavení dorovnej pozice i překryvy
+    }, 150);
   }
 
   // Wheel zoom
@@ -7411,6 +7450,7 @@ function setupEventListeners() {
     zoom = Math.min(Math.max(zoom, 0.05), 20);
     cw.zoomToPoint({ x: e.offsetX, y: e.offsetY }, zoom);
     updateZoomDisplay();
+    _labelsDuringGesture();
     _scheduleLabels();
     // requestRenderAll (not renderAll): coalesces the many 'wheel' events fired during
     // one scroll gesture into a single render per frame instead of one full canvas
@@ -7513,6 +7553,7 @@ function setupEventListeners() {
       ];
       cw.setViewportTransform(vpt);
       updateZoomDisplay();
+      _labelsDuringGesture();
       _scheduleLabels();
       cw.requestRenderAll();
     }
