@@ -2003,9 +2003,15 @@ option { background: var(--card); color: var(--text); }
   display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; min-width: 0;
 }
 .kd-task-text {
-  width: 100%; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-bright);
+  width: 100%; min-width: 0; font-size: 13px; font-weight: 400; color: var(--text-bright);
   line-height: 1.35; background: transparent; border: none; outline: none;
-  resize: none; font-family: var(--font-main); padding: 0; overflow: hidden;
+  font-family: var(--font-main); padding: 0;
+  /* pole je contenteditable, aby šlo tučně označit kus textu přes Ctrl+B */
+  white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.35em;
+}
+.kd-task-text b { font-weight: 700; }
+.kd-task-text:empty::before {
+  content: attr(data-placeholder); color: var(--text-dim); pointer-events: none;
 }
 .kd-task-text:focus { outline: none; }
 .kd-task-date-pair {
@@ -14094,11 +14100,6 @@ function kdRenderContent() {
       el.style.overflow = 'visible';
     });
   }
-  // Textareas start at rows=1 and grow to fit; size them now (synchronously, they are
-  // in the DOM) so the layout is final before the scroll position is restored.
-  inner.querySelectorAll('textarea.kd-task-text').forEach(ta => {
-    ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
-  });
   _kdRestoreScroll(scroll, savedScroll);
   // Re-apply once more after paint in case fonts/zoom shift the layout
   requestAnimationFrame(() => _kdRestoreScroll(scroll, savedScroll));
@@ -14294,11 +14295,36 @@ function kdBuildTask(rec, card, task, isLive) {
 
   // Row 1: task name (full width)
   const nameRow = document.createElement('div'); nameRow.className = 'kd-task-name-row';
-  const ta = document.createElement('textarea');
-  ta.className = 'kd-task-text'; ta.value = task.text || '';
-  ta.placeholder = 'Název úkolu...'; ta.rows = 1; ta.readOnly = !isLive;
-  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; if (isLive) { task.text = ta.value; task.writtenAt = Date.now(); kdSave(); } };
-  setTimeout(() => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }, 0);
+  const ta = document.createElement('div');
+  ta.className = 'kd-task-text';
+  ta.contentEditable = isLive ? 'true' : 'false';
+  ta.dataset.placeholder = 'Název úkolu...';
+  ta.innerHTML = kdTaskToHtml(task);
+  if (isLive) {
+    // Ukládá se obojí: textHtml kvůli tučnému zvýraznění a text jako holý text,
+    // protože z něj čte export do PDF i popisek anotace na výkrese.
+    const store = () => {
+      task.textHtml  = kdSanitizeTaskHtml(ta.innerHTML);
+      task.text      = kdHtmlToPlain(task.textHtml);
+      task.writtenAt = Date.now();
+      kdSave();
+    };
+    ta.addEventListener('input', store);
+    ta.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault(); document.execCommand('bold'); store();
+      } else if (e.key === 'Enter') {
+        // zalomení řádku, ne nový odstavec – značka tak zůstane jednoduchá
+        e.preventDefault(); document.execCommand('insertLineBreak'); store();
+      }
+    });
+    ta.addEventListener('paste', e => {
+      e.preventDefault();
+      const txt = ((e.clipboardData || window.clipboardData).getData('text/plain') || '').replace(/\r\n?/g, '\n');
+      document.execCommand('insertText', false, txt);
+      store();
+    });
+  }
   nameRow.appendChild(ta);
   el.appendChild(nameRow);
 
@@ -14441,6 +14467,52 @@ function kdAddTask(rec, card) {
     el.focus();
     requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }, scrollDelay);
+}
+
+// ── Text úkolu: holý text pro export, tučné zvýraznění pro zobrazení ──────
+// Povolené je jen <b> a <br>. Vkládaný obsah se parsuje v inertním dokumentu,
+// takže se z něj nic nenačítá ani nespouští.
+function kdSanitizeTaskHtml(html) {
+  const doc = new DOMParser().parseFromString('<div id="r">' + (html || '') + '</div>', 'text/html');
+  const src = doc.getElementById('r');
+  const out = document.createElement('div');
+  const walk = (from, to) => {
+    for (const n of Array.from(from.childNodes)) {
+      if (n.nodeType === 3) { to.appendChild(document.createTextNode(n.nodeValue)); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = n.tagName.toLowerCase();
+      // obsah skriptů a stylů zahoď celý, ne jen značku
+      if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'template') continue;
+      if (tag === 'br') { to.appendChild(document.createElement('br')); continue; }
+      if (tag === 'b' || tag === 'strong') {
+        const b = document.createElement('b'); to.appendChild(b); walk(n, b); continue;
+      }
+      // odstavce a divy z contenteditable se převedou na zalomení
+      if (tag === 'div' || tag === 'p') {
+        if (to.lastChild) to.appendChild(document.createElement('br'));
+        walk(n, to); continue;
+      }
+      walk(n, to);   // ostatní značky zahoď, obsah nech
+    }
+  };
+  walk(src, out);
+  return out.innerHTML;
+}
+
+function kdHtmlToPlain(html) {
+  const doc = new DOMParser().parseFromString('<div id="r">' + (html || '') + '</div>', 'text/html');
+  const src = doc.getElementById('r');
+  src.querySelectorAll('br').forEach(br => br.replaceWith(doc.createTextNode('\n')));
+  return (src.textContent || '').replace(/\u00a0/g, ' ');
+}
+
+// Starší úkoly mají jen holý text; ten se jen vyescapuje, aby se znaky jako
+// < nebo & braly doslova a ne jako značka.
+function kdTaskToHtml(task) {
+  if (task.textHtml) return kdSanitizeTaskHtml(task.textHtml);
+  const d = document.createElement('div');
+  d.textContent = task.text || '';
+  return d.innerHTML.replace(/\n/g, '<br>');
 }
 
 // ── Chapter helpers ──────────────────────────────────────────────
