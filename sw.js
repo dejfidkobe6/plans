@@ -1,16 +1,16 @@
 // BeSix Plans – Service Worker
 // Strategie: cache-first pro statické assety, network-first pro API
-const CACHE = 'besix-plans-v8';
+const CACHE = 'besix-plans-v9';
 
 const PRECACHE = [
   './',
   './index.html',
   './manifest.json',
   './besix_logo_bila.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32.png',
+  './icons/icon-192.png?v=3',
+  './icons/icon-512.png?v=3',
+  './icons/apple-touch-icon.png?v=3',
+  './icons/favicon-32.png?v=3',
   './assets/fonts/montserrat-latin-400.woff2',
   './assets/fonts/montserrat-latin-ext-400.woff2',
   './assets/fonts/montserrat-latin-500.woff2',
