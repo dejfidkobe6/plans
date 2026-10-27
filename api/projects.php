@@ -88,4 +88,34 @@ if ($method === 'DELETE') {
     jsonOk();
 }
 
+// ============================================================
+// PATCH /api/projects.php?id=123  – přejmenovat projekt (pouze owner)
+// Body: { name }
+// ============================================================
+if ($method === 'PATCH') {
+    $projectId = (int)($_GET['id'] ?? 0);
+    if (!$projectId) jsonError('Chybí ID projektu');
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $name = trim($body['name'] ?? '');
+    if ($name === '') jsonError('Název projektu je povinný');
+    if (mb_strlen($name) > 120) jsonError('Název je příliš dlouhý, nejvýš 120 znaků');
+
+    // Přejmenovat smí jen vlastník projektu, ne každý člen.
+    $db   = getDB();
+    $stmt = $db->prepare('
+        SELECT p.id
+        FROM plan_projects p
+        JOIN plan_project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+        WHERE p.id = ? AND p.app_id = ? AND p.is_active = 1 AND pm.role = \'owner\'
+        LIMIT 1
+    ');
+    $stmt->execute([$userId, $projectId, $appId]);
+    if (!$stmt->fetch()) jsonError('Projekt nenalezen nebo nemáš oprávnění', 403);
+
+    $db->prepare('UPDATE plan_projects SET name = ? WHERE id = ?')->execute([$name, $projectId]);
+
+    jsonOk(['project' => ['id' => $projectId, 'name' => $name]]);
+}
+
 jsonError('Metoda není povolena', 405);

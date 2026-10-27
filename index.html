@@ -231,6 +231,7 @@ body {
   /* v procentech, aby rámeček seděl na oblouk zaoblený v samotném PNG */
   border-radius: 22%;
 }
+#logo-home { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
 /* Název projektu ve stejném štítku jako nápis na ikoně aplikace */
 #logo .logo-plans {
   font-family: 'Montserrat', var(--font-main), sans-serif;
@@ -246,6 +247,16 @@ body {
   max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
+  border: none;
+  cursor: pointer;
+}
+#logo button.logo-plans:hover { background: #262626; }
+#logo input.logo-plans {
+  cursor: text;
+  outline: 2px solid var(--border);
+  outline-offset: 1px;
+  min-width: 180px;
+  text-overflow: clip;
 }
 
 /* LEVEL TABS */
@@ -1454,6 +1465,27 @@ option { background: var(--card); color: var(--text); }
   border: 1px solid var(--border);
   box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
+
+/* Sdílená bublina horní lišty – fixed, takže ji overflow:hidden neořízne */
+#ui-tip {
+  position: fixed;
+  display: none;
+  z-index: 10000;
+  background: var(--panel);
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.16);
+}
+#ui-tip.show { display: block; }
+/* V liště kreslí nápovědu #ui-tip, pseudo-prvky by se oříznuly */
+#top-bar .tb-btn[title]:hover::after,
+#top-bar [data-tip]:hover::before { content: none; display: none; }
 
 /* Level type color lines */
 .tab-type-np1::after { background: #3B82F6 !important; }
@@ -3938,6 +3970,9 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 </style>
 </head>
 <body>
+<!-- Sdílená bublinová nápověda horní lišty. Je na <body> a position:fixed,
+     takže ji neořízne overflow:hidden lišty ani panelů. -->
+<div id="ui-tip" role="tooltip"></div>
 
 <!-- PWA redirect overlay – shown when opening in a mobile browser instead of the installed app -->
 <div id="pwa-gate" style="display:none;position:fixed;inset:0;z-index:99999;
@@ -4123,10 +4158,14 @@ body.viewer-mode #kd-backup-next { display: none !important; }
 
 <!-- TOP BAR -->
 <div id="top-bar">
-  <a id="logo" href="https://besix.cz/" target="_blank" rel="noopener noreferrer">
-    <img src="/icons/icon-192.png" alt="BeSix Plans">
-    <div class="logo-plans" id="logo-project-name">PLANS</div>
-  </a>
+  <div id="logo">
+    <a id="logo-home" href="https://besix.cz/" target="_blank" rel="noopener noreferrer" aria-label="BeSix">
+      <img src="/icons/icon-192.png" alt="BeSix Plans">
+    </a>
+    <button type="button" class="logo-plans" id="logo-project-name"
+            data-tip="Klik – přepnout projekt · dvojklik – přejmenovat">PLANS</button>
+    <input type="text" id="logo-project-input" class="logo-plans" maxlength="120" hidden>
+  </div>
   <div id="topbar-actions">
   <button id="vykres-btn" class="active" title="Výkresy podlaží">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="3" width="20" height="18" rx="1"/><path d="M2 9h20M9 9v12"/></svg>
@@ -15349,6 +15388,116 @@ function updateTopbarUserInfo() {
   document.getElementById('logo-project-name').textContent = currentProject ? currentProject.name : 'PLANS';
 }
 
+// --- Štítek s názvem projektu: klik přepne projekt, dvojklik přejmenuje ---
+let _badgeClickTimer = null;
+let _renameCancelled = false;
+
+function initProjectBadge() {
+  const btn = document.getElementById('logo-project-name');
+  const inp = document.getElementById('logo-project-input');
+  if (!btn || !inp) return;
+
+  btn.addEventListener('click', () => {
+    // Na dvojklik čeká, jinak by přepnutí projektu zahodilo rozepsané přejmenování.
+    clearTimeout(_badgeClickTimer);
+    _badgeClickTimer = setTimeout(() => {
+      if (currentUser) showProjectScreen();
+    }, 230);
+  });
+
+  btn.addEventListener('dblclick', () => {
+    clearTimeout(_badgeClickTimer);
+    startProjectRename();
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); _renameCancelled = true; inp.blur(); }
+  });
+  inp.addEventListener('blur', finishProjectRename);
+}
+
+function startProjectRename() {
+  if (!currentProject) return;
+  if (currentProject.role !== 'owner') {
+    showToast('Přejmenovat projekt může jen jeho vlastník', 'error');
+    return;
+  }
+  const btn = document.getElementById('logo-project-name');
+  const inp = document.getElementById('logo-project-input');
+  inp.value = currentProject.name || '';
+  btn.hidden = true;
+  inp.hidden = false;
+  inp.focus();
+  inp.select();
+}
+
+async function finishProjectRename() {
+  const btn = document.getElementById('logo-project-name');
+  const inp = document.getElementById('logo-project-input');
+  if (inp.hidden) return;
+  const name = inp.value.trim();
+  inp.hidden = true;
+  btn.hidden = false;
+  if (_renameCancelled) { _renameCancelled = false; return; }
+  if (!name || !currentProject || name === currentProject.name) return;
+
+  const { ok, data } = await apiFetch('api/projects.php?id=' + currentProject.id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!ok) { showToast(data.error || 'Přejmenování se nepodařilo', 'error'); return; }
+  currentProject.name = name;
+  updateTopbarUserInfo();
+  showToast('Projekt přejmenován', 'success');
+}
+
+// --- Bublinová nápověda v horní liště ---
+// #top-bar má overflow:hidden, aby z něj nic nevyčnívalo, jenže tím se ořízly
+// i bublinky kreslené přes ::after. Lišta proto používá jednu sdílenou bublinu
+// na <body>, která je position:fixed, a tak ji nemá co oříznout.
+function initTopbarTips() {
+  const bar = document.getElementById('top-bar');
+  const tip = document.getElementById('ui-tip');
+  if (!bar || !tip) return;
+
+  // title přepiš na data-tip, ať prohlížeč nekreslí ještě svou vlastní bublinu.
+  // aria-label zůstává, aby o popisek nepřišly odečítače obrazovky.
+  bar.querySelectorAll('[title]').forEach(el => {
+    const t = el.getAttribute('title');
+    if (!t) return;
+    el.setAttribute('data-tip', t);
+    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', t);
+    el.removeAttribute('title');
+  });
+
+  let current = null;
+  const hide = () => { current = null; tip.classList.remove('show'); };
+  const show = el => {
+    const text = el.getAttribute('data-tip');
+    if (!text) return;
+    current = el;
+    tip.textContent = text;
+    tip.classList.add('show');
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    tip.style.left = Math.max(6, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 6)) + 'px';
+    // Pod celou lištu, ne jen pod tlačítko – jinak by bublina ležela přes lištu.
+    tip.style.top = (Math.max(r.bottom, bar.getBoundingClientRect().bottom) + 6) + 'px';
+  };
+
+  bar.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el || !bar.contains(el)) { if (current) hide(); return; }
+    if (el !== current) show(el);
+  });
+  bar.addEventListener('mouseleave', hide);
+  bar.addEventListener('mousedown', hide);
+  window.addEventListener('blur', hide);
+  window.addEventListener('scroll', hide, true);
+}
+
 // --- Nabídka účtu v liště ---
 let _userMenuCleanup = null;
 
@@ -15405,6 +15554,8 @@ function openProjectInNewWindow() {
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
   init();
+  initProjectBadge();
+  initTopbarTips();
   // Ověříme session přes API (sdílenou s board.besix.cz)
   const { ok, data } = await apiFetch('api/auth.php?action=me');
   if (ok && data.user) {
