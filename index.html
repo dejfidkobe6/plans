@@ -3454,7 +3454,9 @@ th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
   #level-dropdown {
     display: flex;
     position: fixed;
-    top: 56px;
+    /* Pod horní lištou, ne přes ni – odvozeno z výšky lišty a mezery kolem ní,
+       aby se to nerozešlo, až lišta zase změní výšku. */
+    top: calc(var(--chrome-top) + 4px);
     left: 50%;
     transform: translateX(-50%);
     width: 75%;
