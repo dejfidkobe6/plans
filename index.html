@@ -8566,7 +8566,9 @@ function drawGrid() {
 // ============================================================
 // UNDO / REDO
 // ============================================================
-const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper','linkToLevel','annotSymGen'];
+// Vlastní vlastnosti anotací, které Fabric sám neserializuje. Co tu chybí,
+// se při uložení ztratí – server si drží jen to, co dostane v objektu.
+const _JSON_FIELDS = ['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','isPolyHelper','linkToLevel','annotSymbol','annotSymGen','completedAt'];
 
 function _canvasJSON() {
   const json = fabricCanvas.toJSON(_JSON_FIELDS);
@@ -12656,16 +12658,11 @@ async function _serverSaveNow() {
   let _retryScheduled = false; // 401 retry in flight – keep _hasPendingSave true until it resolves
   // Capture active level canvas into appState before serialising
   if (fabricCanvas && appState.levels[appState.activeLevel]) {
-    const _snap = fabricCanvas.toJSON(['annotId','profese','popisek','priorita','prirazeno','status','annotType','annotLabelFor','createdAt','updatedAt','deadline','dateFrom','isBackground','linkToLevel','annotSymGen']);
-    _snap.objects = (_snap.objects || []).filter(o => o.name !== '__background__' && !o.isBackground && !o.annotLabelFor);
+    // Stejná serializace i stejný soupis jako saveCurrentLevel – dvě kopie se
+    // dřív rozešly a uložení na server pak zahazovalo část vlastností.
+    const _snap = _canvasJSON();
     appState.levels[appState.activeLevel].fabricJSON = _snap;
-    // refresh annotations list for this level
-    appState.levels[appState.activeLevel].annotations = _snap.objects.filter(o => o.annotId).map(o => ({
-      annotId: o.annotId, profese: o.profese, popisek: o.popisek,
-      priorita: o.priorita, prirazeno: o.prirazeno, status: o.status,
-      createdAt: o.createdAt || null, updatedAt: o.updatedAt || null,
-      deadline: o.deadline || null, dateFrom: o.dateFrom || null
-    }));
+    appState.levels[appState.activeLevel].annotations = _annotMetaFromCanvas();
   }
   try {
     let bodyStr;
