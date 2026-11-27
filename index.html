@@ -15723,6 +15723,29 @@ function _beaconSave() {
     const blob = new Blob([formBody], { type: 'application/x-www-form-urlencoded' });
     navigator.sendBeacon('api/canvas.php?project_id=' + currentProject.id, blob);
   } catch(e) { console.error('[beacon] save error:', e); }
+  _beaconSaveKD();
+}
+
+// Kontrolní den se ukládá vlastním endpointem s vteřinovou prodlevou. Když
+// uživatel obnoví stránku dřív, než prodleva doběhne, zápis by se ztratil –
+// proto se při odchodu ze stránky odešle i on, ne jen plátno.
+function _beaconSaveKD() {
+  if (!currentProject || !canEdit()) return;
+  if (!_kdDirty && !_kdSavePending) return;          // není co dosílat
+  if (!Array.isArray(kdRecords) || !kdRecords.length) return;
+  try {
+    const formBody = 'data=' + encodeURIComponent(JSON.stringify({ records: kdRecords }));
+    const blob = new Blob([formBody], { type: 'application/x-www-form-urlencoded' });
+    navigator.sendBeacon('api/kd.php?project_id=' + currentProject.id, blob);
+  } catch(e) { console.error('[beacon] kd save error:', e); }
+}
+
+// Okamžité odeslání všeho rozepsaného – bez čekání na prodlevu.
+function kdFlushNow() {
+  if (!currentProject) return;
+  _kdDirectSave(0);
+  clearTimeout(_srvTimer);
+  _serverSaveNow();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _beaconSave(); });
 window.addEventListener('pagehide', _beaconSave);
@@ -16359,6 +16382,10 @@ setInterval(_pollLiveSync, 2000);
   btn.addEventListener('click', () => {
     document.activeElement?.blur();
     bar.style.display = 'none';
+    // Tlačítko se jmenuje Uložit, tak ať uloží: rozepsaný kontrolní den i plátno
+    // se odešlou hned. Dřív jen zavřelo klávesnici a čekalo se na prodlevu –
+    // kdo hned obnovil stránku, o napsané přišel.
+    try { kdFlushNow(); } catch (e) { console.error('[kd] flush failed:', e); }
   });
 
   document.addEventListener('focusin', e => {
